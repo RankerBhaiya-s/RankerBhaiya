@@ -31,6 +31,10 @@ import { CurrentAffairDetail } from "./pages/student/CurrentAffairDetail";
 import { FastRevision } from "./pages/student/FastRevision";
 import Vocabulary from "./pages/student/Vocabulary";
 import ExamTips from "./pages/student/ExamTips";
+import StudyPlanner from "./pages/student/StudyPlanner";
+import PracticeQuestions from "./pages/student/PracticeQuestions";
+import ProgressTracker from "./pages/student/ProgressTracker";
+import DailyChallenge from "./pages/student/DailyChallenge";
 
 /* =====================================================
    ADMIN
@@ -187,6 +191,42 @@ export default function App() {
                   <Route
                     path="student/exam-tips"
                     element={<ExamTips />}
+                  />
+
+                  {/* =================================================
+                      STUDY PLANNER
+                  ================================================= */}
+
+                  <Route
+                    path="student/study-planner"
+                    element={<StudyPlanner />}
+                  />
+
+                  {/* =================================================
+                      PRACTICE QUESTIONS
+                  ================================================= */}
+
+                  <Route
+                    path="student/practice-questions"
+                    element={<PracticeQuestions />}
+                  />
+
+                  {/* =================================================
+                      PROGRESS TRACKER
+                  ================================================= */}
+
+                  <Route
+                    path="student/progress"
+                    element={<ProgressTracker />}
+                  />
+
+                  {/* =================================================
+                      DAILY CHALLENGE
+                  ================================================= */}
+
+                  <Route
+                    path="student/daily-challenge"
+                    element={<DailyChallenge />}
                   />
 
                 </Route>
