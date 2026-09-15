@@ -172,6 +172,26 @@ export function StudentDashboard() {
   };
 
   /* ===================================================
+     NEW FEATURES
+  =================================================== */
+
+  const handleStudyPlanner = () => {
+    navigate("/student/study-planner");
+  };
+
+  const handlePracticeQuestions = () => {
+    navigate("/student/practice-questions");
+  };
+
+  const handleProgressTracker = () => {
+    navigate("/student/progress");
+  };
+
+  const handleDailyChallenge = () => {
+    navigate("/student/daily-challenge");
+  };
+
+  /* ===================================================
      EXAM BOOSTER TEXT
   =================================================== */
 
@@ -181,9 +201,7 @@ export function StudentDashboard() {
       title: "Exam Booster",
       description:
         "Practice, test and learn to perform better in your exams.",
-
       soon: "Coming Soon",
-      live: "LIVE",
 
       pyqTitle: "PYQ Practice",
       pyqDescription:
@@ -206,9 +224,7 @@ export function StudentDashboard() {
       title: "एग्जाम बूस्टर",
       description:
         "बेहतर परीक्षा प्रदर्शन के लिए अभ्यास, टेस्ट और स्मार्ट तैयारी करें।",
-
       soon: "जल्द आ रहा है",
-      live: "लाइव",
 
       pyqTitle: "PYQ अभ्यास",
       pyqDescription:
@@ -231,9 +247,7 @@ export function StudentDashboard() {
       title: "Exam Booster",
       description:
         "Better exam performance ke liye practice, test aur smart preparation karo.",
-
       soon: "Coming Soon",
-      live: "LIVE",
 
       pyqTitle: "PYQ Practice",
       pyqDescription:
@@ -249,6 +263,93 @@ export function StudentDashboard() {
       tipsDescription:
         "Smart strategies, revision techniques aur last-minute exam tips pao.",
       tipsAction: "Tips Dekho",
+    },
+  }[language];
+
+  /* ===================================================
+     NEW OPTIONS TEXT
+  =================================================== */
+
+  const newFeaturesText = {
+    en: {
+      eyebrow: "STUDY SMART",
+      title: "Your Preparation Tools",
+      description:
+        "Plan your study, practice questions, track progress and challenge yourself every day.",
+
+      plannerTitle: "Study Planner",
+      plannerDescription:
+        "Plan your daily and weekly study goals and stay consistent with your preparation.",
+      plannerAction: "Plan Your Study",
+
+      practiceTitle: "Practice Questions",
+      practiceDescription:
+        "Solve topic-wise questions and strengthen your concepts with regular practice.",
+      practiceAction: "Practice Now",
+
+      progressTitle: "Progress Tracker",
+      progressDescription:
+        "Track your preparation, practice performance and improvement over time.",
+      progressAction: "View Progress",
+
+      challengeTitle: "Daily Challenge",
+      challengeDescription:
+        "Take a quick daily challenge, test your knowledge and build a winning streak.",
+      challengeAction: "Take Challenge",
+    },
+
+    hi: {
+      eyebrow: "स्मार्ट पढ़ाई",
+      title: "आपके तैयारी टूल्स",
+      description:
+        "अपनी पढ़ाई प्लान करें, प्रश्नों का अभ्यास करें, प्रोग्रेस ट्रैक करें और रोज़ खुद को चैलेंज करें।",
+
+      plannerTitle: "स्टडी प्लानर",
+      plannerDescription:
+        "अपनी दैनिक और साप्ताहिक पढ़ाई के लक्ष्य बनाएं और तैयारी में निरंतरता रखें।",
+      plannerAction: "पढ़ाई प्लान करें",
+
+      practiceTitle: "प्रैक्टिस प्रश्न",
+      practiceDescription:
+        "टॉपिक के अनुसार प्रश्न हल करें और नियमित अभ्यास से अपनी समझ मजबूत करें।",
+      practiceAction: "अभ्यास करें",
+
+      progressTitle: "प्रोग्रेस ट्रैकर",
+      progressDescription:
+        "अपनी तैयारी, अभ्यास प्रदर्शन और समय के साथ सुधार को ट्रैक करें।",
+      progressAction: "प्रोग्रेस देखें",
+
+      challengeTitle: "डेली चैलेंज",
+      challengeDescription:
+        "हर दिन एक छोटा चैलेंज लें, अपनी जानकारी जांचें और लगातार बेहतर बनें।",
+      challengeAction: "चैलेंज लें",
+    },
+
+    hinglish: {
+      eyebrow: "STUDY SMART",
+      title: "Your Preparation Tools",
+      description:
+        "Apni study plan karo, questions practice karo, progress track karo aur daily khud ko challenge karo.",
+
+      plannerTitle: "Study Planner",
+      plannerDescription:
+        "Daily aur weekly study goals plan karo aur preparation mein consistency maintain karo.",
+      plannerAction: "Study Plan Karo",
+
+      practiceTitle: "Practice Questions",
+      practiceDescription:
+        "Topic-wise questions solve karo aur regular practice se concepts strong karo.",
+      practiceAction: "Practice Karo",
+
+      progressTitle: "Progress Tracker",
+      progressDescription:
+        "Apni preparation, practice performance aur improvement ko time ke saath track karo.",
+      progressAction: "Progress Dekho",
+
+      challengeTitle: "Daily Challenge",
+      challengeDescription:
+        "Har din ek quick challenge lo, apni knowledge test karo aur winning streak banao.",
+      challengeAction: "Challenge Lo",
     },
   }[language];
 
@@ -707,10 +808,6 @@ export function StudentDashboard() {
                   🔥
                 </div>
 
-                <span className="rounded-full bg-orange-500 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-white">
-                  {boosterText.live}
-                </span>
-
               </div>
 
               <h3 className="relative z-10 mt-5 text-lg font-black tracking-tight text-slate-900 dark:text-white">
@@ -732,6 +829,93 @@ export function StudentDashboard() {
               <div className="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-orange-500/10 transition duration-500 group-hover:scale-150" />
 
             </button>
+
+          </div>
+        </section>
+
+        {/* ===================================================
+            NEW PREPARATION TOOLS
+        =================================================== */}
+
+        <section className="mt-10">
+
+          <div>
+
+            <div className="flex flex-wrap items-center gap-2">
+
+              <span className="text-xl">
+                🚀
+              </span>
+
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
+                {newFeaturesText.eyebrow}
+              </p>
+
+            </div>
+
+            <h2 className="mt-2 text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+              {newFeaturesText.title}
+            </h2>
+
+            <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+              {newFeaturesText.description}
+            </p>
+
+          </div>
+
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+
+            {/* STUDY PLANNER */}
+
+            <FeatureCard
+              icon="📅"
+              title={newFeaturesText.plannerTitle}
+              description={newFeaturesText.plannerDescription}
+              action={newFeaturesText.plannerAction}
+              onClick={handleStudyPlanner}
+              className="border-cyan-200 bg-gradient-to-br from-cyan-50 via-sky-50 to-blue-50 dark:border-cyan-900/50 dark:from-cyan-950/30 dark:via-sky-950/20 dark:to-blue-950/30"
+              actionClass="text-cyan-700 dark:text-cyan-400"
+              iconClass="bg-cyan-100 dark:bg-cyan-500/10"
+            />
+
+            {/* PRACTICE QUESTIONS */}
+
+            <FeatureCard
+              icon="📝"
+              title={newFeaturesText.practiceTitle}
+              description={newFeaturesText.practiceDescription}
+              action={newFeaturesText.practiceAction}
+              onClick={handlePracticeQuestions}
+              className="border-rose-200 bg-gradient-to-br from-rose-50 via-pink-50 to-orange-50 dark:border-rose-900/50 dark:from-rose-950/30 dark:via-pink-950/20 dark:to-orange-950/20"
+              actionClass="text-rose-700 dark:text-rose-400"
+              iconClass="bg-rose-100 dark:bg-rose-500/10"
+            />
+
+            {/* PROGRESS TRACKER */}
+
+            <FeatureCard
+              icon="📊"
+              title={newFeaturesText.progressTitle}
+              description={newFeaturesText.progressDescription}
+              action={newFeaturesText.progressAction}
+              onClick={handleProgressTracker}
+              className="border-emerald-200 bg-gradient-to-br from-emerald-50 via-teal-50 to-green-50 dark:border-emerald-900/50 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-green-950/20"
+              actionClass="text-emerald-700 dark:text-emerald-400"
+              iconClass="bg-emerald-100 dark:bg-emerald-500/10"
+            />
+
+            {/* DAILY CHALLENGE */}
+
+            <FeatureCard
+              icon="🔥"
+              title={newFeaturesText.challengeTitle}
+              description={newFeaturesText.challengeDescription}
+              action={newFeaturesText.challengeAction}
+              onClick={handleDailyChallenge}
+              className="border-amber-200 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:border-amber-900/50 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-orange-950/20"
+              actionClass="text-amber-700 dark:text-amber-400"
+              iconClass="bg-amber-100 dark:bg-amber-500/10"
+            />
 
           </div>
         </section>
@@ -805,6 +989,72 @@ export function StudentDashboard() {
       </footer>
 
     </div>
+  );
+}
+
+/* =====================================================
+   FEATURE CARD
+===================================================== */
+
+interface FeatureCardProps {
+  icon: string;
+  title: string;
+  description: string;
+  action: string;
+  className?: string;
+  actionClass?: string;
+  iconClass?: string;
+  onClick?: () => void;
+}
+
+function FeatureCard({
+  icon,
+  title,
+  description,
+  action,
+  className = "",
+  actionClass = "",
+  iconClass = "",
+  onClick,
+}: FeatureCardProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative w-full overflow-hidden rounded-[1.5rem] border p-5 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-6 ${className}`}
+    >
+
+      <div className="relative z-10">
+
+        <div
+          className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl shadow-sm ${iconClass}`}
+        >
+          {icon}
+        </div>
+
+        <h3 className="mt-5 text-lg font-black tracking-tight text-slate-900 dark:text-white">
+          {title}
+        </h3>
+
+        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+          {description}
+        </p>
+
+        <div
+          className={`mt-5 flex items-center gap-2 text-sm font-black ${actionClass}`}
+        >
+          {action}
+
+          <span className="transition-transform duration-300 group-hover:translate-x-1">
+            →
+          </span>
+        </div>
+
+      </div>
+
+      <div className="absolute -bottom-12 -right-12 h-32 w-32 rounded-full bg-white/30 transition duration-500 group-hover:scale-150 dark:bg-white/5" />
+
+    </button>
   );
 }
 
