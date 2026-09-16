@@ -38,10 +38,7 @@ const CATEGORY_ORDER = [
   "Reasoning",
 ];
 
-const DEFAULT_TOTALS: Record<
-  ProgressSubject,
-  number
-> = {
+const DEFAULT_TOTALS: Record<ProgressSubject, number> = {
   "Current Affairs": 25,
   English: 30,
   Reasoning: 25,
@@ -52,17 +49,12 @@ const DEFAULT_TOTALS: Record<
    HELPERS
 ===================================================== */
 
-function normalizeCategory(
-  category: string,
-): string {
+function normalizeCategory(category: string): string {
   return category.trim();
 }
 
-function getProgressSubject(
-  category: string,
-): ProgressSubject {
-  const normalized =
-    category.trim().toLowerCase();
+function getProgressSubject(category: string): ProgressSubject {
+  const normalized = category.trim().toLowerCase();
 
   if (
     normalized.includes("current") ||
@@ -87,38 +79,21 @@ function getProgressSubject(
 }
 
 function getTodayIndia(): string {
-  return new Intl.DateTimeFormat(
-    "en-CA",
-    {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    },
-  ).format(new Date());
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
-function shuffleArray<T>(
-  array: T[],
-): T[] {
+function shuffleArray<T>(array: T[]): T[] {
   const copy = [...array];
 
-  for (
-    let i = copy.length - 1;
-    i > 0;
-    i--
-  ) {
-    const j = Math.floor(
-      Math.random() * (i + 1),
-    );
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
 
-    [
-      copy[i],
-      copy[j],
-    ] = [
-      copy[j],
-      copy[i],
-    ];
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
 
   return copy;
@@ -133,80 +108,60 @@ async function updateStudentProgress(
   answers: AnswerRecord[],
   questions: Question[],
 ) {
-  const subjectCounts =
-    new Map<ProgressSubject, number>();
+  const subjectCounts = new Map<ProgressSubject, number>();
 
   for (const record of answers) {
-    const question =
-      questions.find(
-        (item) =>
-          item.id ===
-          record.questionId,
-      );
+    const question = questions.find(
+      (item) => item.id === record.questionId,
+    );
 
     if (!question) continue;
 
-    const subject =
-      getProgressSubject(
-        question.category,
-      );
+    const subject = getProgressSubject(question.category);
 
     subjectCounts.set(
       subject,
-      (subjectCounts.get(subject) ?? 0) +
-        1,
+      (subjectCounts.get(subject) ?? 0) + 1,
     );
   }
 
-  for (const [
-    subject,
-    count,
-  ] of subjectCounts.entries()) {
-    const { data: existing, error } =
-      await supabase
-        .from("student_progress")
-        .select(
-          `
-            id,
-            completed,
-            total,
-            study_minutes,
-            mock_tests,
-            current_streak
-          `,
-        )
-        .eq("user_id", userId)
-        .eq("subject", subject)
-        .maybeSingle();
+  for (const [subject, count] of subjectCounts.entries()) {
+    const { data: existing, error } = await supabase
+      .from("student_progress")
+      .select(
+        `
+          id,
+          completed,
+          total,
+          study_minutes,
+          mock_tests,
+          current_streak
+        `,
+      )
+      .eq("user_id", userId)
+      .eq("subject", subject)
+      .maybeSingle();
 
     if (error) {
-      console.error(
-        "Progress fetch error:",
-        error,
-      );
+      console.error("Progress fetch error:", error);
       continue;
     }
 
-    const studyMinutes =
-      Math.max(1, count);
+    const studyMinutes = Math.max(1, count);
 
     if (!existing) {
-      const { error: insertError } =
-        await supabase
-          .from("student_progress")
-          .insert({
-            user_id: userId,
-            subject,
-            completed: count,
-            total:
-              DEFAULT_TOTALS[subject],
-            study_minutes:
-              studyMinutes,
-            mock_tests: 0,
-            current_streak: 0,
-            updated_at:
-              new Date().toISOString(),
-          });
+      const { error: insertError } = await supabase
+        .from("student_progress")
+        .insert({
+          user_id: userId,
+          subject,
+          completed: count,
+          total: DEFAULT_TOTALS[subject],
+          study_minutes: studyMinutes,
+          mock_tests: 0,
+          current_streak: 0,
+          updated_at: new Date().toISOString(),
+        });
 
       if (insertError) {
         console.error(
@@ -218,41 +173,32 @@ async function updateStudentProgress(
       continue;
     }
 
-    const currentCompleted =
-      Number(
-        existing.completed ?? 0,
-      );
+    const currentCompleted = Number(
+      existing.completed ?? 0,
+    );
 
-    const currentMinutes =
-      Number(
-        existing.study_minutes ?? 0,
-      );
+    const currentMinutes = Number(
+      existing.study_minutes ?? 0,
+    );
 
-    const total =
-      Number(
-        existing.total ??
-          DEFAULT_TOTALS[subject],
-      );
+    const total = Number(
+      existing.total ?? DEFAULT_TOTALS[subject],
+    );
 
-    const newCompleted =
-      Math.min(
-        currentCompleted + count,
-        total,
-      );
+    const newCompleted = Math.min(
+      currentCompleted + count,
+      total,
+    );
 
-    const { error: updateError } =
-      await supabase
-        .from("student_progress")
-        .update({
-          completed: newCompleted,
-          study_minutes:
-            currentMinutes +
-            studyMinutes,
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq("id", existing.id)
-        .eq("user_id", userId);
+    const { error: updateError } = await supabase
+      .from("student_progress")
+      .update({
+        completed: newCompleted,
+        study_minutes: currentMinutes + studyMinutes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .eq("user_id", userId);
 
     if (updateError) {
       console.error(
@@ -276,8 +222,7 @@ async function updateStudyActivity(
    * 1 minute per answered question record
    * kar rahe hain.
    */
-  const minutes =
-    Math.max(1, answeredCount);
+  const minutes = Math.max(1, answeredCount);
 
   const {
     data: existing,
@@ -298,14 +243,13 @@ async function updateStudyActivity(
   }
 
   if (!existing) {
-    const { error: insertError } =
-      await supabase
-        .from("study_activity")
-        .insert({
-          user_id: userId,
-          activity_date: today,
-          minutes,
-        });
+    const { error: insertError } = await supabase
+      .from("study_activity")
+      .insert({
+        user_id: userId,
+        activity_date: today,
+        minutes,
+      });
 
     if (insertError) {
       console.error(
@@ -317,21 +261,17 @@ async function updateStudyActivity(
     return;
   }
 
-  const currentMinutes =
-    Number(
-      existing.minutes ?? 0,
-    );
+  const currentMinutes = Number(
+    existing.minutes ?? 0,
+  );
 
-  const { error: updateError } =
-    await supabase
-      .from("study_activity")
-      .update({
-        minutes:
-          currentMinutes +
-          minutes,
-      })
-      .eq("id", existing.id)
-      .eq("user_id", userId);
+  const { error: updateError } = await supabase
+    .from("study_activity")
+    .update({
+      minutes: currentMinutes + minutes,
+    })
+    .eq("id", existing.id)
+    .eq("user_id", userId);
 
   if (updateError) {
     console.error(
@@ -471,7 +411,7 @@ export default function DailyChallenge() {
         );
 
         setError(
-          "Daily Challenge questions load nahi ho paaye. Please try again.",
+          "Daily Challenge questions load nahi ho paaye. Please try again. Pareshani ke liye Maafi .",
         );
 
         setQuestions([]);
@@ -482,39 +422,30 @@ export default function DailyChallenge() {
       const formatted: Question[] =
         (data ?? [])
           .map((item) => {
-            let options: string[] =
-              [];
+            let options: string[] = [];
 
-            if (
-              Array.isArray(
-                item.options,
-              )
-            ) {
-              options =
-                item.options.filter(
-                  (
-                    option,
-                  ): option is string =>
-                    typeof option ===
-                    "string",
-                );
+            if (Array.isArray(item.options)) {
+              options = item.options.filter(
+                (
+                  option,
+                ): option is string =>
+                  typeof option === "string",
+              );
             }
 
             return {
               id: item.id,
-              category:
-                normalizeCategory(
-                  item.category ??
-                    "General Knowledge",
-                ),
+              category: normalizeCategory(
+                item.category ??
+                  "General Knowledge",
+              ),
               question:
                 item.question ?? "",
               options,
               answer:
                 item.answer ?? "",
               explanation:
-                item.explanation ??
-                "",
+                item.explanation ?? "",
               difficulty:
                 item.difficulty ??
                 "Easy",
@@ -522,12 +453,9 @@ export default function DailyChallenge() {
           })
           .filter(
             (question) =>
-              question.question.trim() !==
-                "" &&
-              question.options.length >
-                0 &&
-              question.answer.trim() !==
-                "",
+              question.question.trim() !== "" &&
+              question.options.length > 0 &&
+              question.answer.trim() !== "",
           );
 
       setQuestions(formatted);
@@ -587,51 +515,6 @@ export default function DailyChallenge() {
       ...additional,
     ];
   }, [questions]);
-
-  /* =====================================================
-     FILTER AVAILABLE QUESTIONS
-  ===================================================== */
-
-  const filteredQuestions = useMemo(() => {
-    const query =
-      searchQuery
-        .trim()
-        .toLowerCase();
-
-    return questions.filter(
-      (question) => {
-        const categoryMatch =
-          selectedCategory ===
-            "All" ||
-          question.category ===
-            selectedCategory;
-
-        const searchMatch =
-          !query ||
-          question.question
-            .toLowerCase()
-            .includes(query) ||
-          question.category
-            .toLowerCase()
-            .includes(query) ||
-          question.options.some(
-            (option) =>
-              option
-                .toLowerCase()
-                .includes(query),
-          );
-
-        return (
-          categoryMatch &&
-          searchMatch
-        );
-      },
-    );
-  }, [
-    questions,
-    selectedCategory,
-    searchQuery,
-  ]);
 
   /* =====================================================
      CREATE CHALLENGE
@@ -750,15 +633,14 @@ export default function DailyChallenge() {
       );
     }
 
-    const answerRecord: AnswerRecord =
-      {
-        questionId:
-          currentQuestion.id,
-        selectedAnswer: option,
-        correctAnswer:
-          currentQuestion.answer,
-        isCorrect,
-      };
+    const answerRecord: AnswerRecord = {
+      questionId:
+        currentQuestion.id,
+      selectedAnswer: option,
+      correctAnswer:
+        currentQuestion.answer,
+      isCorrect,
+    };
 
     setAnswers((previous) => [
       ...previous,
@@ -950,6 +832,7 @@ export default function DailyChallenge() {
     setSelectedCategory(
       category,
     );
+
     setSearchQuery("");
 
     createChallenge(
@@ -1261,15 +1144,12 @@ export default function DailyChallenge() {
                         >
                           <div className="flex items-start gap-3">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white font-black dark:bg-slate-900">
-                              {index +
-                                1}
+                              {index + 1}
                             </div>
 
                             <div className="min-w-0 flex-1">
                               <p className="font-black leading-6">
-                                {
-                                  question.question
-                                }
+                                {question.question}
                               </p>
 
                               <p className="mt-2 text-sm">
@@ -1408,6 +1288,7 @@ export default function DailyChallenge() {
                 setSelectedCategory(
                   "All",
                 );
+
                 setSearchQuery("");
 
                 createChallenge(
