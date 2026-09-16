@@ -1,1135 +1,1553 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
-import { LanguageToggle } from "../../components/LanguageToggle";
-import { getDailyMindset } from "../../data/dailyMindsets";
 
-export function StudentDashboard() {
-  const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
-  const { profile, signOut } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+type PracticeQuestion = {
+  id: string;
+  category: string;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation: string | null;
+  difficulty: string | null;
+  published: boolean;
+  created_at: string;
+};
 
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [today, setToday] = useState(() => new Date());
+type ChallengeAnswer = {
+  questionId: string;
+  selectedAnswer: string;
+  correctAnswer: string;
+  isCorrect: boolean;
+};
 
-  const menuRef = useRef<HTMLDivElement | null>(null);
+type ProgressSubject =
+  | "Current Affairs"
+  | "English"
+  | "Reasoning"
+  | "General Knowledge";
 
-  /* ===================================================
-     LANGUAGE
-  =================================================== */
+const DEFAULT_TOTALS: Record<ProgressSubject, number> = {
+  "Current Affairs": 25,
+  English: 30,
+  Reasoning: 25,
+  "General Knowledge": 25,
+};
 
-  const language =
-    i18n.resolvedLanguage === "hi"
-      ? "hi"
-      : i18n.resolvedLanguage === "hinglish"
-        ? "hinglish"
-        : "en";
+function getProgressSubject(category: string): ProgressSubject {
+  const normalized = category.trim().toLowerCase();
 
-  /* ===================================================
-     DAILY MINDSET
-  =================================================== */
+  if (
+    normalized.includes("current") ||
+    normalized.includes("affair")
+  ) {
+    return "Current Affairs";
+  }
 
-  const mindset = getDailyMindset(today);
+  if (
+    normalized.includes("english") ||
+    normalized.includes("vocab") ||
+    normalized.includes("idiom")
+  ) {
+    return "English";
+  }
 
-  const mindsetQuote =
-    mindset?.[language] ??
-    mindset?.en ??
-    "";
+  if (normalized.includes("reason")) {
+    return "Reasoning";
+  }
 
-  /* ===================================================
-     UPDATE DATE AFTER MIDNIGHT
-  =================================================== */
+  return "General Knowledge";
+}
 
-  useEffect(() => {
-    const now = new Date();
+function getTodayIndia(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
 
-    const nextMidnight = new Date(now);
-    nextMidnight.setHours(24, 0, 0, 0);
+function shuffleArray<T>(items: T[]): T[] {
+  const array = [...items];
 
-    const timeout = window.setTimeout(() => {
-      setToday(new Date());
-    }, nextMidnight.getTime() - now.getTime() + 1000);
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
 
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [today]);
+    [array[i], array[j]] = [array[j], array[i]];
+  }
 
-  /* ===================================================
-     CLOSE MENU ON OUTSIDE CLICK
-  =================================================== */
+  return array;
+}
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
-      ) {
-        setMenuOpen(false);
+function normalizeAnswer(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function parseOptions(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item));
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item));
       }
-    };
+    } catch {
+      return [];
+    }
+  }
 
-    document.addEventListener("mousedown", handleClickOutside);
+  return [];
+}
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+async function recordDailyProgress(
+  userId: string,
+  category: string
+): Promise<void> {
+  const subject = getProgressSubject(category);
+  const defaultTotal = DEFAULT_TOTALS[subject];
 
-  /* ===================================================
-     STUDENT
-  =================================================== */
+  try {
+    const { data: existing, error: fetchError } = await supabase
+      .from("student_progress")
+      .select(
+        "id, completed, total, study_minutes, mock_tests, current_streak"
+      )
+      .eq("user_id", userId)
+      .eq("subject", subject)
+      .maybeSingle();
 
-  const studentName = useMemo(() => {
-    return profile?.full_name?.trim() || "Student";
-  }, [profile]);
+    if (fetchError) {
+      console.error(
+        "Progress fetch error:",
+        fetchError.message
+      );
+      return;
+    }
 
-  /* ===================================================
-     DATE
-  =================================================== */
+    if (!existing) {
+      const { error: insertError } = await supabase
+        .from("student_progress")
+        .insert({
+          user_id: userId,
+          subject,
+          completed: 1,
+          total: defaultTotal,
+          study_minutes: 1,
+          mock_tests: 0,
+          current_streak: 0,
+          updated_at: new Date().toISOString(),
+        });
 
-  const formattedDate = useMemo(() => {
-    const locale =
-      language === "hi"
-        ? "hi-IN"
-        : "en-IN";
+      if (insertError) {
+        console.error(
+          "Progress insert error:",
+          insertError.message
+        );
+      }
 
-    return new Intl.DateTimeFormat(locale, {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).format(today);
-  }, [today, language]);
+      return;
+    }
 
-  /* ===================================================
-     DAY OF YEAR
-  =================================================== */
-
-  const mindsetDay = useMemo(() => {
-    const start = new Date(today.getFullYear(), 0, 0);
-
-    const diff =
-      today.getTime() -
-      start.getTime() +
-      (start.getTimezoneOffset() -
-        today.getTimezoneOffset()) *
-        60 *
-        1000;
-
-    const day = Math.floor(
-      diff / (1000 * 60 * 60 * 24),
+    const currentCompleted = Number(existing.completed ?? 0);
+    const currentStudyMinutes = Number(
+      existing.study_minutes ?? 0
     );
 
-    return Math.min(365, Math.max(1, day));
-  }, [today]);
+    const { error: updateError } = await supabase
+      .from("student_progress")
+      .update({
+        completed: currentCompleted + 1,
+        study_minutes: currentStudyMinutes + 1,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .eq("user_id", userId);
 
-  /* ===================================================
-     NAVIGATION
-  =================================================== */
+    if (updateError) {
+      console.error(
+        "Progress update error:",
+        updateError.message
+      );
+    }
+  } catch (error) {
+    console.error("recordDailyProgress error:", error);
+  }
+}
 
-  const handleProfile = () => {
-    setMenuOpen(false);
-    navigate("/student/profile");
-  };
+async function recordStudyActivity(
+  userId: string
+): Promise<void> {
+  const today = getTodayIndia();
 
-  const handleLogout = async () => {
-    setMenuOpen(false);
+  try {
+    const { data: existing, error: fetchError } = await supabase
+      .from("study_activity")
+      .select("id, minutes")
+      .eq("user_id", userId)
+      .eq("activity_date", today)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error(
+        "Study activity fetch error:",
+        fetchError.message
+      );
+      return;
+    }
+
+    if (!existing) {
+      const { error: insertError } = await supabase
+        .from("study_activity")
+        .insert({
+          user_id: userId,
+          activity_date: today,
+          minutes: 1,
+        });
+
+      if (insertError) {
+        console.error(
+          "Study activity insert error:",
+          insertError.message
+        );
+      }
+
+      return;
+    }
+
+    const currentMinutes = Number(existing.minutes ?? 0);
+
+    const { error: updateError } = await supabase
+      .from("study_activity")
+      .update({
+        minutes: currentMinutes + 1,
+      })
+      .eq("id", existing.id)
+      .eq("user_id", userId);
+
+    if (updateError) {
+      console.error(
+        "Study activity update error:",
+        updateError.message
+      );
+    }
+  } catch (error) {
+    console.error("recordStudyActivity error:", error);
+  }
+}
+
+export default function DailyChallenge() {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { theme } = useTheme();
+
+  const isDark = theme === "dark";
+
+  const [questions, setQuestions] = useState<PracticeQuestion[]>(
+    []
+  );
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [error, setError] = useState("");
+
+  const [category, setCategory] = useState("All");
+  const [search, setSearch] = useState("");
+
+  const [challengeQuestions, setChallengeQuestions] = useState<
+    PracticeQuestion[]
+  >([]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const [selectedAnswer, setSelectedAnswer] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const [answers, setAnswers] = useState<ChallengeAnswer[]>([]);
+
+  const [finished, setFinished] = useState(false);
+
+  const [startTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      navigate("/student/login");
+      return;
+    }
+
+    void loadQuestions();
+  }, [user, authLoading, navigate]);
+
+  async function loadQuestions() {
+    setLoading(true);
+    setError("");
 
     try {
-      await signOut();
-    } catch (error) {
-      console.error("Sign out failed:", error);
+      const { data, error: fetchError } = await supabase
+        .from("practice_questions")
+        .select(
+          `
+            id,
+            category,
+            question,
+            options,
+            answer,
+            explanation,
+            difficulty,
+            published,
+            created_at
+          `
+        )
+        .eq("published", true)
+        .order("created_at", {
+          ascending: false,
+        });
+
+      if (fetchError) {
+        console.error(fetchError);
+
+        setError(
+          fetchError.message ||
+            "Unable to load daily challenge."
+        );
+
+        return;
+      }
+
+      const formattedQuestions: PracticeQuestion[] =
+        (data ?? []).map((item) => ({
+          id: item.id,
+          category: item.category ?? "General Knowledge",
+          question: item.question ?? "",
+          options: parseOptions(item.options),
+          answer: item.answer ?? "",
+          explanation: item.explanation ?? null,
+          difficulty: item.difficulty ?? "Medium",
+          published: item.published ?? true,
+          created_at: item.created_at,
+        }));
+
+      setQuestions(formattedQuestions);
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        "Something went wrong while loading the challenge."
+      );
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
-  const handleFastRevision = () => {
-    navigate("/student/quick-revision");
-  };
+  const categories = useMemo(() => {
+    const unique = Array.from(
+      new Set(
+        questions
+          .map((question) => question.category)
+          .filter(Boolean)
+      )
+    );
 
-  const handleCurrentAffairs = () => {
-    navigate("/student/current-affairs");
-  };
+    return ["All", ...unique];
+  }, [questions]);
 
-  const handleNewspaper = () => {
-    navigate("/student/daily-newspaper");
-  };
+  const filteredQuestions = useMemo(() => {
+    const searchTerm = search.trim().toLowerCase();
 
-  const handleAskVidhya = () => {
-    navigate("/student/ask");
-  };
+    return questions.filter((question) => {
+      const matchesCategory =
+        category === "All" ||
+        question.category === category;
 
-  const handleVocabulary = () => {
-    navigate("/student/vocabulary");
-  };
+      const matchesSearch =
+        !searchTerm ||
+        question.question
+          .toLowerCase()
+          .includes(searchTerm) ||
+        question.category
+          .toLowerCase()
+          .includes(searchTerm);
 
-  const handleExamTips = () => {
-    navigate("/student/exam-tips");
-  };
+      return matchesCategory && matchesSearch;
+    });
+  }, [questions, category, search]);
 
-  /* ===================================================
-     NEW FEATURES
-  =================================================== */
+  function startChallenge() {
+    const selectedPool = filteredQuestions;
 
-  const handleStudyPlanner = () => {
-    navigate("/student/study-planner");
-  };
+    if (selectedPool.length === 0) {
+      return;
+    }
 
-  const handlePracticeQuestions = () => {
-    navigate("/student/practice-questions");
-  };
+    const shuffled = shuffleArray(selectedPool).slice(0, 10);
 
-  const handleProgressTracker = () => {
-    navigate("/student/progress");
-  };
+    setChallengeQuestions(shuffled);
+    setCurrentIndex(0);
+    setSelectedAnswer("");
+    setSubmitted(false);
+    setAnswers([]);
+    setFinished(false);
+    setError("");
+  }
 
-  const handleDailyChallenge = () => {
-    navigate("/student/daily-challenge");
-  };
+  const currentQuestion =
+    challengeQuestions[currentIndex];
 
-  /* ===================================================
-     EXAM BOOSTER TEXT
-  =================================================== */
+  const progressPercent =
+    challengeQuestions.length > 0
+      ? ((currentIndex + 1) /
+          challengeQuestions.length) *
+        100
+      : 0;
 
-  const boosterText = {
-    en: {
-      eyebrow: "LEVEL UP",
-      title: "Exam Booster",
-      description:
-        "Practice, test and learn to perform better in your exams.",
-      soon: "Coming Soon",
+  const score = useMemo(() => {
+    return answers.filter(
+      (answer) => answer.isCorrect
+    ).length;
+  }, [answers]);
 
-      pyqTitle: "PYQ Practice",
-      pyqDescription:
-        "Practice previous year questions and understand real exam patterns.",
-      pyqAction: "Practice PYQs",
+  const accuracy =
+    answers.length > 0
+      ? Math.round((score / answers.length) * 100)
+      : 0;
 
-      mockTitle: "Mock Test",
-      mockDescription:
-        "Test your preparation with exam-style questions and timed practice.",
-      mockAction: "Start Test",
+  function getOptionLetter(index: number): string {
+    return String.fromCharCode(65 + index);
+  }
 
-      tipsTitle: "Exam Tips",
-      tipsDescription:
-        "Get smart strategies, revision techniques and last-minute exam tips.",
-      tipsAction: "Learn Tips",
-    },
+  function isCorrectAnswer(
+    question: PracticeQuestion,
+    option: string
+  ): boolean {
+    return (
+      normalizeAnswer(option) ===
+      normalizeAnswer(question.answer)
+    );
+  }
 
-    hi: {
-      eyebrow: "बेहतर तैयारी",
-      title: "एग्जाम बूस्टर",
-      description:
-        "बेहतर परीक्षा प्रदर्शन के लिए अभ्यास, टेस्ट और स्मार्ट तैयारी करें।",
-      soon: "जल्द आ रहा है",
+  async function submitAnswer() {
+    if (!user || !currentQuestion || !selectedAnswer) {
+      return;
+    }
 
-      pyqTitle: "PYQ अभ्यास",
-      pyqDescription:
-        "पिछले वर्षों के प्रश्नों का अभ्यास करें और वास्तविक परीक्षा पैटर्न समझें।",
-      pyqAction: "PYQ अभ्यास करें",
+    if (submitted || saving) {
+      return;
+    }
 
-      mockTitle: "मॉक टेस्ट",
-      mockDescription:
-        "परीक्षा जैसे प्रश्नों और टाइम्ड प्रैक्टिस से अपनी तैयारी जांचें।",
-      mockAction: "टेस्ट शुरू करें",
+    setSaving(true);
+    setError("");
 
-      tipsTitle: "एग्जाम टिप्स",
-      tipsDescription:
-        "स्मार्ट रणनीतियां, रिवीजन तकनीक और अंतिम समय की परीक्षा टिप्स पाएं।",
-      tipsAction: "टिप्स देखें",
-    },
+    const isCorrect = isCorrectAnswer(
+      currentQuestion,
+      selectedAnswer
+    );
 
-    hinglish: {
-      eyebrow: "LEVEL UP",
-      title: "Exam Booster",
-      description:
-        "Better exam performance ke liye practice, test aur smart preparation karo.",
-      soon: "Coming Soon",
+    try {
+      /*
+       * 1. Save the actual attempt first.
+       */
+      const { error: attemptError } = await supabase
+        .from("practice_attempts")
+        .insert({
+          user_id: user.id,
+          question_id: currentQuestion.id,
+          selected_answer: selectedAnswer,
+          is_correct: isCorrect,
+        });
 
-      pyqTitle: "PYQ Practice",
-      pyqDescription:
-        "Previous year questions practice karo aur real exam pattern samjho.",
-      pyqAction: "PYQs Practice Karo",
+      /*
+       * If attempt saving fails, do NOT update progress.
+       * This keeps Progress Tracker consistent with actual attempts.
+       */
+      if (attemptError) {
+        console.error(
+          "Practice attempt error:",
+          attemptError.message
+        );
 
-      mockTitle: "Mock Test",
-      mockDescription:
-        "Exam-style questions aur timed practice ke saath preparation test karo.",
-      mockAction: "Test Start Karo",
+        setError(
+          "Answer save nahi ho paya. Please try again."
+        );
 
-      tipsTitle: "Exam Tips",
-      tipsDescription:
-        "Smart strategies, revision techniques aur last-minute exam tips pao.",
-      tipsAction: "Tips Dekho",
-    },
-  }[language];
+        return;
+      }
 
-  /* ===================================================
-     NEW OPTIONS TEXT
-  =================================================== */
+      /*
+       * 2. Add answer to local challenge history.
+       */
+      setAnswers((previous) => [
+        ...previous,
+        {
+          questionId: currentQuestion.id,
+          selectedAnswer,
+          correctAnswer: currentQuestion.answer,
+          isCorrect,
+        },
+      ]);
 
-  const newFeaturesText = {
-    en: {
-      eyebrow: "STUDY SMART",
-      title: "Your Preparation Tools",
-      description:
-        "Plan your study, practice questions, track progress and challenge yourself every day.",
+      /*
+       * 3. Update Progress Tracker.
+       */
+      await recordDailyProgress(
+        user.id,
+        currentQuestion.category
+      );
 
-      plannerTitle: "Study Planner",
-      plannerDescription:
-        "Plan your daily and weekly study goals and stay consistent with your preparation.",
-      plannerAction: "Plan Your Study",
+      /*
+       * 4. Update Weekly Study Activity.
+       */
+      await recordStudyActivity(user.id);
 
-      practiceTitle: "Practice Questions",
-      practiceDescription:
-        "Solve topic-wise questions and strengthen your concepts with regular practice.",
-      practiceAction: "Practice Now",
+      setSubmitted(true);
+    } catch (err) {
+      console.error(err);
 
-      progressTitle: "Progress Tracker",
-      progressDescription:
-        "Track your preparation, practice performance and improvement over time.",
-      progressAction: "View Progress",
+      setError(
+        "Something went wrong while submitting your answer."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
-      challengeTitle: "Daily Challenge",
-      challengeDescription:
-        "Take a quick daily challenge, test your knowledge and build a winning streak.",
-      challengeAction: "Take Challenge",
-    },
+  function nextQuestion() {
+    if (!currentQuestion) return;
 
-    hi: {
-      eyebrow: "स्मार्ट पढ़ाई",
-      title: "आपके तैयारी टूल्स",
-      description:
-        "अपनी पढ़ाई प्लान करें, प्रश्नों का अभ्यास करें, प्रोग्रेस ट्रैक करें और रोज़ खुद को चैलेंज करें।",
+    if (currentIndex >= challengeQuestions.length - 1) {
+      setFinished(true);
+      return;
+    }
 
-      plannerTitle: "स्टडी प्लानर",
-      plannerDescription:
-        "अपनी दैनिक और साप्ताहिक पढ़ाई के लक्ष्य बनाएं और तैयारी में निरंतरता रखें।",
-      plannerAction: "पढ़ाई प्लान करें",
+    setCurrentIndex((previous) => previous + 1);
+    setSelectedAnswer("");
+    setSubmitted(false);
+  }
 
-      practiceTitle: "प्रैक्टिस प्रश्न",
-      practiceDescription:
-        "टॉपिक के अनुसार प्रश्न हल करें और नियमित अभ्यास से अपनी समझ मजबूत करें।",
-      practiceAction: "अभ्यास करें",
+  function previousQuestion() {
+    if (currentIndex <= 0) return;
 
-      progressTitle: "प्रोग्रेस ट्रैकर",
-      progressDescription:
-        "अपनी तैयारी, अभ्यास प्रदर्शन और समय के साथ सुधार को ट्रैक करें।",
-      progressAction: "प्रोग्रेस देखें",
+    setCurrentIndex((previous) => previous - 1);
 
-      challengeTitle: "डेली चैलेंज",
-      challengeDescription:
-        "हर दिन एक छोटा चैलेंज लें, अपनी जानकारी जांचें और लगातार बेहतर बनें।",
-      challengeAction: "चैलेंज लें",
-    },
+    const previousQuestionId =
+      challengeQuestions[currentIndex - 1]?.id;
 
-    hinglish: {
-      eyebrow: "STUDY SMART",
-      title: "Your Preparation Tools",
-      description:
-        "Apni study plan karo, questions practice karo, progress track karo aur daily khud ko challenge karo.",
+    const previousAnswer = answers.find(
+      (answer) =>
+        answer.questionId === previousQuestionId
+    );
 
-      plannerTitle: "Study Planner",
-      plannerDescription:
-        "Daily aur weekly study goals plan karo aur preparation mein consistency maintain karo.",
-      plannerAction: "Study Plan Karo",
+    setSelectedAnswer(
+      previousAnswer?.selectedAnswer ?? ""
+    );
 
-      practiceTitle: "Practice Questions",
-      practiceDescription:
-        "Topic-wise questions solve karo aur regular practice se concepts strong karo.",
-      practiceAction: "Practice Karo",
+    setSubmitted(Boolean(previousAnswer));
+  }
 
-      progressTitle: "Progress Tracker",
-      progressDescription:
-        "Apni preparation, practice performance aur improvement ko time ke saath track karo.",
-      progressAction: "Progress Dekho",
+  function retryChallenge() {
+    startChallenge();
+  }
 
-      challengeTitle: "Daily Challenge",
-      challengeDescription:
-        "Har din ek quick challenge lo, apni knowledge test karo aur winning streak banao.",
-      challengeAction: "Challenge Lo",
-    },
-  }[language];
+  function exitChallenge() {
+    setChallengeQuestions([]);
+    setCurrentIndex(0);
+    setSelectedAnswer("");
+    setSubmitted(false);
+    setAnswers([]);
+    setFinished(false);
+    setError("");
+  }
 
+  function getResultMessage() {
+    if (accuracy >= 90) {
+      return "Excellent performance! 🔥";
+    }
+
+    if (accuracy >= 70) {
+      return "Great work! Keep going. 💪";
+    }
+
+    if (accuracy >= 50) {
+      return "Good attempt. More practice will help. 📚";
+    }
+
+    return "Keep practicing. Every attempt makes you better. 🚀";
+  }
+
+  const challengeStarted =
+    challengeQuestions.length > 0 && !finished;
+
+  /*
+   * Auth loading
+   */
+  if (authLoading) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          isDark
+            ? "bg-slate-950 text-white"
+            : "bg-slate-50 text-slate-900"
+        }`}
+      >
+        <div className="text-center">
+          <div className="text-4xl mb-3 animate-pulse">
+            🔥
+          </div>
+
+          <p className="font-semibold">
+            Loading Daily Challenge...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /*
+   * Main page
+   */
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-
-      {/* ===================================================
-          HEADER
-      =================================================== */}
-
-      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-
-          {/* LOGO */}
-
+    <div
+      className={`min-h-screen transition-colors duration-300 ${
+        isDark
+          ? "bg-slate-950 text-white"
+          : "bg-slate-50 text-slate-900"
+      }`}
+    >
+      {/* Header */}
+      <header
+        className={`sticky top-0 z-40 border-b backdrop-blur-xl ${
+          isDark
+            ? "bg-slate-950/90 border-slate-800"
+            : "bg-white/90 border-slate-200"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <button
-            type="button"
             onClick={() => navigate("/student/dashboard")}
-            className="group flex items-center gap-3"
+            className={`flex items-center gap-2 font-semibold transition ${
+              isDark
+                ? "text-slate-200 hover:text-white"
+                : "text-slate-700 hover:text-slate-950"
+            }`}
           >
-            <img
-              src={`${import.meta.env.BASE_URL}favicon.png`}
-              alt="Ranker Bhaiya"
-              className="h-10 w-10 rounded-xl object-cover shadow-lg shadow-blue-500/20 transition group-hover:scale-105"
-            />
-
-            <div className="hidden text-left sm:block">
-              <div className="text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                Ranker <span className="text-yellow-500">Bhaiya</span>
-              </div>
-
-              <div className="text-[10px] font-medium tracking-wide text-slate-400">
-                Aapki Mehnat&nbsp; · &nbsp;Hamari Strategy
-              </div>
-            </div>
+            <span className="text-xl">←</span>
+            <span className="hidden sm:inline">
+              Dashboard
+            </span>
           </button>
 
-          {/* RIGHT SIDE */}
+          <div className="text-center">
+            <h1 className="font-black text-lg sm:text-xl">
+              🔥 Daily Challenge
+            </h1>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-
-            <LanguageToggle />
-
-            {/* THEME */}
-
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label="Toggle theme"
-              className="flex h-10 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 text-sm shadow-sm transition hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+            <p
+              className={`text-xs ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
             >
-              <span>
-                {theme === "dark" ? "🌙" : "☀️"}
-              </span>
-            </button>
-
-            {/* STUDENT */}
-
-            <div className="hidden items-center gap-3 sm:flex">
-
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-black text-white shadow-md shadow-blue-500/20">
-                {studentName.charAt(0).toUpperCase()}
-              </div>
-
-              <div className="hidden text-left md:block">
-
-                <p className="text-xs font-bold text-slate-900 dark:text-white">
-                  {studentName}
-                </p>
-
-                <p className="text-[10px] text-slate-400">
-                  {profile?.email ?? "Student"}
-                </p>
-
-              </div>
-            </div>
-
-            {/* MENU */}
-
-            <div
-              className="relative"
-              ref={menuRef}
-            >
-              <button
-                type="button"
-                onClick={() =>
-                  setMenuOpen((value) => !value)
-                }
-                aria-label={t("dashboard.openMenu")}
-                aria-expanded={menuOpen}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
-              >
-                ⋮
-              </button>
-
-              {menuOpen && (
-                <div className="absolute right-0 top-12 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900">
-
-                  <button
-                    type="button"
-                    onClick={handleProfile}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    <span>👤</span>
-                    {t("dashboard.menu.profile")}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
-                  >
-                    <span>↪</span>
-                    {t("dashboard.menu.logout")}
-                  </button>
-
-                </div>
-              )}
-            </div>
-
+              Test yourself every day
+            </p>
           </div>
+
+          <button
+            onClick={() => navigate("/student/progress")}
+            className="px-3 sm:px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition"
+          >
+            📊 Progress
+          </button>
         </div>
       </header>
 
-      {/* ===================================================
-          MAIN
-      =================================================== */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Hero */}
+        {!challengeStarted && !finished && (
+          <section className="relative overflow-hidden rounded-3xl p-6 sm:p-10 mb-8 bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 text-white shadow-2xl">
+            <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-black/10 rounded-full blur-3xl" />
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-
-        {/* ===================================================
-            TODAY'S MINDSET
-        =================================================== */}
-
-        <section className="group relative isolate overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_20px_70px_-30px_rgba(37,99,235,0.25)] dark:border-slate-800 dark:bg-slate-900">
-
-          <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-blue-500/15 blur-3xl" />
-
-          <div className="absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-violet-500/15 blur-3xl" />
-
-          <div className="absolute right-1/4 top-0 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
-
-          <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.035] dark:opacity-[0.05]">
-            <div
-              className="h-full w-full"
-              style={{
-                backgroundImage:
-                  "linear-gradient(#2563eb 1px, transparent 1px), linear-gradient(90deg, #2563eb 1px, transparent 1px)",
-                backgroundSize: "32px 32px",
-              }}
-            />
-          </div>
-
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
-
-          <div className="relative grid min-h-[320px] items-center gap-8 px-6 py-8 sm:px-10 sm:py-10 lg:grid-cols-[1fr_240px] lg:px-12">
-
-            <div className="relative z-10">
-
-              <div className="flex flex-wrap items-center gap-3">
-
-                <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-blue-600 backdrop-blur-sm dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-400">
-
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
-
-                  {t("dashboard.mindset.label")}
-
-                </div>
-
-                <span className="rounded-full border border-slate-200 bg-white/70 px-3 py-1.5 text-xs font-medium text-slate-500 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">
-                  {formattedDate}
-                </span>
-
+            <div className="relative z-10 max-w-3xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 border border-white/20 text-xs font-bold mb-4">
+                🔥 DAILY PRACTICE
               </div>
 
-              <div className="relative mt-7 max-w-4xl">
-
-                <span className="pointer-events-none absolute -left-5 -top-12 select-none font-serif text-[110px] font-black leading-none text-blue-600/[0.07] dark:text-blue-400/[0.08] sm:-left-7 sm:-top-14 sm:text-[140px]">
-                  “
-                </span>
-
-                <blockquote className="relative text-3xl font-black leading-[1.08] tracking-[-0.03em] text-slate-950 dark:text-white sm:text-4xl lg:text-5xl xl:text-[3.5rem]">
-                  {mindsetQuote}
-                </blockquote>
-
-              </div>
-
-              <div className="mt-7 flex items-center gap-3">
-
-                <div className="h-px w-8 bg-blue-500/50" />
-
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                  {t("dashboard.mindset.subtitle")}
-                </p>
-
-              </div>
-
-              <div className="mt-6 flex items-center gap-3">
-
-                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div className="h-full w-[62%] rounded-full bg-gradient-to-r from-blue-500 to-violet-500" />
-                </div>
-
-                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Daily Growth
-                </span>
-
-              </div>
-
-            </div>
-
-            {/* DESKTOP MINDSET COUNTER */}
-
-            <div className="relative hidden h-56 items-center justify-center lg:flex">
-
-              <div className="absolute h-48 w-48 rounded-full border border-blue-500/10" />
-              <div className="absolute h-40 w-40 rounded-full border border-violet-500/10" />
-              <div className="absolute h-32 w-32 rounded-full border border-cyan-500/10" />
-              <div className="absolute h-28 w-28 rounded-full bg-blue-500/10 blur-2xl" />
-
-              <div className="relative flex h-28 w-28 flex-col items-center justify-center rounded-full border border-white/70 bg-white/75 shadow-[0_15px_45px_-15px_rgba(37,99,235,0.35)] backdrop-blur-xl dark:border-slate-700 dark:bg-slate-800/75">
-
-                <span className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-                  {mindsetDay}
-                </span>
-
-                <span className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                  / 365
-                </span>
-
-                <span className="mt-1 text-[8px] font-black uppercase tracking-[0.18em] text-blue-500">
-                  Mindset
-                </span>
-
-              </div>
-
-              <span className="absolute left-1 top-7 h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_14px_rgba(59,130,246,0.8)]" />
-              <span className="absolute bottom-7 right-4 h-1.5 w-1.5 rounded-full bg-violet-500 shadow-[0_0_12px_rgba(139,92,246,0.8)]" />
-              <span className="absolute right-5 top-4 h-1 w-1 rounded-full bg-cyan-400" />
-              <span className="absolute bottom-10 left-8 h-1 w-1 rounded-full bg-blue-400" />
-
-            </div>
-
-          </div>
-        </section>
-
-        {/* ===================================================
-            WELCOME
-        =================================================== */}
-
-        <section className="relative mt-6 overflow-hidden rounded-[2rem] bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-6 py-7 text-white shadow-[0_20px_50px_-20px_rgba(37,99,235,0.45)] sm:px-10">
-
-          <div className="absolute -right-10 -top-20 h-52 w-52 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -bottom-24 right-20 h-56 w-56 rounded-full bg-violet-300/10 blur-3xl" />
-
-          <div className="relative z-10">
-
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">
-              👋 {t("dashboard.welcomeBack")}
-            </p>
-
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-              {studentName}
-            </h1>
-
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100 sm:text-base">
-              {t("dashboard.welcomeDescription")}
-            </p>
-
-          </div>
-
-          <div className="pointer-events-none absolute right-8 top-1/2 hidden -translate-y-1/2 text-[100px] opacity-10 lg:block">
-            🧠
-          </div>
-
-        </section>
-
-        {/* ===================================================
-            PRIMARY LEARNING
-        =================================================== */}
-
-        <section className="mt-10">
-
-          <div className="grid gap-5 md:grid-cols-3">
-
-            <DashboardCard
-              icon="⚡"
-              title={t("dashboard.fastRevision.title")}
-              description={t("dashboard.fastRevision.description")}
-              action={t("dashboard.fastRevision.action")}
-              badge={t("dashboard.fastRevision.badge")}
-              badgeClass="bg-violet-600"
-              className="border-violet-200 bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 dark:border-violet-900/50 dark:from-violet-950/30 dark:via-purple-950/20 dark:to-fuchsia-950/20"
-              actionClass="text-violet-700 dark:text-violet-400"
-              onClick={handleFastRevision}
-            />
-
-            <DashboardCard
-              icon="📰"
-              title={t("dashboard.currentAffairs.title")}
-              description={t("dashboard.currentAffairs.description")}
-              action={t("dashboard.currentAffairs.action")}
-              badge={t("dashboard.currentAffairs.badge")}
-              badgeClass="bg-emerald-600"
-              className="border-emerald-200 bg-gradient-to-br from-emerald-50 via-teal-50 to-green-50 dark:border-emerald-900/50 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-green-950/20"
-              actionClass="text-emerald-700 dark:text-emerald-400"
-              onClick={handleCurrentAffairs}
-            />
-
-            <DashboardCard
-              icon="🗞️"
-              title={t("dashboard.newspaper.title")}
-              description={t("dashboard.newspaper.description")}
-              action={t("dashboard.newspaper.action")}
-              badge={t("dashboard.newspaper.badge")}
-              badgeClass="bg-blue-600"
-              className="border-blue-200 bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 dark:border-blue-900/50 dark:from-blue-950/30 dark:via-sky-950/20 dark:to-indigo-950/30"
-              actionClass="text-blue-700 dark:text-blue-400"
-              onClick={handleNewspaper}
-            />
-
-          </div>
-        </section>
-
-        {/* ===================================================
-            EXAM BOOSTER
-        =================================================== */}
-
-        <section className="mt-10">
-
-          <div className="flex items-end justify-between gap-4">
-
-            <div>
-
-              <div className="flex flex-wrap items-center gap-2">
-
-                <span className="text-xl">
-                  🎯
-                </span>
-
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
-                  {boosterText.eyebrow}
-                </p>
-
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-blue-600 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-400">
-                  {boosterText.soon}
-                </span>
-
-              </div>
-
-              <h2 className="mt-2 text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
-                {boosterText.title}
+              <h2 className="text-3xl sm:text-5xl font-black leading-tight">
+                Challenge Yourself.
+                <br />
+                Improve Every Day.
               </h2>
 
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {boosterText.description}
+              <p className="mt-4 text-white/85 max-w-2xl text-sm sm:text-base leading-relaxed">
+                Practice random questions, track your accuracy,
+                and build a consistent study habit with Daily
+                Challenge.
               </p>
 
+              <div className="flex flex-wrap gap-3 mt-6">
+                <div className="px-4 py-2 rounded-xl bg-white/15 border border-white/20">
+                  <div className="font-black text-lg">
+                    10
+                  </div>
+                  <div className="text-xs text-white/75">
+                    Questions
+                  </div>
+                </div>
+
+                <div className="px-4 py-2 rounded-xl bg-white/15 border border-white/20">
+                  <div className="font-black text-lg">
+                    ⚡
+                  </div>
+                  <div className="text-xs text-white/75">
+                    Quick Practice
+                  </div>
+                </div>
+
+                <div className="px-4 py-2 rounded-xl bg-white/15 border border-white/20">
+                  <div className="font-black text-lg">
+                    📊
+                  </div>
+                  <div className="text-xs text-white/75">
+                    Progress Tracking
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div
+            className={`mb-6 rounded-2xl border px-4 py-3 text-sm ${
+              isDark
+                ? "bg-red-950/40 border-red-900 text-red-300"
+                : "bg-red-50 border-red-200 text-red-700"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <span>⚠️</span>
+
+              <div className="flex-1">
+                <p className="font-semibold">
+                  {error}
+                </p>
+
+                <button
+                  onClick={() => setError("")}
+                  className="mt-1 text-xs underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading */}
+        {loading && (
+          <div className="py-20 text-center">
+            <div className="text-5xl animate-pulse mb-4">
+              🔥
             </div>
 
+            <p className="font-semibold">
+              Preparing your challenge...
+            </p>
+
+            <p
+              className={`text-sm mt-1 ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Loading questions
+            </p>
           </div>
+        )}
 
-          <div className="mt-5 grid gap-5 md:grid-cols-3">
+        {/* Selection Screen */}
+        {!loading &&
+          !challengeStarted &&
+          !finished && (
+            <>
+              {/* Filters */}
+              <section
+                className={`rounded-3xl border p-5 sm:p-6 mb-8 ${
+                  isDark
+                    ? "bg-slate-900 border-slate-800"
+                    : "bg-white border-slate-200 shadow-sm"
+                }`}
+              >
+                <div className="flex flex-col lg:flex-row gap-5">
+                  <div className="flex-1">
+                    <label
+                      className={`block text-sm font-bold mb-2 ${
+                        isDark
+                          ? "text-slate-200"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      Search Questions
+                    </label>
 
-            {/* PYQ */}
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2">
+                        🔍
+                      </span>
 
-            <button
-              type="button"
-              onClick={() => undefined}
-              className="group relative overflow-hidden rounded-[1.5rem] border border-blue-200 bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 p-6 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-blue-900/50 dark:from-blue-950/30 dark:via-sky-950/20 dark:to-indigo-950/30"
-            >
-
-              <div className="relative z-10 flex items-start justify-between gap-4">
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-slate-900/70">
-                  🎯
+                      <input
+                        value={search}
+                        onChange={(event) =>
+                          setSearch(event.target.value)
+                        }
+                        placeholder="Search questions..."
+                        className={`w-full pl-11 pr-4 py-3 rounded-xl border outline-none transition ${
+                          isDark
+                            ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500"
+                            : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
+                        }`}
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <span className="rounded-full bg-blue-600 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-white">
-                  {boosterText.soon}
-                </span>
+                <div className="mt-5">
+                  <div
+                    className={`text-sm font-bold mb-3 ${
+                      isDark
+                        ? "text-slate-200"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    Choose Category
+                  </div>
 
-              </div>
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {categories.map((item) => {
+                      const active =
+                        category === item;
 
-              <h3 className="relative z-10 mt-5 text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                {boosterText.pyqTitle}
-              </h3>
-
-              <p className="relative z-10 mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                {boosterText.pyqDescription}
-              </p>
-
-              <div className="relative z-10 mt-5 flex items-center gap-2 text-sm font-black text-blue-700 dark:text-blue-400">
-                {boosterText.pyqAction}
-
-                <span className="transition-transform duration-300 group-hover:translate-x-1">
-                  →
-                </span>
-              </div>
-
-              <div className="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-blue-500/10 transition duration-500 group-hover:scale-150" />
-
-            </button>
-
-            {/* MOCK TEST */}
-
-            <button
-              type="button"
-              onClick={() => undefined}
-              className="group relative overflow-hidden rounded-[1.5rem] border border-violet-200 bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 p-6 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-violet-900/50 dark:from-violet-950/30 dark:via-purple-950/20 dark:to-fuchsia-950/30"
-            >
-
-              <div className="relative z-10 flex items-start justify-between gap-4">
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-slate-900/70">
-                  📝
+                      return (
+                        <button
+                          key={item}
+                          onClick={() =>
+                            setCategory(item)
+                          }
+                          className={`shrink-0 px-4 py-2 rounded-xl text-sm font-bold transition ${
+                            active
+                              ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
+                              : isDark
+                              ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+              </section>
 
-                <span className="rounded-full bg-violet-600 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-white">
-                  {boosterText.soon}
-                </span>
-
-              </div>
-
-              <h3 className="relative z-10 mt-5 text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                {boosterText.mockTitle}
-              </h3>
-
-              <p className="relative z-10 mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                {boosterText.mockDescription}
-              </p>
-
-              <div className="relative z-10 mt-5 flex items-center gap-2 text-sm font-black text-violet-700 dark:text-violet-400">
-                {boosterText.mockAction}
-
-                <span className="transition-transform duration-300 group-hover:translate-x-1">
-                  →
-                </span>
-              </div>
-
-              <div className="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-violet-500/10 transition duration-500 group-hover:scale-150" />
-
-            </button>
-
-            {/* EXAM TIPS */}
-
-            <button
-              type="button"
-              onClick={handleExamTips}
-              className="group relative overflow-hidden rounded-[1.5rem] border border-orange-200 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 p-6 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-orange-900/50 dark:from-orange-950/30 dark:via-amber-950/20 dark:to-yellow-950/30"
-            >
-
-              <div className="relative z-10 flex items-start justify-between gap-4">
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-slate-900/70">
+              {/* Start card */}
+              <section
+                className={`rounded-3xl border p-8 sm:p-12 text-center ${
+                  isDark
+                    ? "bg-slate-900 border-slate-800"
+                    : "bg-white border-slate-200 shadow-sm"
+                }`}
+              >
+                <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-4xl shadow-xl">
                   🔥
                 </div>
 
+                <h3 className="mt-6 text-2xl sm:text-3xl font-black">
+                  Ready for today's challenge?
+                </h3>
+
+                <p
+                  className={`max-w-xl mx-auto mt-3 text-sm sm:text-base ${
+                    isDark
+                      ? "text-slate-400"
+                      : "text-slate-500"
+                  }`}
+                >
+                  We'll randomly select up to 10 questions
+                  from your selected category.
+                </p>
+
+                <div className="flex flex-wrap justify-center gap-3 mt-6">
+                  <div
+                    className={`px-4 py-3 rounded-2xl ${
+                      isDark
+                        ? "bg-slate-800"
+                        : "bg-slate-100"
+                    }`}
+                  >
+                    <div className="font-black text-lg">
+                      {Math.min(
+                        filteredQuestions.length,
+                        10
+                      )}
+                    </div>
+
+                    <div
+                      className={`text-xs ${
+                        isDark
+                          ? "text-slate-400"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      Questions
+                    </div>
+                  </div>
+
+                  <div
+                    className={`px-4 py-3 rounded-2xl ${
+                      isDark
+                        ? "bg-slate-800"
+                        : "bg-slate-100"
+                    }`}
+                  >
+                    <div className="font-black text-lg">
+                      {filteredQuestions.length}
+                    </div>
+
+                    <div
+                      className={`text-xs ${
+                        isDark
+                          ? "text-slate-400"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      Available
+                    </div>
+                  </div>
+                </div>
+
+                {filteredQuestions.length === 0 ? (
+                  <div
+                    className={`mt-7 p-4 rounded-2xl text-sm ${
+                      isDark
+                        ? "bg-yellow-950/30 text-yellow-300"
+                        : "bg-yellow-50 text-yellow-700"
+                    }`}
+                  >
+                    No questions found for this filter.
+                    Try another category or search.
+                  </div>
+                ) : (
+                  <button
+                    onClick={startChallenge}
+                    className="mt-8 px-8 py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black text-base shadow-xl shadow-red-500/20 hover:scale-[1.02] active:scale-[0.98] transition"
+                  >
+                    🚀 Start Challenge
+                  </button>
+                )}
+              </section>
+            </>
+          )}
+
+        {/* Challenge */}
+        {challengeStarted && currentQuestion && (
+          <section className="max-w-4xl mx-auto">
+            {/* Top controls */}
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <button
+                onClick={exitChallenge}
+                className={`text-sm font-semibold ${
+                  isDark
+                    ? "text-slate-400 hover:text-white"
+                    : "text-slate-600 hover:text-slate-950"
+                }`}
+              >
+                ← Exit
+              </button>
+
+              <div
+                className={`text-sm font-bold ${
+                  isDark
+                    ? "text-slate-300"
+                    : "text-slate-600"
+                }`}
+              >
+                Question {currentIndex + 1} of{" "}
+                {challengeQuestions.length}
               </div>
-
-              <h3 className="relative z-10 mt-5 text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                {boosterText.tipsTitle}
-              </h3>
-
-              <p className="relative z-10 mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                {boosterText.tipsDescription}
-              </p>
-
-              <div className="relative z-10 mt-5 flex items-center gap-2 text-sm font-black text-orange-700 dark:text-orange-400">
-                {boosterText.tipsAction}
-
-                <span className="transition-transform duration-300 group-hover:translate-x-1">
-                  →
-                </span>
-              </div>
-
-              <div className="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-orange-500/10 transition duration-500 group-hover:scale-150" />
-
-            </button>
-
-          </div>
-        </section>
-
-        {/* ===================================================
-            NEW PREPARATION TOOLS
-        =================================================== */}
-
-        <section className="mt-10">
-
-          <div>
-
-            <div className="flex flex-wrap items-center gap-2">
-
-              <span className="text-xl">
-                🚀
-              </span>
-
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
-                {newFeaturesText.eyebrow}
-              </p>
-
             </div>
 
-            <h2 className="mt-2 text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
-              {newFeaturesText.title}
-            </h2>
+            {/* Progress */}
+            <div
+              className={`h-2 rounded-full overflow-hidden mb-6 ${
+                isDark
+                  ? "bg-slate-800"
+                  : "bg-slate-200"
+              }`}
+            >
+              <div
+                className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
+                style={{
+                  width: `${progressPercent}%`,
+                }}
+              />
+            </div>
 
-            <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-              {newFeaturesText.description}
-            </p>
+            {/* Question card */}
+            <div
+              className={`rounded-3xl border overflow-hidden ${
+                isDark
+                  ? "bg-slate-900 border-slate-800"
+                  : "bg-white border-slate-200 shadow-sm"
+              }`}
+            >
+              {/* Question header */}
+              <div
+                className={`px-5 sm:px-8 py-5 border-b ${
+                  isDark
+                    ? "border-slate-800"
+                    : "border-slate-200"
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-500 text-xs font-black">
+                    {currentQuestion.category}
+                  </span>
 
-          </div>
+                  {currentQuestion.difficulty && (
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        currentQuestion.difficulty
+                          .toLowerCase()
+                          .includes("hard")
+                          ? "bg-red-500/10 text-red-500"
+                          : currentQuestion.difficulty
+                              .toLowerCase()
+                              .includes("easy")
+                          ? "bg-green-500/10 text-green-500"
+                          : "bg-yellow-500/10 text-yellow-600"
+                      }`}
+                    >
+                      {currentQuestion.difficulty}
+                    </span>
+                  )}
+                </div>
+              </div>
 
-          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Question */}
+              <div className="p-5 sm:p-8">
+                <h2 className="text-xl sm:text-2xl font-black leading-relaxed">
+                  {currentQuestion.question}
+                </h2>
 
-            {/* STUDY PLANNER */}
+                {/* Options */}
+                <div className="mt-7 space-y-3">
+                  {currentQuestion.options.map(
+                    (option, index) => {
+                      const isSelected =
+                        selectedAnswer === option;
 
-            <FeatureCard
-              icon="📅"
-              title={newFeaturesText.plannerTitle}
-              description={newFeaturesText.plannerDescription}
-              action={newFeaturesText.plannerAction}
-              onClick={handleStudyPlanner}
-              className="border-cyan-200 bg-gradient-to-br from-cyan-50 via-sky-50 to-blue-50 dark:border-cyan-900/50 dark:from-cyan-950/30 dark:via-sky-950/20 dark:to-blue-950/30"
-              actionClass="text-cyan-700 dark:text-cyan-400"
-              iconClass="bg-cyan-100 dark:bg-cyan-500/10"
-            />
+                      const correct =
+                        isCorrectAnswer(
+                          currentQuestion,
+                          option
+                        );
 
-            {/* PRACTICE QUESTIONS */}
+                      let optionClass = "";
 
-            <FeatureCard
-              icon="📝"
-              title={newFeaturesText.practiceTitle}
-              description={newFeaturesText.practiceDescription}
-              action={newFeaturesText.practiceAction}
-              onClick={handlePracticeQuestions}
-              className="border-rose-200 bg-gradient-to-br from-rose-50 via-pink-50 to-orange-50 dark:border-rose-900/50 dark:from-rose-950/30 dark:via-pink-950/20 dark:to-orange-950/20"
-              actionClass="text-rose-700 dark:text-rose-400"
-              iconClass="bg-rose-100 dark:bg-rose-500/10"
-            />
+                      if (submitted) {
+                        if (correct) {
+                          optionClass =
+                            "border-green-500 bg-green-500/10";
+                        } else if (isSelected) {
+                          optionClass =
+                            "border-red-500 bg-red-500/10";
+                        } else {
+                          optionClass = isDark
+                            ? "border-slate-700 opacity-70"
+                            : "border-slate-200 opacity-70";
+                        }
+                      } else if (isSelected) {
+                        optionClass =
+                          "border-blue-500 bg-blue-500/10";
+                      } else {
+                        optionClass = isDark
+                          ? "border-slate-700 hover:border-blue-500"
+                          : "border-slate-200 hover:border-blue-400";
+                      }
 
-            {/* PROGRESS TRACKER */}
+                      return (
+                        <button
+                          key={`${currentQuestion.id}-${index}`}
+                          onClick={() => {
+                            if (!submitted) {
+                              setSelectedAnswer(option);
+                            }
+                          }}
+                          disabled={
+                            submitted || saving
+                          }
+                          className={`w-full text-left p-4 rounded-2xl border-2 transition ${optionClass} ${
+                            submitted
+                              ? "cursor-default"
+                              : "cursor-pointer"
+                          }`}
+                        >
+                          <div className="flex items-start gap-4">
+                            <span
+                              className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center font-black ${
+                                submitted &&
+                                correct
+                                  ? "bg-green-500 text-white"
+                                  : submitted &&
+                                    isSelected
+                                  ? "bg-red-500 text-white"
+                                  : isSelected
+                                  ? "bg-blue-600 text-white"
+                                  : isDark
+                                  ? "bg-slate-800 text-slate-300"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {getOptionLetter(
+                                index
+                              )}
+                            </span>
 
-            <FeatureCard
-              icon="📊"
-              title={newFeaturesText.progressTitle}
-              description={newFeaturesText.progressDescription}
-              action={newFeaturesText.progressAction}
-              onClick={handleProgressTracker}
-              className="border-emerald-200 bg-gradient-to-br from-emerald-50 via-teal-50 to-green-50 dark:border-emerald-900/50 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-green-950/20"
-              actionClass="text-emerald-700 dark:text-emerald-400"
-              iconClass="bg-emerald-100 dark:bg-emerald-500/10"
-            />
+                            <span className="pt-1 font-semibold text-sm sm:text-base">
+                              {option}
+                            </span>
 
-            {/* DAILY CHALLENGE */}
+                            {submitted &&
+                              correct && (
+                                <span className="ml-auto text-green-500 font-black">
+                                  ✓
+                                </span>
+                              )}
 
-            <FeatureCard
-              icon="🔥"
-              title={newFeaturesText.challengeTitle}
-              description={newFeaturesText.challengeDescription}
-              action={newFeaturesText.challengeAction}
-              onClick={handleDailyChallenge}
-              className="border-amber-200 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:border-amber-900/50 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-orange-950/20"
-              actionClass="text-amber-700 dark:text-amber-400"
-              iconClass="bg-amber-100 dark:bg-amber-500/10"
-            />
+                            {submitted &&
+                              isSelected &&
+                              !correct && (
+                                <span className="ml-auto text-red-500 font-black">
+                                  ✕
+                                </span>
+                              )}
+                          </div>
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
 
-          </div>
-        </section>
+                {/* Feedback */}
+                {submitted && (
+                  <div
+                    className={`mt-6 rounded-2xl p-5 ${
+                      answers[
+                        answers.length - 1
+                      ]?.isCorrect
+                        ? isDark
+                          ? "bg-green-950/30 border border-green-900"
+                          : "bg-green-50 border border-green-200"
+                        : isDark
+                        ? "bg-red-950/30 border border-red-900"
+                        : "bg-red-50 border border-red-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-black">
+                      {answers[
+                        answers.length - 1
+                      ]?.isCorrect
+                        ? "🎉 Correct Answer!"
+                        : "❌ Incorrect Answer"}
+                    </div>
 
-        {/* ===================================================
-            SECONDARY LEARNING
-        =================================================== */}
+                    {!answers[
+                      answers.length - 1
+                    ]?.isCorrect && (
+                      <p className="mt-2 text-sm">
+                        <span className="font-bold">
+                          Correct answer:
+                        </span>{" "}
+                        {currentQuestion.answer}
+                      </p>
+                    )}
 
-        <section className="mt-10">
+                    {currentQuestion.explanation && (
+                      <div className="mt-3">
+                        <p className="text-xs uppercase tracking-wider font-black opacity-60">
+                          Explanation
+                        </p>
 
-          <div className="grid gap-5 md:grid-cols-3">
+                        <p className="mt-1 text-sm leading-relaxed">
+                          {
+                            currentQuestion.explanation
+                          }
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-            <DashboardCard
-              icon="🤖"
-              title={t("dashboard.askVidhya.title")}
-              description={t("dashboard.askVidhya.description")}
-              action={t("dashboard.askVidhya.action")}
-              badge={t("dashboard.askVidhya.badge")}
-              badgeClass="bg-blue-600"
-              className="border-blue-200 bg-gradient-to-br from-blue-50 via-indigo-50 to-violet-50 dark:border-blue-900/50 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-violet-950/30"
-              actionClass="text-blue-700 dark:text-blue-400"
-              onClick={handleAskVidhya}
-            />
+                {/* Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 mt-7">
+                  <button
+                    onClick={previousQuestion}
+                    disabled={
+                      currentIndex === 0 || saving
+                    }
+                    className={`px-5 py-3 rounded-xl font-bold transition ${
+                      currentIndex === 0
+                        ? "opacity-40 cursor-not-allowed"
+                        : isDark
+                        ? "bg-slate-800 hover:bg-slate-700"
+                        : "bg-slate-100 hover:bg-slate-200"
+                    }`}
+                  >
+                    ← Previous
+                  </button>
 
-            <DashboardCard
-              icon="📖"
-              title={t("dashboard.vocabulary.title")}
-              description={t("dashboard.vocabulary.description")}
-              action={t("dashboard.vocabulary.action")}
-              badge={t("dashboard.vocabulary.badge")}
-              badgeClass="bg-violet-600"
-              className="border-violet-200 bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-50 dark:border-violet-900/50 dark:from-violet-950/30 dark:via-purple-950/20 dark:to-indigo-950/20"
-              actionClass="text-violet-700 dark:text-violet-400"
-              onClick={handleVocabulary}
-            />
+                  {!submitted ? (
+                    <button
+                      onClick={submitAnswer}
+                      disabled={
+                        !selectedAnswer || saving
+                      }
+                      className={`flex-1 px-5 py-3 rounded-xl font-black text-white transition ${
+                        !selectedAnswer || saving
+                          ? "bg-blue-400 cursor-not-allowed"
+                          : "bg-blue-600 hover:bg-blue-700"
+                      }`}
+                    >
+                      {saving
+                        ? "Saving..."
+                        : "Submit Answer"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={nextQuestion}
+                      className="flex-1 px-5 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black hover:opacity-95 transition"
+                    >
+                      {currentIndex ===
+                      challengeQuestions.length - 1
+                        ? "🏁 Finish Challenge"
+                        : "Next Question →"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
 
-            <DashboardCard
-              icon="▶️"
-              title={t("dashboard.videos.title")}
-              description={t("dashboard.videos.description")}
-              action={t("dashboard.videos.action")}
-              badge={t("dashboard.videos.badge")}
-              badgeClass="bg-slate-500"
-              className="border-slate-200 bg-gradient-to-br from-slate-50 via-blue-50 to-sky-50 dark:border-slate-700 dark:from-slate-900 dark:via-blue-950/20 dark:to-sky-950/20"
-              actionClass="text-slate-600 dark:text-slate-300"
-              onClick={() => undefined}
-            />
+            {/* Live score */}
+            <div className="mt-5 flex justify-center">
+              <div
+                className={`px-5 py-3 rounded-2xl ${
+                  isDark
+                    ? "bg-slate-900 border border-slate-800"
+                    : "bg-white border border-slate-200 shadow-sm"
+                }`}
+              >
+                <span className="text-sm font-bold">
+                  Current Score:{" "}
+                </span>
 
-          </div>
-        </section>
+                <span className="text-orange-500 font-black">
+                  {score}
+                </span>
 
+                <span
+                  className={
+                    isDark
+                      ? "text-slate-500"
+                      : "text-slate-400"
+                  }
+                >
+                  {" "}
+                  / {answers.length}
+                </span>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Result Screen */}
+        {finished && (
+          <section className="max-w-4xl mx-auto">
+            <div
+              className={`rounded-3xl border overflow-hidden ${
+                isDark
+                  ? "bg-slate-900 border-slate-800"
+                  : "bg-white border-slate-200 shadow-sm"
+              }`}
+            >
+              {/* Result Hero */}
+              <div className="bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 text-white p-8 sm:p-12 text-center">
+                <div className="text-6xl mb-4">
+                  {accuracy >= 70
+                    ? "🏆"
+                    : accuracy >= 50
+                    ? "🔥"
+                    : "💪"}
+                </div>
+
+                <h2 className="text-3xl sm:text-4xl font-black">
+                  Challenge Complete!
+                </h2>
+
+                <p className="mt-2 text-white/80">
+                  {getResultMessage()}
+                </p>
+
+                <div className="mt-8">
+                  <div className="text-6xl sm:text-7xl font-black">
+                    {score}/{challengeQuestions.length}
+                  </div>
+
+                  <div className="mt-2 text-white/80 font-bold">
+                    {accuracy}% Accuracy
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-5 sm:p-7">
+                <div
+                  className={`rounded-2xl p-4 text-center ${
+                    isDark
+                      ? "bg-slate-800"
+                      : "bg-slate-50"
+                  }`}
+                >
+                  <div className="text-2xl font-black text-green-500">
+                    {score}
+                  </div>
+
+                  <div className="text-xs mt-1 opacity-60">
+                    Correct
+                  </div>
+                </div>
+
+                <div
+                  className={`rounded-2xl p-4 text-center ${
+                    isDark
+                      ? "bg-slate-800"
+                      : "bg-slate-50"
+                  }`}
+                >
+                  <div className="text-2xl font-black text-red-500">
+                    {answers.length - score}
+                  </div>
+
+                  <div className="text-xs mt-1 opacity-60">
+                    Incorrect
+                  </div>
+                </div>
+
+                <div
+                  className={`rounded-2xl p-4 text-center ${
+                    isDark
+                      ? "bg-slate-800"
+                      : "bg-slate-50"
+                  }`}
+                >
+                  <div className="text-2xl font-black text-blue-500">
+                    {answers.length}
+                  </div>
+
+                  <div className="text-xs mt-1 opacity-60">
+                    Attempted
+                  </div>
+                </div>
+
+                <div
+                  className={`rounded-2xl p-4 text-center ${
+                    isDark
+                      ? "bg-slate-800"
+                      : "bg-slate-50"
+                  }`}
+                >
+                  <div className="text-2xl font-black text-orange-500">
+                    +{answers.length}
+                  </div>
+
+                  <div className="text-xs mt-1 opacity-60">
+                    Progress
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress message */}
+              <div className="px-5 sm:px-7">
+                <div
+                  className={`rounded-2xl p-4 flex items-start gap-3 ${
+                    isDark
+                      ? "bg-blue-950/30 border border-blue-900"
+                      : "bg-blue-50 border border-blue-200"
+                  }`}
+                >
+                  <span className="text-xl">
+                    📊
+                  </span>
+
+                  <div>
+                    <p className="font-black text-sm">
+                      Progress Updated
+                    </p>
+
+                    <p
+                      className={`text-xs mt-1 ${
+                        isDark
+                          ? "text-blue-300"
+                          : "text-blue-700"
+                      }`}
+                    >
+                      Your Daily Challenge attempts have
+                      been added to Progress Tracker and
+                      today's study activity.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Review */}
+              <div className="p-5 sm:p-7">
+                <h3 className="text-xl font-black mb-4">
+                  📝 Answer Review
+                </h3>
+
+                <div className="space-y-3">
+                  {challengeQuestions.map(
+                    (question, index) => {
+                      const answer = answers.find(
+                        (item) =>
+                          item.questionId ===
+                          question.id
+                      );
+
+                      if (!answer) return null;
+
+                      return (
+                        <div
+                          key={question.id}
+                          className={`rounded-2xl border p-4 ${
+                            answer.isCorrect
+                              ? isDark
+                                ? "border-green-900 bg-green-950/20"
+                                : "border-green-200 bg-green-50"
+                              : isDark
+                              ? "border-red-900 bg-red-950/20"
+                              : "border-red-200 bg-red-50"
+                          }`}
+                        >
+                          <div className="flex gap-3">
+                            <div
+                              className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center font-black text-white ${
+                                answer.isCorrect
+                                  ? "bg-green-500"
+                                  : "bg-red-500"
+                              }`}
+                            >
+                              {index + 1}
+                            </div>
+
+                            <div className="flex-1">
+                              <p className="font-bold text-sm leading-relaxed">
+                                {question.question}
+                              </p>
+
+                              <div className="mt-2 text-xs space-y-1">
+                                <p>
+                                  <span className="font-bold">
+                                    Your answer:
+                                  </span>{" "}
+                                  {answer.selectedAnswer}
+                                </p>
+
+                                {!answer.isCorrect && (
+                                  <p>
+                                    <span className="font-bold">
+                                      Correct:
+                                    </span>{" "}
+                                    {answer.correctAnswer}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-lg">
+                              {answer.isCorrect
+                                ? "✓"
+                                : "✕"}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+
+                {/* Result actions */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-7">
+                  <button
+                    onClick={retryChallenge}
+                    className="px-5 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-black hover:opacity-95 transition"
+                  >
+                    🔄 Try Again
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      navigate("/student/progress")
+                    }
+                    className={`px-5 py-3 rounded-xl font-black transition ${
+                      isDark
+                        ? "bg-slate-800 hover:bg-slate-700"
+                        : "bg-slate-100 hover:bg-slate-200"
+                    }`}
+                  >
+                    📊 View Progress
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      navigate("/student/dashboard")
+                    }
+                    className={`px-5 py-3 rounded-xl font-black transition ${
+                      isDark
+                        ? "bg-slate-800 hover:bg-slate-700"
+                        : "bg-slate-100 hover:bg-slate-200"
+                    }`}
+                  >
+                    🏠 Dashboard
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
-      {/* ===================================================
-          FOOTER
-      =================================================== */}
-
-      <footer className="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-
-          <div className="text-sm font-black tracking-tight text-slate-900 dark:text-white">
-            Ranker <span className="text-yellow-500">Bhaiya</span>
-          </div>
-
-          <p className="text-center text-xs text-slate-400 sm:text-right">
-            {t("dashboard.footer.tagline")}
-          </p>
-
-        </div>
+      {/* Footer */}
+      <footer
+        className={`py-8 text-center text-xs ${
+          isDark
+            ? "text-slate-600"
+            : "text-slate-400"
+        }`}
+      >
+        Ranker Bhaiya • Daily Challenge
       </footer>
-
     </div>
   );
 }
-
-/* =====================================================
-   FEATURE CARD
-===================================================== */
-
-interface FeatureCardProps {
-  icon: string;
-  title: string;
-  description: string;
-  action: string;
-  className?: string;
-  actionClass?: string;
-  iconClass?: string;
-  onClick?: () => void;
-}
-
-function FeatureCard({
-  icon,
-  title,
-  description,
-  action,
-  className = "",
-  actionClass = "",
-  iconClass = "",
-  onClick,
-}: FeatureCardProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group relative w-full overflow-hidden rounded-[1.5rem] border p-5 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-6 ${className}`}
-    >
-
-      <div className="relative z-10">
-
-        <div
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl shadow-sm ${iconClass}`}
-        >
-          {icon}
-        </div>
-
-        <h3 className="mt-5 text-lg font-black tracking-tight text-slate-900 dark:text-white">
-          {title}
-        </h3>
-
-        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-          {description}
-        </p>
-
-        <div
-          className={`mt-5 flex items-center gap-2 text-sm font-black ${actionClass}`}
-        >
-          {action}
-
-          <span className="transition-transform duration-300 group-hover:translate-x-1">
-            →
-          </span>
-        </div>
-
-      </div>
-
-      <div className="absolute -bottom-12 -right-12 h-32 w-32 rounded-full bg-white/30 transition duration-500 group-hover:scale-150 dark:bg-white/5" />
-
-    </button>
-  );
-}
-
-/* =====================================================
-   DASHBOARD CARD
-===================================================== */
-
-interface DashboardCardProps {
-  icon: string;
-  title: string;
-  description: string;
-  action: string;
-  badge?: string;
-  badgeClass?: string;
-  className?: string;
-  actionClass?: string;
-  onClick?: () => void;
-}
-
-function DashboardCard({
-  icon,
-  title,
-  description,
-  action,
-  badge,
-  badgeClass = "",
-  className = "",
-  actionClass = "",
-  onClick,
-}: DashboardCardProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`group relative w-full overflow-hidden rounded-[1.5rem] border p-6 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-7 ${className}`}
-    >
-
-      <div className="relative z-10 flex items-start justify-between gap-4">
-
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-3xl shadow-sm dark:bg-slate-900/60">
-          {icon}
-        </div>
-
-        {badge && (
-          <span
-            className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-white ${badgeClass}`}
-          >
-            {badge}
-          </span>
-        )}
-
-      </div>
-
-      <h3 className="relative z-10 mt-6 text-xl font-black tracking-tight text-slate-900 dark:text-white">
-        {title}
-      </h3>
-
-      <p className="relative z-10 mt-2 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-400">
-        {description}
-      </p>
-
-      <span
-        className={`relative z-10 mt-5 inline-flex items-center gap-2 text-sm font-black ${actionClass}`}
-      >
-        {action}
-
-        <span className="transition-transform duration-300 group-hover:translate-x-1">
-          →
-        </span>
-      </span>
-
-      <div className="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-white/20 transition duration-500 group-hover:scale-150 dark:bg-white/5" />
-
-    </button>
-  );
-}
-
-export default StudentDashboard;
