@@ -1,28 +1,49 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../../lib/supabase";
 
-type Task = {
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+
+type StudyTask = {
   id: string;
+  user_id: string;
   subject: string;
   topic: string;
   duration: number;
   completed: boolean;
-  task_date: string;
-  created_at?: string;
+  created_at: string;
 };
 
-const DURATION_OPTIONS = [
-  15,
-  30,
-  45,
-  60,
-  90,
-  120,
+type ProgressSubject =
+  | "Current Affairs"
+  | "English"
+  | "Reasoning"
+  | "General Knowledge";
+
+const DEFAULT_TOTALS: Record<ProgressSubject, number> = {
+  "Current Affairs": 25,
+  English: 30,
+  Reasoning: 25,
+  "General Knowledge": 25,
+};
+
+const DEFAULT_TASKS = [
+  {
+    subject: "Current Affairs",
+    topic: "Daily Current Affairs",
+    duration: 30,
+  },
+  {
+    subject: "English",
+    topic: "Vocabulary & Idioms",
+    duration: 30,
+  },
+  {
+    subject: "Revision",
+    topic: "Fast Revision",
+    duration: 45,
+  },
 ];
 
 const SUBJECTS = [
@@ -31,42 +52,222 @@ const SUBJECTS = [
   "Reasoning",
   "General Knowledge",
   "Mathematics",
+  "Science",
+  "Revision",
   "Other",
 ];
 
-const getToday = () => {
-  const now = new Date();
+const DURATIONS = [15, 30, 45, 60, 90, 120];
 
-  const year = now.getFullYear();
-  const month = String(
-    now.getMonth() + 1,
-  ).padStart(2, "0");
-  const day = String(
-    now.getDate(),
-  ).padStart(2, "0");
+function getProgressSubject(
+  subject: string
+): ProgressSubject {
+  const normalized = subject.trim().toLowerCase();
 
-  return `${year}-${month}-${day}`;
-};
+  if (
+    normalized.includes("current") ||
+    normalized.includes("affair")
+  ) {
+    return "Current Affairs";
+  }
 
-const formatDate = (date: string) => {
-  const value = new Date(`${date}T00:00:00`);
+  if (
+    normalized.includes("english") ||
+    normalized.includes("vocab") ||
+    normalized.includes("idiom")
+  ) {
+    return "English";
+  }
 
-  return value.toLocaleDateString(
-    "en-IN",
-    {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    },
-  );
-};
+  if (normalized.includes("reason")) {
+    return "Reasoning";
+  }
+
+  return "General Knowledge";
+}
+
+function getTodayIndia(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+async function updateProgressAfterStudy(
+  userId: string,
+  subject: string,
+  duration: number
+): Promise<void> {
+  const progressSubject =
+    getProgressSubject(subject);
+
+  const defaultTotal =
+    DEFAULT_TOTALS[progressSubject];
+
+  try {
+    const { data: existing, error: fetchError } =
+      await supabase
+        .from("student_progress")
+        .select(
+          "id, completed, total, study_minutes, mock_tests, current_streak"
+        )
+        .eq("user_id", userId)
+        .eq("subject", progressSubject)
+        .maybeSingle();
+
+    if (fetchError) {
+      console.error(
+        "Progress fetch error:",
+        fetchError.message
+      );
+      return;
+    }
+
+    if (!existing) {
+      const { error: insertError } =
+        await supabase
+          .from("student_progress")
+          .insert({
+            user_id: userId,
+            subject: progressSubject,
+            completed: 1,
+            total: defaultTotal,
+            study_minutes: duration,
+            mock_tests: 0,
+            current_streak: 0,
+            updated_at:
+              new Date().toISOString(),
+          });
+
+      if (insertError) {
+        console.error(
+          "Progress insert error:",
+          insertError.message
+        );
+      }
+
+      return;
+    }
+
+    const currentCompleted = Number(
+      existing.completed ?? 0
+    );
+
+    const currentMinutes = Number(
+      existing.study_minutes ?? 0
+    );
+
+    const { error: updateError } =
+      await supabase
+        .from("student_progress")
+        .update({
+          completed: currentCompleted + 1,
+          study_minutes:
+            currentMinutes + duration,
+          updated_at:
+            new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+        .eq("user_id", userId);
+
+    if (updateError) {
+      console.error(
+        "Progress update error:",
+        updateError.message
+      );
+    }
+  } catch (error) {
+    console.error(
+      "updateProgressAfterStudy error:",
+      error
+    );
+  }
+}
+
+async function updateStudyActivity(
+  userId: string,
+  minutes: number
+): Promise<void> {
+  const today = getTodayIndia();
+
+  try {
+    const { data: existing, error: fetchError } =
+      await supabase
+        .from("study_activity")
+        .select("id, minutes")
+        .eq("user_id", userId)
+        .eq("activity_date", today)
+        .maybeSingle();
+
+    if (fetchError) {
+      console.error(
+        "Study activity fetch error:",
+        fetchError.message
+      );
+      return;
+    }
+
+    if (!existing) {
+      const { error: insertError } =
+        await supabase
+          .from("study_activity")
+          .insert({
+            user_id: userId,
+            activity_date: today,
+            minutes,
+          });
+
+      if (insertError) {
+        console.error(
+          "Study activity insert error:",
+          insertError.message
+        );
+      }
+
+      return;
+    }
+
+    const currentMinutes = Number(
+      existing.minutes ?? 0
+    );
+
+    const { error: updateError } =
+      await supabase
+        .from("study_activity")
+        .update({
+          minutes: currentMinutes + minutes,
+        })
+        .eq("id", existing.id)
+        .eq("user_id", userId);
+
+    if (updateError) {
+      console.error(
+        "Study activity update error:",
+        updateError.message
+      );
+    }
+  } catch (error) {
+    console.error(
+      "updateStudyActivity error:",
+      error
+    );
+  }
+}
 
 export default function StudyPlanner() {
   const navigate = useNavigate();
 
-  const [tasks, setTasks] = useState<Task[]>(
-    [],
+  const { user, loading: authLoading } =
+    useAuth();
+
+  const { theme } = useTheme();
+
+  const isDark = theme === "dark";
+
+  const [tasks, setTasks] = useState<StudyTask[]>(
+    []
   );
 
   const [loading, setLoading] =
@@ -81,614 +282,938 @@ export default function StudyPlanner() {
   const [showAddTask, setShowAddTask] =
     useState(false);
 
-  const [newSubject, setNewSubject] =
+  const [subject, setSubject] =
+    useState("Current Affairs");
+
+  const [topic, setTopic] =
     useState("");
 
-  const [newTopic, setNewTopic] =
-    useState("");
+  const [duration, setDuration] =
+    useState(30);
 
-  const [newDuration, setNewDuration] =
-    useState("30");
-
-  const today = getToday();
-
-  /* =====================================================
-     LOAD TODAY'S TASKS
-  ===================================================== */
+  /*
+   * --------------------------------------------------
+   * AUTH + LOAD
+   * --------------------------------------------------
+   */
 
   useEffect(() => {
-    loadTasks();
-  }, []);
+    if (authLoading) return;
 
-  const loadTasks = async () => {
-    setLoading(true);
-    setError("");
+    if (!user) {
+      navigate("/student/login");
+      return;
+    }
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    void loadTasks();
+  }, [
+    user,
+    authLoading,
+    navigate,
+  ]);
 
-    if (userError || !user) {
+  async function loadTasks() {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const { data, error: fetchError } =
+        await supabase
+          .from("study_tasks")
+          .select(
+            `
+              id,
+              user_id,
+              subject,
+              topic,
+              duration,
+              completed,
+              created_at
+            `
+          )
+          .eq("user_id", user.id)
+          .order("created_at", {
+            ascending: true,
+          });
+
+      if (fetchError) {
+        console.error(fetchError);
+
+        /*
+         * If table doesn't exist yet, show a useful
+         * error instead of silently failing.
+         */
+        setError(
+          fetchError.message ||
+            "Study Planner load nahi ho paya."
+        );
+
+        return;
+      }
+
+      setTasks(data ?? []);
+
+      /*
+       * First-time user ke liye default tasks.
+       */
+      if (!data || data.length === 0) {
+        await createDefaultTasks();
+      }
+    } catch (err) {
+      console.error(err);
+
       setError(
-        "Please login to use your Study Planner.",
+        "Study Planner load karte waqt error aa gaya."
       );
+    } finally {
       setLoading(false);
-      return;
     }
+  }
 
-    const { data, error: fetchError } =
-      await supabase
-        .from("study_tasks")
-        .select(
-          `
-            id,
-            subject,
-            topic,
-            duration,
-            completed,
-            task_date,
-            created_at
-          `,
-        )
-        .eq("user_id", user.id)
-        .eq("task_date", today)
-        .order("created_at", {
-          ascending: true,
-        });
+  async function createDefaultTasks() {
+    if (!user) return;
 
-    if (fetchError) {
-      console.error(
-        "Failed to load study tasks:",
-        fetchError,
-      );
-
-      setError(
-        "Unable to load your study plan. Please try again.",
-      );
-
-      setTasks([]);
-      setLoading(false);
-      return;
-    }
-
-    setTasks(data ?? []);
-    setLoading(false);
-  };
-
-  /* =====================================================
-     ADD TASK
-  ===================================================== */
-
-  const addTask = async () => {
-    const subject = newSubject.trim();
-    const topic = newTopic.trim();
-    const duration =
-      Number(newDuration) || 30;
-
-    if (!subject) {
-      setError("Please select a subject.");
-      return;
-    }
-
-    if (!topic) {
-      setError("Please enter a topic.");
-      return;
-    }
-
-    if (duration <= 0) {
-      setError(
-        "Please select a valid duration.",
-      );
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      setError(
-        "Your session has expired. Please login again.",
-      );
-      setSaving(false);
-      return;
-    }
-
-    const { data, error: insertError } =
-      await supabase
-        .from("study_tasks")
-        .insert({
+    try {
+      const rows = DEFAULT_TASKS.map(
+        (task) => ({
           user_id: user.id,
-          subject,
-          topic,
-          duration,
+          subject: task.subject,
+          topic: task.topic,
+          duration: task.duration,
           completed: false,
-          task_date: today,
         })
-        .select(
-          `
-            id,
-            subject,
-            topic,
-            duration,
-            completed,
-            task_date,
-            created_at
-          `,
-        )
-        .single();
+      );
 
-    if (insertError) {
+      const { data, error: insertError } =
+        await supabase
+          .from("study_tasks")
+          .insert(rows)
+          .select(
+            `
+              id,
+              user_id,
+              subject,
+              topic,
+              duration,
+              completed,
+              created_at
+            `
+          );
+
+      if (insertError) {
+        console.error(
+          "Default task insert error:",
+          insertError.message
+        );
+        return;
+      }
+
+      setTasks(data ?? []);
+    } catch (error) {
       console.error(
-        "Failed to add study task:",
-        insertError,
+        "createDefaultTasks error:",
+        error
       );
+    }
+  }
 
+  /*
+   * --------------------------------------------------
+   * ADD TASK
+   * --------------------------------------------------
+   */
+
+  async function handleAddTask() {
+    if (!user) return;
+
+    const cleanTopic = topic.trim();
+
+    if (!cleanTopic) {
       setError(
-        "Unable to add task. Please try again.",
+        "Please task ka topic enter karo."
       );
-
-      setSaving(false);
       return;
     }
 
-    if (data) {
-      setTasks((current) => [
-        ...current,
-        data,
-      ]);
+    try {
+      setSaving(true);
+      setError("");
+
+      const { data, error: insertError } =
+        await supabase
+          .from("study_tasks")
+          .insert({
+            user_id: user.id,
+            subject,
+            topic: cleanTopic,
+            duration,
+            completed: false,
+          })
+          .select(
+            `
+              id,
+              user_id,
+              subject,
+              topic,
+              duration,
+              completed,
+              created_at
+            `
+          )
+          .single();
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      if (data) {
+        setTasks((previous) => [
+          ...previous,
+          data,
+        ]);
+      }
+
+      setTopic("");
+      setSubject("Current Affairs");
+      setDuration(30);
+      setShowAddTask(false);
+    } catch (err: any) {
+      console.error(err);
+
+      setError(
+        err?.message ||
+          "Task add nahi ho paya."
+      );
+    } finally {
+      setSaving(false);
     }
+  }
 
-    setNewSubject("");
-    setNewTopic("");
-    setNewDuration("30");
-    setShowAddTask(false);
-    setSaving(false);
-  };
+  /*
+   * --------------------------------------------------
+   * TOGGLE TASK
+   * --------------------------------------------------
+   */
 
-  /* =====================================================
-     TOGGLE TASK
-  ===================================================== */
-
-  const toggleTask = async (
-    task: Task,
-  ) => {
-    setError("");
+  async function toggleTask(
+    task: StudyTask
+  ) {
+    if (!user || saving) return;
 
     const newCompleted =
       !task.completed;
 
-    const { error: updateError } =
-      await supabase
-        .from("study_tasks")
-        .update({
-          completed: newCompleted,
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq("id", task.id);
+    try {
+      setSaving(true);
+      setError("");
 
-    if (updateError) {
-      console.error(
-        "Failed to update task:",
-        updateError,
+      /*
+       * Update DB first.
+       */
+      const { error: updateError } =
+        await supabase
+          .from("study_tasks")
+          .update({
+            completed: newCompleted,
+          })
+          .eq("id", task.id)
+          .eq("user_id", user.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      /*
+       * Update local UI.
+       */
+      setTasks((previous) =>
+        previous.map((item) =>
+          item.id === task.id
+            ? {
+                ...item,
+                completed:
+                  newCompleted,
+              }
+            : item
+        )
       );
+
+      /*
+       * IMPORTANT:
+       *
+       * Progress sirf task COMPLETE karne par
+       * update hoga.
+       *
+       * Uncomplete karne par progress ko minus
+       * nahi kar rahe, because study activity
+       * already represent actual study performed.
+       */
+      if (newCompleted) {
+        await updateProgressAfterStudy(
+          user.id,
+          task.subject,
+          task.duration
+        );
+
+        await updateStudyActivity(
+          user.id,
+          task.duration
+        );
+      }
+    } catch (err: any) {
+      console.error(err);
 
       setError(
-        "Unable to update task. Please try again.",
+        err?.message ||
+          "Task status update nahi ho paya."
       );
-
-      return;
+    } finally {
+      setSaving(false);
     }
+  }
 
-    setTasks((current) =>
-      current.map((item) =>
-        item.id === task.id
-          ? {
-              ...item,
-              completed: newCompleted,
-            }
-          : item,
-      ),
-    );
-  };
+  /*
+   * --------------------------------------------------
+   * DELETE TASK
+   * --------------------------------------------------
+   */
 
-  /* =====================================================
-     DELETE TASK
-  ===================================================== */
+  async function deleteTask(
+    task: StudyTask
+  ) {
+    if (!user || saving) return;
 
-  const deleteTask = async (
-    id: string,
-  ) => {
-    setError("");
-
-    const { error: deleteError } =
-      await supabase
-        .from("study_tasks")
-        .delete()
-        .eq("id", id);
-
-    if (deleteError) {
-      console.error(
-        "Failed to delete task:",
-        deleteError,
+    const confirmed =
+      window.confirm(
+        `"${task.topic}" task delete karna hai?`
       );
+
+    if (!confirmed) return;
+
+    try {
+      setSaving(true);
+      setError("");
+
+      const { error: deleteError } =
+        await supabase
+          .from("study_tasks")
+          .delete()
+          .eq("id", task.id)
+          .eq("user_id", user.id);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      setTasks((previous) =>
+        previous.filter(
+          (item) => item.id !== task.id
+        )
+      );
+    } catch (err: any) {
+      console.error(err);
 
       setError(
-        "Unable to delete task. Please try again.",
+        err?.message ||
+          "Task delete nahi ho paya."
       );
-
-      return;
+    } finally {
+      setSaving(false);
     }
+  }
 
-    setTasks((current) =>
-      current.filter(
-        (task) => task.id !== id,
-      ),
-    );
-  };
-
-  /* =====================================================
-     STATS
-  ===================================================== */
+  /*
+   * --------------------------------------------------
+   * STATS
+   * --------------------------------------------------
+   */
 
   const totalTasks = tasks.length;
 
-  const completedTasks = useMemo(
-    () =>
-      tasks.filter(
-        (task) => task.completed,
-      ).length,
-    [tasks],
+  const completedTasks =
+    tasks.filter(
+      (task) => task.completed
+    ).length;
+
+  const pendingTasks =
+    totalTasks - completedTasks;
+
+  const totalStudyMinutes = tasks.reduce(
+    (sum, task) =>
+      sum +
+      (task.completed
+        ? task.duration
+        : 0),
+    0
   );
 
-  const totalMinutes = useMemo(
-    () =>
-      tasks.reduce(
-        (total, task) =>
-          total + task.duration,
-        0,
-      ),
-    [tasks],
+  const plannedMinutes = tasks.reduce(
+    (sum, task) =>
+      sum + task.duration,
+    0
   );
 
-  const completedMinutes = useMemo(
-    () =>
-      tasks
-        .filter(
-          (task) => task.completed,
-        )
-        .reduce(
-          (total, task) =>
-            total + task.duration,
-          0,
-        ),
-    [tasks],
-  );
-
-  const progress =
-    totalTasks === 0
-      ? 0
-      : Math.round(
+  const progressPercent =
+    totalTasks > 0
+      ? Math.round(
           (completedTasks /
             totalTasks) *
-            100,
-        );
+            100
+        )
+      : 0;
 
-  /* =====================================================
-     FORMAT STUDY TIME
-  ===================================================== */
+  const groupedTasks = useMemo(() => {
+    const groups: Record<
+      string,
+      StudyTask[]
+    > = {};
 
-  const formatMinutes = (
-    minutes: number,
-  ) => {
-    if (minutes < 60) {
-      return `${minutes} min`;
+    for (const task of tasks) {
+      if (!groups[task.subject]) {
+        groups[task.subject] = [];
+      }
+
+      groups[task.subject].push(task);
     }
 
-    const hours = Math.floor(
-      minutes / 60,
+    return groups;
+  }, [tasks]);
+
+  /*
+   * --------------------------------------------------
+   * LOADING
+   * --------------------------------------------------
+   */
+
+  if (authLoading || loading) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          isDark
+            ? "bg-slate-950 text-white"
+            : "bg-slate-50 text-slate-900"
+        }`}
+      >
+        <div className="text-center">
+          <div className="text-5xl animate-pulse mb-4">
+            📅
+          </div>
+
+          <p className="font-black text-lg">
+            Loading Study Planner...
+          </p>
+
+          <p
+            className={`text-sm mt-1 ${
+              isDark
+                ? "text-slate-400"
+                : "text-slate-500"
+            }`}
+          >
+            Preparing your study plan
+          </p>
+        </div>
+      </div>
     );
+  }
 
-    const remaining =
-      minutes % 60;
-
-    if (remaining === 0) {
-      return `${hours} hr`;
-    }
-
-    return `${hours} hr ${remaining} min`;
-  };
-
-  /* =====================================================
-     RENDER
-  ===================================================== */
+  /*
+   * --------------------------------------------------
+   * MAIN UI
+   * --------------------------------------------------
+   */
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-white">
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                navigate(
-                  "/student/dashboard",
-                )
-              }
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
-              aria-label="Back to dashboard"
-            >
+    <div
+      className={`min-h-screen ${
+        isDark
+          ? "bg-slate-950 text-white"
+          : "bg-slate-50 text-slate-900"
+      }`}
+    >
+      {/* HEADER */}
+      <header
+        className={`sticky top-0 z-40 border-b backdrop-blur-xl ${
+          isDark
+            ? "bg-slate-950/90 border-slate-800"
+            : "bg-white/90 border-slate-200"
+        }`}
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                "/student/dashboard"
+              )
+            }
+            className={`flex items-center gap-2 font-bold ${
+              isDark
+                ? "text-slate-300 hover:text-white"
+                : "text-slate-700 hover:text-slate-950"
+            }`}
+          >
+            <span className="text-xl">
               ←
-            </button>
+            </span>
 
+            <span className="hidden sm:inline">
+              Dashboard
+            </span>
+          </button>
+
+          <div className="text-center">
+            <h1 className="text-lg sm:text-xl font-black">
+              📅 Study Planner
+            </h1>
+
+            <p
+              className={`text-xs ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Plan. Study. Track. Improve.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                "/student/progress"
+              )
+            }
+            className="rounded-xl bg-blue-600 px-3 sm:px-4 py-2 text-sm font-black text-white hover:bg-blue-700 transition"
+          >
+            📊 Progress
+          </button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-7">
+        {/* HERO */}
+        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-600 via-cyan-600 to-indigo-700 p-6 sm:p-9 text-white shadow-2xl mb-7">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+
+          <div className="pointer-events-none absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-cyan-300/20 blur-3xl" />
+
+          <div className="relative z-10 max-w-4xl">
+            <span className="inline-flex rounded-full border border-white/20 bg-white/15 px-3.5 py-1.5 text-xs font-black tracking-wide backdrop-blur">
+              📅 SMART STUDY PLANNER
+            </span>
+
+            <h2 className="mt-4 text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight">
+              Make a plan.
+              <br />
+              Make progress.
+            </h2>
+
+            <p className="mt-3 max-w-2xl text-sm sm:text-base leading-7 text-white/85">
+              Apne daily study tasks plan karo,
+              complete karo aur tumhari study
+              activity automatically Progress
+              Tracker mein update hogi.
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
+                <div className="text-xl font-black">
+                  {totalTasks}
+                </div>
+
+                <div className="text-xs text-white/70">
+                  Total Tasks
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
+                <div className="text-xl font-black">
+                  {completedTasks}
+                </div>
+
+                <div className="text-xs text-white/70">
+                  Completed
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
+                <div className="text-xl font-black">
+                  {totalStudyMinutes}
+                </div>
+
+                <div className="text-xs text-white/70">
+                  Minutes Studied
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ERROR */}
+        {error && (
+          <div
+            className={`mb-6 rounded-2xl border px-4 py-3 ${
+              isDark
+                ? "border-red-900 bg-red-950/30 text-red-300"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <span>⚠️</span>
+
+              <div>
+                <p className="font-bold text-sm">
+                  {error}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setError("")
+                  }
+                  className="mt-1 text-xs underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STATS */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+          <div
+            className={`rounded-2xl border p-5 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200 shadow-sm"
+            }`}
+          >
+            <div className="text-2xl">
+              📚
+            </div>
+
+            <div className="mt-2 text-2xl font-black">
+              {totalTasks}
+            </div>
+
+            <div
+              className={`text-xs mt-1 ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Total Tasks
+            </div>
+          </div>
+
+          <div
+            className={`rounded-2xl border p-5 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200 shadow-sm"
+            }`}
+          >
+            <div className="text-2xl">
+              ✅
+            </div>
+
+            <div className="mt-2 text-2xl font-black text-green-500">
+              {completedTasks}
+            </div>
+
+            <div
+              className={`text-xs mt-1 ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Completed
+            </div>
+          </div>
+
+          <div
+            className={`rounded-2xl border p-5 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200 shadow-sm"
+            }`}
+          >
+            <div className="text-2xl">
+              ⏱️
+            </div>
+
+            <div className="mt-2 text-2xl font-black text-blue-500">
+              {totalStudyMinutes}
+            </div>
+
+            <div
+              className={`text-xs mt-1 ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Minutes Studied
+            </div>
+          </div>
+
+          <div
+            className={`rounded-2xl border p-5 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200 shadow-sm"
+            }`}
+          >
+            <div className="text-2xl">
+              ⏳
+            </div>
+
+            <div className="mt-2 text-2xl font-black text-orange-500">
+              {pendingTasks}
+            </div>
+
+            <div
+              className={`text-xs mt-1 ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Pending Tasks
+            </div>
+          </div>
+        </section>
+
+        {/* PROGRESS BAR */}
+        <section
+          className={`rounded-3xl border p-5 sm:p-6 mb-7 ${
+            isDark
+              ? "bg-slate-900 border-slate-800"
+              : "bg-white border-slate-200 shadow-sm"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-4 mb-3">
             <div>
-              <h1 className="text-lg font-black tracking-tight sm:text-xl">
-                Study Planner
-              </h1>
+              <h3 className="font-black">
+                Today's Plan
+              </h3>
 
-              <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
-                Plan your day. Study smarter.
+              <p
+                className={`text-xs mt-1 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                {completedTasks} of{" "}
+                {totalTasks} tasks completed
               </p>
             </div>
+
+            <div className="text-xl font-black text-blue-500">
+              {progressPercent}%
+            </div>
+          </div>
+
+          <div
+            className={`h-3 overflow-hidden rounded-full ${
+              isDark
+                ? "bg-slate-800"
+                : "bg-slate-100"
+            }`}
+          >
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all duration-500"
+              style={{
+                width: `${progressPercent}%`,
+              }}
+            />
+          </div>
+
+          <div className="mt-4 flex items-center justify-between text-xs">
+            <span
+              className={
+                isDark
+                  ? "text-slate-500"
+                  : "text-slate-400"
+              }
+            >
+              Planned:{" "}
+              <span className="font-bold">
+                {plannedMinutes} min
+              </span>
+            </span>
+
+            <span
+              className={
+                isDark
+                  ? "text-slate-500"
+                  : "text-slate-400"
+              }
+            >
+              Completed:{" "}
+              <span className="font-bold">
+                {totalStudyMinutes} min
+              </span>
+            </span>
+          </div>
+        </section>
+
+        {/* ADD TASK BUTTON */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+          <div>
+            <h2 className="text-2xl font-black">
+              Your Study Tasks
+            </h2>
+
+            <p
+              className={`text-sm mt-1 ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Complete a task to automatically
+              update your progress.
+            </p>
           </div>
 
           <button
             type="button"
             onClick={() =>
               setShowAddTask(
-                (value) => !value,
+                (previous) => !previous
               )
             }
-            className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-95"
+            className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-700 transition"
           >
-            <span className="mr-1">
-              +
-            </span>
-            <span className="hidden sm:inline">
-              Add Task
-            </span>
-            <span className="sm:hidden">
-              Add
-            </span>
-          </button>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-        {/* =================================================
-            HERO
-        ================================================= */}
-
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-cyan-600 to-sky-500 p-6 text-white shadow-xl shadow-blue-600/20 sm:p-8 lg:p-10">
-          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-
-          <div className="relative z-10 max-w-3xl">
-            <div className="mb-3 inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider backdrop-blur">
-              📅 Smart Study Planner
-            </div>
-
-            <h2 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
-              Make every study
-              <br />
-              session count.
-            </h2>
-
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-blue-50 sm:text-base">
-              Organise your subjects, set study
-              durations, and track what you complete
-              every day.
-            </p>
-          </div>
-        </section>
-
-        {/* =================================================
-            DATE
-        ================================================= */}
-
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Today
-            </p>
-
-            <h2 className="mt-1 text-xl font-black sm:text-2xl">
-              {formatDate(today)}
-            </h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={loadTasks}
-            disabled={loading}
-            className="self-start rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            ↻ Refresh
+            {showAddTask
+              ? "✕ Close"
+              : "＋ Add Task"}
           </button>
         </div>
 
-        {/* =================================================
-            ERROR
-        ================================================= */}
-
-        {error && (
-          <div className="mt-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
-            <span className="text-lg">
-              ⚠️
-            </span>
-
-            <div className="flex-1">
-              <p className="font-bold">
-                Something went wrong
-              </p>
-
-              <p className="mt-1">
-                {error}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                setError("")
-              }
-              className="text-lg opacity-70 hover:opacity-100"
-              aria-label="Close error"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {/* =================================================
-            ADD TASK FORM
-        ================================================= */}
-
+        {/* ADD TASK FORM */}
         {showAddTask && (
-          <section className="mt-6 rounded-3xl border border-blue-100 bg-white p-5 shadow-sm dark:border-blue-900/40 dark:bg-slate-900 sm:p-6">
-            <div className="mb-5">
-              <h3 className="text-lg font-black">
-                Add a study task
-              </h3>
+          <section
+            className={`rounded-3xl border p-5 sm:p-6 mb-7 ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200 shadow-sm"
+            }`}
+          >
+            <h3 className="text-lg font-black mb-5">
+              ➕ Add New Study Task
+            </h3>
 
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Add what you want to study today.
-              </p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              {/* Subject */}
-
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* SUBJECT */}
               <div>
-                <label
-                  htmlFor="study-subject"
-                  className="mb-2 block text-sm font-bold"
-                >
+                <label className="block text-sm font-bold mb-2">
                   Subject
                 </label>
 
                 <select
-                  id="study-subject"
-                  value={newSubject}
+                  value={subject}
                   onChange={(event) =>
-                    setNewSubject(
-                      event.target.value,
+                    setSubject(
+                      event.target.value
                     )
                   }
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                  className={`w-full rounded-xl border px-4 py-3 outline-none ${
+                    isDark
+                      ? "bg-slate-950 border-slate-700 text-white"
+                      : "bg-slate-50 border-slate-200 text-slate-900"
+                  }`}
                 >
-                  <option value="">
-                    Select subject
-                  </option>
-
                   {SUBJECTS.map(
-                    (subject) => (
+                    (item) => (
                       <option
-                        key={subject}
-                        value={subject}
+                        key={item}
+                        value={item}
                       >
-                        {subject}
+                        {item}
                       </option>
-                    ),
+                    )
                   )}
                 </select>
               </div>
 
-              {/* Topic */}
-
+              {/* TOPIC */}
               <div>
-                <label
-                  htmlFor="study-topic"
-                  className="mb-2 block text-sm font-bold"
-                >
+                <label className="block text-sm font-bold mb-2">
                   Topic
                 </label>
 
                 <input
-                  id="study-topic"
                   type="text"
-                  value={newTopic}
+                  value={topic}
                   onChange={(event) =>
-                    setNewTopic(
-                      event.target.value,
+                    setTopic(
+                      event.target.value
                     )
                   }
-                  onKeyDown={(event) => {
-                    if (
-                      event.key === "Enter"
-                    ) {
-                      addTask();
-                    }
-                  }}
-                  placeholder="e.g. Banking Current Affairs"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                  placeholder="e.g. Parliament, Vocabulary..."
+                  className={`w-full rounded-xl border px-4 py-3 outline-none ${
+                    isDark
+                      ? "bg-slate-950 border-slate-700 text-white placeholder:text-slate-600"
+                      : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400"
+                  }`}
                 />
               </div>
 
-              {/* Duration */}
-
+              {/* DURATION */}
               <div>
-                <label
-                  htmlFor="study-duration"
-                  className="mb-2 block text-sm font-bold"
-                >
+                <label className="block text-sm font-bold mb-2">
                   Duration
                 </label>
 
                 <select
-                  id="study-duration"
-                  value={newDuration}
+                  value={duration}
                   onChange={(event) =>
-                    setNewDuration(
-                      event.target.value,
+                    setDuration(
+                      Number(
+                        event.target.value
+                      )
                     )
                   }
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950"
+                  className={`w-full rounded-xl border px-4 py-3 outline-none ${
+                    isDark
+                      ? "bg-slate-950 border-slate-700 text-white"
+                      : "bg-slate-50 border-slate-200 text-slate-900"
+                  }`}
                 >
-                  {DURATION_OPTIONS.map(
-                    (duration) => (
+                  {DURATIONS.map(
+                    (minutes) => (
                       <option
-                        key={duration}
-                        value={duration}
+                        key={minutes}
+                        value={minutes}
                       >
-                        {duration} minutes
+                        {minutes} minutes
                       </option>
-                    ),
+                    )
                   )}
                 </select>
               </div>
             </div>
 
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <div className="flex justify-end mt-5">
               <button
                 type="button"
-                onClick={() => {
-                  setShowAddTask(false);
-                  setNewSubject("");
-                  setNewTopic("");
-                  setNewDuration("30");
-                  setError("");
-                }}
-                className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={addTask}
+                onClick={handleAddTask}
                 disabled={saving}
-                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`rounded-xl px-6 py-3 font-black text-white ${
+                  saving
+                    ? "bg-blue-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
               >
                 {saving
                   ? "Saving..."
@@ -698,313 +1223,286 @@ export default function StudyPlanner() {
           </section>
         )}
 
-        {/* =================================================
-            STATS
-        ================================================= */}
-
-        <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="text-2xl">
+        {/* EMPTY STATE */}
+        {tasks.length === 0 && (
+          <section
+            className={`rounded-3xl border p-10 text-center ${
+              isDark
+                ? "bg-slate-900 border-slate-800"
+                : "bg-white border-slate-200 shadow-sm"
+            }`}
+          >
+            <div className="text-5xl mb-4">
               📚
             </div>
 
-            <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Total Tasks
+            <h3 className="text-xl font-black">
+              No study tasks yet
+            </h3>
+
+            <p
+              className={`mt-2 text-sm ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Add your first task and start
+              building your study routine.
             </p>
 
-            <p className="mt-1 text-2xl font-black">
-              {totalTasks}
-            </p>
-          </div>
+            <button
+              type="button"
+              onClick={() =>
+                setShowAddTask(true)
+              }
+              className="mt-5 rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white"
+            >
+              ＋ Add First Task
+            </button>
+          </section>
+        )}
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="text-2xl">
-              ✅
-            </div>
+        {/* TASK GROUPS */}
+        <div className="space-y-6">
+          {Object.entries(
+            groupedTasks
+          ).map(
+            ([
+              groupSubject,
+              groupTasks,
+            ]) => (
+              <section
+                key={groupSubject}
+                className={`rounded-3xl border overflow-hidden ${
+                  isDark
+                    ? "bg-slate-900 border-slate-800"
+                    : "bg-white border-slate-200 shadow-sm"
+                }`}
+              >
+                <div
+                  className={`px-5 sm:px-6 py-4 border-b flex items-center justify-between ${
+                    isDark
+                      ? "border-slate-800"
+                      : "border-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-xl">
+                      {groupSubject ===
+                      "Current Affairs"
+                        ? "📰"
+                        : groupSubject ===
+                          "English"
+                        ? "📖"
+                        : groupSubject ===
+                          "Reasoning"
+                        ? "🧠"
+                        : groupSubject ===
+                          "Mathematics"
+                        ? "➗"
+                        : groupSubject ===
+                          "Science"
+                        ? "🔬"
+                        : groupSubject ===
+                          "Revision"
+                        ? "🔄"
+                        : "📚"}
+                    </div>
 
-            <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Completed
-            </p>
+                    <div>
+                      <h3 className="font-black">
+                        {groupSubject}
+                      </h3>
 
-            <p className="mt-1 text-2xl font-black">
-              {completedTasks}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="text-2xl">
-              ⏱️
-            </div>
-
-            <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Study Time
-            </p>
-
-            <p className="mt-1 text-2xl font-black">
-              {formatMinutes(
-                totalMinutes,
-              )}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="text-2xl">
-              🎯
-            </div>
-
-            <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Progress
-            </p>
-
-            <p className="mt-1 text-2xl font-black">
-              {progress}%
-            </p>
-          </div>
-        </section>
-
-        {/* =================================================
-            PROGRESS
-        ================================================= */}
-
-        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Daily Progress
-              </p>
-
-              <h3 className="mt-1 text-xl font-black">
-                {completedTasks} of{" "}
-                {totalTasks} tasks completed
-              </h3>
-            </div>
-
-            <div className="text-right">
-              <p className="text-2xl font-black text-blue-600 dark:text-blue-400">
-                {progress}%
-              </p>
-
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {formatMinutes(
-                  completedMinutes,
-                )}{" "}
-                completed
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 transition-all duration-500"
-              style={{
-                width: `${progress}%`,
-              }}
-            />
-          </div>
-        </section>
-
-        {/* =================================================
-            TASK LIST
-        ================================================= */}
-
-        <section className="mt-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-black">
-                Today's Study Plan
-              </h3>
-
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Complete your tasks one by one.
-              </p>
-            </div>
-
-            {totalTasks > 0 && (
-              <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
-                {totalTasks}{" "}
-                {totalTasks === 1
-                  ? "task"
-                  : "tasks"}
-              </span>
-            )}
-          </div>
-
-          {/* Loading */}
-
-          {loading && (
-            <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600 dark:border-slate-700 dark:border-t-blue-400" />
-
-              <p className="mt-4 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                Loading your study plan...
-              </p>
-            </div>
-          )}
-
-          {/* Empty */}
-
-          {!loading &&
-            tasks.length === 0 && (
-              <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-14">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-3xl dark:bg-blue-950/40">
-                  📅
+                      <p
+                        className={`text-xs ${
+                          isDark
+                            ? "text-slate-500"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        {
+                          groupTasks.filter(
+                            (task) =>
+                              task.completed
+                          ).length
+                        }{" "}
+                        /{" "}
+                        {groupTasks.length}{" "}
+                        completed
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <h4 className="mt-5 text-xl font-black">
-                  Your plan is empty
-                </h4>
-
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Add your first study task and
-                  start building your productive
-                  study day.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowAddTask(true)
-                  }
-                  className="mt-6 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
-                >
-                  + Add Your First Task
-                </button>
-              </div>
-            )}
-
-          {/* Tasks */}
-
-          {!loading &&
-            tasks.length > 0 && (
-              <div className="space-y-3">
-                {tasks.map(
-                  (task, index) => (
-                    <article
-                      key={task.id}
-                      className={`group rounded-2xl border bg-white p-4 shadow-sm transition dark:bg-slate-900 sm:p-5 ${
-                        task.completed
-                          ? "border-emerald-200 dark:border-emerald-900/50"
-                          : "border-slate-200 dark:border-slate-800"
-                      }`}
-                    >
-                      <div className="flex items-start gap-4">
-                        {/* Checkbox */}
-
+                <div>
+                  {groupTasks.map(
+                    (task, index) => (
+                      <div
+                        key={task.id}
+                        className={`p-4 sm:p-5 flex items-center gap-4 ${
+                          index !==
+                          groupTasks.length - 1
+                            ? isDark
+                              ? "border-b border-slate-800"
+                              : "border-b border-slate-100"
+                            : ""
+                        }`}
+                      >
+                        {/* CHECK */}
                         <button
                           type="button"
                           onClick={() =>
                             toggleTask(task)
                           }
-                          className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 text-lg transition ${
-                            task.completed
-                              ? "border-emerald-500 bg-emerald-500 text-white"
-                              : "border-slate-300 bg-white text-transparent hover:border-blue-500 dark:border-slate-600 dark:bg-slate-950"
-                          }`}
+                          disabled={saving}
                           aria-label={
                             task.completed
-                              ? "Mark incomplete"
-                              : "Mark complete"
+                              ? "Mark task incomplete"
+                              : "Mark task complete"
                           }
+                          className={`w-10 h-10 shrink-0 rounded-xl border-2 flex items-center justify-center transition ${
+                            task.completed
+                              ? "bg-green-500 border-green-500 text-white"
+                              : isDark
+                              ? "border-slate-700 hover:border-blue-500"
+                              : "border-slate-300 hover:border-blue-500"
+                          }`}
                         >
-                          ✓
+                          {task.completed
+                            ? "✓"
+                            : ""}
                         </button>
 
-                        {/* Task info */}
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
-                              {task.subject}
-                            </span>
-
-                            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                              ⏱️{" "}
-                              {task.duration}{" "}
-                              min
-                            </span>
-                          </div>
-
+                        {/* CONTENT */}
+                        <div className="flex-1 min-w-0">
                           <h4
-                            className={`mt-3 text-base font-black transition sm:text-lg ${
+                            className={`font-black text-sm sm:text-base ${
                               task.completed
-                                ? "text-slate-400 line-through dark:text-slate-500"
-                                : "text-slate-900 dark:text-white"
+                                ? "line-through opacity-50"
+                                : ""
                             }`}
                           >
                             {task.topic}
                           </h4>
 
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Task #{index + 1}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <span
+                              className={`text-xs ${
+                                isDark
+                                  ? "text-slate-500"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              ⏱️{" "}
+                              {
+                                task.duration
+                              }{" "}
+                              min
+                            </span>
+
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${
+                                task.completed
+                                  ? "bg-green-500/10 text-green-500"
+                                  : "bg-orange-500/10 text-orange-500"
+                              }`}
+                            >
+                              {task.completed
+                                ? "Completed"
+                                : "Pending"}
+                            </span>
+                          </div>
                         </div>
 
-                        {/* Delete */}
-
+                        {/* DELETE */}
                         <button
                           type="button"
                           onClick={() =>
-                            deleteTask(
-                              task.id,
-                            )
+                            deleteTask(task)
                           }
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30"
+                          disabled={saving}
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center transition ${
+                            isDark
+                              ? "text-slate-500 hover:text-red-400 hover:bg-red-950/30"
+                              : "text-slate-400 hover:text-red-500 hover:bg-red-50"
+                          }`}
                           aria-label="Delete task"
                         >
                           🗑️
                         </button>
                       </div>
-                    </article>
-                  ),
-                )}
-              </div>
-            )}
-        </section>
+                    )
+                  )}
+                </div>
+              </section>
+            )
+          )}
+        </div>
 
-        {/* =================================================
-            SMART STUDY TIP
-        ================================================= */}
-
-        <section className="mt-6 overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-5 dark:border-amber-900/40 dark:from-amber-950/20 dark:to-orange-950/20 sm:p-6">
+        {/* SMART TIP */}
+        <section
+          className={`mt-7 rounded-3xl border p-5 sm:p-6 ${
+            isDark
+              ? "bg-indigo-950/30 border-indigo-900"
+              : "bg-indigo-50 border-indigo-100"
+          }`}
+        >
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-2xl dark:bg-amber-900/40">
+            <div className="text-3xl">
               💡
             </div>
 
             <div>
-              <h3 className="text-base font-black text-amber-900 dark:text-amber-200">
+              <h3 className="font-black">
                 Smart Study Tip
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-amber-800/80 dark:text-amber-200/70">
-                Break longer study sessions into
-                focused blocks. After completing a
-                task, take a short break before
-                starting the next one. Consistency
-                beats cramming.
+              <p
+                className={`mt-1 text-sm leading-6 ${
+                  isDark
+                    ? "text-indigo-300"
+                    : "text-indigo-700"
+                }`}
+              >
+                Chhote, focused study sessions
+                complete karna consistency build
+                karne mein help karta hai. Har task
+                complete karne par tumhari study
+                activity aur Progress Tracker
+                automatically update ho jayega.
               </p>
             </div>
           </div>
         </section>
 
-        {/* =================================================
-            DASHBOARD BUTTON
-        ================================================= */}
-
-        <div className="mt-8 flex justify-center pb-6">
+        {/* VIEW PROGRESS */}
+        <section className="mt-7 text-center">
           <button
             type="button"
             onClick={() =>
               navigate(
-                "/student/dashboard",
+                "/student/progress"
               )
             }
-            className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-7 py-4 text-white font-black shadow-xl shadow-blue-500/20 hover:scale-[1.01] transition"
           >
-            ← Back to Dashboard
+            📊 View My Progress
           </button>
-        </div>
+        </section>
       </main>
+
+      {/* FOOTER */}
+      <footer
+        className={`py-8 text-center text-xs ${
+          isDark
+            ? "text-slate-600"
+            : "text-slate-400"
+        }`}
+      >
+        Ranker Bhaiya • Smart Study Planner
+      </footer>
     </div>
   );
 }
