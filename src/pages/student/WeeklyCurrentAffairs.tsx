@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import { supabase } from "../../lib/supabase";
+import { useTranslation } from "react-i18next";
+import {
+  ArrowLeft,
+  BookOpen,
+  CalendarDays,
+  ChevronRight,
+  Clock,
+  FileText,
+  Globe2,
+  Search,
+  Sparkles,
+  Trophy,
+  X,
+} from "lucide-react";
 
-/* =====================================================
-   TYPES
-===================================================== */
+import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+import { supabase } from "../../lib/supabase";
 
 interface MCQ {
   question: string;
@@ -17,31 +29,24 @@ interface MCQ {
 interface CurrentAffair {
   id: string;
   affair_date: string;
-  serial_no: number;
-
+  serial_no: number | null;
   title: string;
-  why_in_news: string;
-  key_facts: string;
-  exam_point: string;
-  static_gk: string;
-
-  mcqs: MCQ[];
-
+  why_in_news: string | null;
+  key_facts: string | null;
+  exam_point: string | null;
+  static_gk: string | null;
+  mcqs: MCQ[] | unknown;
   published: boolean;
-  category: string;
+  category: string | null;
 
-  title_hi: string;
-  why_in_news_hi: string;
-  key_facts_hi: string;
-  exam_point_hi: string;
-  static_gk_hi: string;
+  title_hi: string | null;
+  why_in_news_hi: string | null;
+  key_facts_hi: string | null;
+  exam_point_hi: string | null;
+  static_gk_hi: string | null;
 }
 
-/* =====================================================
-   CATEGORIES
-===================================================== */
-
-const CATEGORIES = [
+const categories = [
   "All",
   "National",
   "International",
@@ -58,1107 +63,870 @@ const CATEGORIES = [
   "Other",
 ];
 
-/* =====================================================
-   COMPONENT
-===================================================== */
+function normalizeMcqs(value: unknown): MCQ[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+
+      const row = item as Record<string, unknown>;
+
+      const question =
+        typeof row.question === "string" ? row.question : "";
+
+      const options = Array.isArray(row.options)
+        ? row.options.filter(
+            (option): option is string => typeof option === "string",
+          )
+        : [];
+
+      const answer =
+        typeof row.answer === "string" ? row.answer : "";
+
+      const explanation =
+        typeof row.explanation === "string"
+          ? row.explanation
+          : undefined;
+
+      if (!question || !options.length || !answer) return null;
+
+      return {
+        question,
+        options,
+        answer,
+        explanation,
+      };
+    })
+    .filter((item): item is MCQ => item !== null);
+}
+
+function formatDate(dateString: string, language: string) {
+  if (!dateString) return "";
+
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) return dateString;
+
+  return date.toLocaleDateString(
+    language.startsWith("hi") ? "hi-IN" : "en-IN",
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    },
+  );
+}
+
+function stripHtml(value: string | null) {
+  if (!value) return "";
+
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 export function WeeklyCurrentAffairs() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { t, i18n } = useTranslation();
+  const { user, loading: authLoading } = useAuth();
+  const { theme } = useTheme();
+
+  const isDark = theme === "dark";
+  const language = i18n.language?.toLowerCase() || "en";
+  const isHindi = language.startsWith("hi");
 
   const [affairs, setAffairs] = useState<CurrentAffair[]>([]);
-  const [selectedCategory, setSelectedCategory] =
-    useState("All");
-  const [search, setSearch] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  /* =====================================================
-     PAGE SETUP
-  ===================================================== */
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
 
   useEffect(() => {
-    document.title = "Daily Current Affairs | VIDYZEN";
+    document.title = isHindi
+      ? "डेली करंट अफेयर्स | Ranker Bhaiya"
+      : "Daily Current Affairs | Ranker Bhaiya";
+  }, [isHindi]);
 
-    void loadCurrentAffairs();
-  }, []);
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/student/login", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
 
-  /* =====================================================
-     LOAD CURRENT AFFAIRS
-  ===================================================== */
+  useEffect(() => {
+    if (!user) return;
 
-  async function loadCurrentAffairs() {
-    console.log("========================================");
-    console.log("📚 CURRENT AFFAIRS LOAD START");
-    console.log("========================================");
+    let cancelled = false;
 
-    setLoading(true);
-    setError("");
+    const loadCurrentAffairs = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-    try {
-      /* -----------------------------------------------
-         AUTH CHECK
-      ----------------------------------------------- */
-
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      console.log(
-        "🔐 Session:",
-        session ? "SESSION FOUND" : "NO SESSION",
-      );
-
-      if (sessionError) {
-        console.error(
-          "❌ Session Error:",
-          sessionError,
-        );
-      }
-
-      if (!session) {
-        console.warn(
-          "⚠️ No active session. Redirecting login.",
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Request timed out")),
+            15000,
+          ),
         );
 
-        navigate("/student/login");
-        return;
-      }
+        const query = supabase
+          .from("current_affairs")
+          .select(
+            `
+              id,
+              affair_date,
+              serial_no,
+              title,
+              why_in_news,
+              key_facts,
+              exam_point,
+              static_gk,
+              mcqs,
+              published,
+              category,
+              title_hi,
+              why_in_news_hi,
+              key_facts_hi,
+              exam_point_hi,
+              static_gk_hi
+            `,
+          )
+          .eq("published", true)
+          .order("affair_date", { ascending: false })
+          .order("serial_no", { ascending: true });
 
-      /* -----------------------------------------------
-         SUPABASE QUERY
-         
-         IMPORTANT:
-         Literal select string intentionally used.
-         Do NOT use array.join(",") here.
-      ----------------------------------------------- */
+        const { data, error: fetchError } = await Promise.race([
+          query,
+          timeout,
+        ]);
 
-      console.log(
-        "📡 Querying current_affairs table...",
-      );
+        if (fetchError) throw fetchError;
 
-      const queryPromise = supabase
-        .from("current_affairs")
-        .select(
-          "id,affair_date,serial_no,title,why_in_news,key_facts,exam_point,static_gk,mcqs,published,category,title_hi,why_in_news_hi,key_facts_hi,exam_point_hi,static_gk_hi",
-        )
-        .eq("published", true)
-        .order("affair_date", {
-          ascending: false,
-        })
-        .order("serial_no", {
-          ascending: true,
-        });
+        if (cancelled) return;
 
-      /* -----------------------------------------------
-         TIMEOUT
-      ----------------------------------------------- */
-
-      const timeoutPromise =
-        new Promise<{
-          data: null;
-          error: Error;
-        }>((resolve) => {
-          setTimeout(() => {
-            resolve({
-              data: null,
-              error: new Error(
-                "Supabase request 15 seconds se zyada time le rahi hai. Network, RLS policy ya Supabase connection check karo.",
-              ),
-            });
-          }, 15000);
-        });
-
-      const result = await Promise.race([
-        queryPromise,
-        timeoutPromise,
-      ]);
-
-      const {
-        data,
-        error: fetchError,
-      } = result;
-
-      /* -----------------------------------------------
-         RAW DEBUG
-      ----------------------------------------------- */
-
-      console.log(
-        "📦 Supabase Data:",
-        data,
-      );
-
-      console.log(
-        "❗ Supabase Error:",
-        fetchError,
-      );
-
-      /* -----------------------------------------------
-         ERROR CHECK
-      ----------------------------------------------- */
-
-      if (fetchError) {
-        console.error(
-          "❌ CURRENT AFFAIRS QUERY FAILED",
-          fetchError,
-        );
-
-        throw fetchError;
-      }
-
-      /* -----------------------------------------------
-         EMPTY RESULT
-      ----------------------------------------------- */
-
-      if (!data) {
-        console.warn(
-          "⚠️ Supabase returned null data.",
-        );
-
-        setAffairs([]);
-        return;
-      }
-
-      console.log(
-        `✅ ${data.length} current affairs received.`,
-      );
-
-      /* -----------------------------------------------
-         DEBUG FIRST ROW
-      ----------------------------------------------- */
-
-      if (data.length > 0) {
-        console.log(
-          "🔎 FIRST CURRENT AFFAIR:",
-          data[0],
-        );
-      } else {
-        console.warn(
-          "⚠️ Query successful but 0 published current affairs found.",
-        );
-      }
-
-      /* -----------------------------------------------
-         FORMAT DATA
-      ----------------------------------------------- */
-
-      const formatted: CurrentAffair[] =
-        data.map((row) => ({
-          id: String(row.id ?? ""),
-
-          affair_date: String(
-            row.affair_date ?? "",
-          ),
-
-          serial_no: Number(
-            row.serial_no ?? 1,
-          ),
-
-          title: String(
-            row.title ?? "",
-          ),
-
-          why_in_news: String(
-            row.why_in_news ?? "",
-          ),
-
-          key_facts: String(
-            row.key_facts ?? "",
-          ),
-
-          exam_point: String(
-            row.exam_point ?? "",
-          ),
-
-          static_gk: String(
-            row.static_gk ?? "",
-          ),
-
-          mcqs: normalizeMCQs(
-            row.mcqs,
-          ),
-
-          published:
-            typeof row.published ===
-            "boolean"
-              ? row.published
-              : true,
-
-          category:
-            typeof row.category ===
-              "string" &&
-            row.category.trim()
-              ? row.category.trim()
-              : "Other",
-
-          title_hi: String(
-            row.title_hi ?? "",
-          ),
-
-          why_in_news_hi: String(
-            row.why_in_news_hi ?? "",
-          ),
-
-          key_facts_hi: String(
-            row.key_facts_hi ?? "",
-          ),
-
-          exam_point_hi: String(
-            row.exam_point_hi ?? "",
-          ),
-
-          static_gk_hi: String(
-            row.static_gk_hi ?? "",
-          ),
+        const normalized: CurrentAffair[] = (data || []).map((row) => ({
+          ...row,
+          mcqs: normalizeMcqs(row.mcqs),
         }));
 
-      console.log(
-        "🧹 FORMATTED CURRENT AFFAIRS:",
-        formatted,
-      );
+        setAffairs(normalized);
+      } catch (err) {
+        console.error("Current Affairs fetch error:", err);
 
-      setAffairs(formatted);
-
-      console.log(
-        "✅ CURRENT AFFAIRS LOAD SUCCESS",
-      );
-    } catch (err) {
-      console.error(
-        "========================================",
-      );
-
-      console.error(
-        "❌ CURRENT AFFAIRS LOAD ERROR",
-      );
-
-      console.error(err);
-
-      console.error(
-        "========================================",
-      );
-
-      setAffairs([]);
-
-      if (err instanceof Error) {
-        setError(
-          err.message ||
-            "Unable to load current affairs.",
-        );
-      } else {
-        setError(
-          "Unable to load current affairs.",
-        );
+        if (!cancelled) {
+          setError(
+            isHindi
+              ? "करंट अफेयर्स लोड नहीं हो पाए। कृपया दोबारा प्रयास करें।"
+              : "Current affairs could not be loaded. Please try again.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    } finally {
-      console.log(
-        "🔚 Current Affairs loading finished.",
-      );
+    };
 
-      setLoading(false);
-    }
-  }
+    loadCurrentAffairs();
 
-  /* =====================================================
-     FILTER
-  ===================================================== */
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isHindi]);
 
   const filteredAffairs = useMemo(() => {
-    const query =
-      search.trim().toLowerCase();
+    const query = search.trim().toLowerCase();
 
     return affairs.filter((item) => {
-      const category =
-        item.category || "Other";
+      const categoryMatch =
+        activeCategory === "All" ||
+        item.category?.toLowerCase() === activeCategory.toLowerCase();
 
-      const matchesCategory =
-        selectedCategory === "All" ||
-        category === selectedCategory;
+      if (!categoryMatch) return false;
 
-      if (!matchesCategory) {
-        return false;
-      }
-
-      if (!query) {
-        return true;
-      }
+      if (!query) return true;
 
       const searchableText = [
         item.title,
-        item.why_in_news,
-        item.key_facts,
-        item.exam_point,
-        item.static_gk,
         item.title_hi,
+        item.why_in_news,
         item.why_in_news_hi,
+        item.key_facts,
         item.key_facts_hi,
+        item.exam_point,
         item.exam_point_hi,
+        item.static_gk,
         item.static_gk_hi,
         item.category,
       ]
-        .filter(Boolean)
+        .map(stripHtml)
         .join(" ")
         .toLowerCase();
 
       return searchableText.includes(query);
     });
-  }, [
-    affairs,
-    selectedCategory,
-    search,
-  ]);
+  }, [affairs, search, activeCategory]);
 
-  /* =====================================================
-     DATE FORMAT
-  ===================================================== */
+  const latestDate = affairs[0]?.affair_date;
 
-  function formatDate(date: string) {
-    if (!date) {
-      return "";
+  const getTitle = (item: CurrentAffair) => {
+    if (isHindi && item.title_hi) return item.title_hi;
+    return item.title;
+  };
+
+  const getWhyInNews = (item: CurrentAffair) => {
+    if (isHindi && item.why_in_news_hi) {
+      return item.why_in_news_hi;
     }
 
-    const parsed = new Date(
-      `${date}T00:00:00`,
-    );
+    return item.why_in_news;
+  };
 
-    if (
-      Number.isNaN(
-        parsed.getTime(),
-      )
-    ) {
-      return date;
-    }
+  const retry = () => {
+    window.location.reload();
+  };
 
-    return parsed.toLocaleDateString(
-      "en-IN",
-      {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      },
-    );
-  }
-
-  /* =====================================================
-     OPEN DETAIL
-  ===================================================== */
-
-  function openAffair(id: string) {
-    navigate(
-      `/student/current-affairs/${id}`,
+  if (authLoading || (!user && loading)) {
+    return (
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          isDark
+            ? "bg-slate-950 text-white"
+            : "bg-slate-50 text-slate-900"
+        }`}
+      >
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+          <p className="text-sm opacity-70">
+            {isHindi ? "लोड हो रहा है..." : "Loading..."}
+          </p>
+        </div>
+      </div>
     );
   }
 
-  /* =====================================================
-     CLEAR FILTERS
-  ===================================================== */
-
-  function clearFilters() {
-    setSearch("");
-    setSelectedCategory("All");
-  }
-
-  /* =====================================================
-     STUDENT NAME
-  ===================================================== */
-
-  const studentName =
-    profile?.full_name ||
-    user?.email?.split("@")[0] ||
-    "Student";
-
-  /* =====================================================
-     UI
-  ===================================================== */
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4">
-
+    <div
+      className={`min-h-screen transition-colors duration-300 ${
+        isDark
+          ? "bg-slate-950 text-white"
+          : "bg-slate-50 text-slate-900"
+      }`}
+    >
+      {/* Header */}
+      <header
+        className={`sticky top-0 z-40 border-b backdrop-blur-xl ${
+          isDark
+            ? "border-white/10 bg-slate-950/85"
+            : "border-slate-200 bg-white/85"
+        }`}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <button
-            type="button"
-            onClick={() =>
-              navigate(
-                "/student/dashboard",
-              )
-            }
-            className="flex items-center gap-3"
+            onClick={() => navigate("/student/dashboard")}
+            className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+              isDark
+                ? "text-slate-300 hover:bg-white/10 hover:text-white"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-lg font-black text-white shadow-sm">
-              V
-            </div>
+            <ArrowLeft size={18} />
+            <span className="hidden sm:inline">
+              {isHindi ? "डैशबोर्ड" : "Dashboard"}
+            </span>
+          </button>
 
-            <div className="text-left">
-              <h1 className="text-lg font-black tracking-tight">
-                VIDYZEN
-              </h1>
-
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Daily Current Affairs
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <p
+                className={`text-xs ${
+                  isDark ? "text-slate-400" : "text-slate-500"
+                }`}
+              >
+                {isHindi ? "आपका स्टडी पार्टनर" : "Your Study Partner"}
+              </p>
+              <p className="text-sm font-black tracking-tight">
+                Ranker Bhaiya
               </p>
             </div>
-          </button>
 
-          <button
-            type="button"
-            onClick={() =>
-              navigate(
-                "/student/dashboard",
-              )
-            }
-            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            ← Dashboard
-          </button>
-
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/20">
+              <BookOpen size={20} />
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* =================================================
-          MAIN
-      ================================================= */}
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        {/* Hero */}
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-purple-700 to-fuchsia-700 p-6 text-white shadow-2xl sm:p-8">
+          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
+          <div className="absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-fuchsia-400/20 blur-3xl" />
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
+          <div className="relative z-10">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold backdrop-blur">
+                <Sparkles size={14} />
+                {isHindi ? "डेली अपडेट" : "DAILY UPDATE"}
+              </span>
 
-        {/* HERO */}
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold backdrop-blur">
+                <Globe2 size={14} />
+                {isHindi ? "परीक्षा केंद्रित" : "Exam Focused"}
+              </span>
+            </div>
 
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-6 text-white shadow-lg sm:p-8">
+            <h1 className="max-w-3xl text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
+              {isHindi
+                ? "डेली करंट अफेयर्स"
+                : "Daily Current Affairs"}
+            </h1>
 
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-indigo-100 sm:text-base">
+              {isHindi
+                ? "महत्वपूर्ण राष्ट्रीय और अंतरराष्ट्रीय घटनाओं को पढ़ें, समझें और परीक्षा के लिए जरूरी पॉइंट्स को जल्दी रिवाइज करें।"
+                : "Read, understand and revise important national and international events with exam-focused facts and MCQs."}
+            </p>
 
-            <div className="max-w-3xl">
-
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold backdrop-blur">
-                🆓 FREE
+            <div className="mt-6 flex flex-wrap gap-3">
+              <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
+                <div className="flex items-center gap-2 text-xs text-indigo-100">
+                  <FileText size={15} />
+                  {isHindi ? "कुल अपडेट" : "Total Updates"}
+                </div>
+                <p className="mt-1 text-2xl font-black">
+                  {affairs.length}
+                </p>
               </div>
 
-              <h2 className="text-2xl font-black sm:text-3xl">
-                Daily Current Affairs 📰
-              </h2>
+              {latestDate && (
+                <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
+                  <div className="flex items-center gap-2 text-xs text-indigo-100">
+                    <CalendarDays size={15} />
+                    {isHindi ? "नवीनतम" : "Latest"}
+                  </div>
+                  <p className="mt-1 text-sm font-black">
+                    {formatDate(latestDate, language)}
+                  </p>
+                </div>
+              )}
 
-              <p className="mt-3 text-sm leading-6 text-blue-100 sm:text-base">
-                Stay updated with exam-focused
-                current affairs, important facts,
-                exam points, static GK and practice
-                MCQs.
-              </p>
-
-              <p className="mt-4 text-sm font-semibold text-blue-100">
-                Hi {studentName} 👋
-              </p>
-
+              <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
+                <div className="flex items-center gap-2 text-xs text-indigo-100">
+                  <Trophy size={15} />
+                  {isHindi ? "MCQs" : "MCQs"}
+                </div>
+                <p className="mt-1 text-2xl font-black">
+                  {affairs.reduce(
+                    (total, item) =>
+                      total + normalizeMcqs(item.mcqs).length,
+                    0,
+                  )}
+                </p>
+              </div>
             </div>
-
-            <div className="hidden select-none text-7xl md:block">
-              📰
-            </div>
-
           </div>
-
         </section>
 
-        {/* SEARCH + FILTER */}
+        {/* Search */}
+        <section className="mt-6">
+          <div
+            className={`rounded-2xl border p-3 shadow-sm ${
+              isDark
+                ? "border-white/10 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="relative">
+              <Search
+                size={19}
+                className={`absolute left-4 top-1/2 -translate-y-1/2 ${
+                  isDark ? "text-slate-500" : "text-slate-400"
+                }`}
+              />
 
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={
+                  isHindi
+                    ? "करंट अफेयर्स खोजें..."
+                    : "Search current affairs..."
+                }
+                className={`w-full rounded-xl border py-3 pl-11 pr-11 text-sm outline-none transition ${
+                  isDark
+                    ? "border-white/10 bg-slate-950 text-white placeholder:text-slate-500 focus:border-indigo-500"
+                    : "border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white"
+                }`}
+              />
 
-          <div className="relative">
-
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
-              🔎
-            </span>
-
-            <input
-              type="text"
-              value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value,
-                )
-              }
-              placeholder="Search current affairs..."
-              className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-            />
-
-          </div>
-
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-
-            {CATEGORIES.map(
-              (category) => (
+              {search && (
                 <button
-                  key={category}
-                  type="button"
-                  onClick={() =>
-                    setSelectedCategory(
-                      category,
-                    )
-                  }
-                  className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition ${
-                    selectedCategory ===
-                    category
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                  onClick={() => setSearch("")}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 ${
+                    isDark
+                      ? "text-slate-400 hover:bg-white/10"
+                      : "text-slate-500 hover:bg-slate-100"
                   }`}
                 >
-                  {category}
+                  <X size={17} />
                 </button>
-              ),
-            )}
-
+              )}
+            </div>
           </div>
-
         </section>
 
-        {/* SECTION HEADER */}
+        {/* Categories */}
+        <section className="mt-5">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {categories.map((category) => {
+              const active = activeCategory === category;
 
-        <div className="mt-8 flex items-end justify-between gap-4">
+              return (
+                <button
+                  key={category}
+                  onClick={() => setActiveCategory(category)}
+                  className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition ${
+                    active
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
+                      : isDark
+                        ? "border border-white/10 bg-slate-900 text-slate-300 hover:bg-slate-800"
+                        : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {category === "All"
+                    ? isHindi
+                      ? "सभी"
+                      : "All"
+                    : category}
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
+        {/* Result info */}
+        <div className="mt-6 flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
-              Latest Updates
-            </p>
-
-            <h2 className="mt-1 text-xl font-black sm:text-2xl">
-              Important Current Affairs
+            <h2 className="text-xl font-black">
+              {isHindi ? "आज के करंट अफेयर्स" : "Current Affairs"}
             </h2>
+            <p
+              className={`mt-1 text-sm ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
+              {filteredAffairs.length}{" "}
+              {isHindi ? "अपडेट मिले" : "updates found"}
+            </p>
           </div>
 
-          <span className="shrink-0 text-sm font-medium text-slate-500 dark:text-slate-400">
-            {filteredAffairs.length}{" "}
-            {filteredAffairs.length === 1
-              ? "topic"
-              : "topics"}
-          </span>
-
+          {(search || activeCategory !== "All") && (
+            <button
+              onClick={() => {
+                setSearch("");
+                setActiveCategory("All");
+              }}
+              className="text-xs font-bold text-indigo-500 hover:text-indigo-600"
+            >
+              {isHindi ? "फ़िल्टर हटाएं" : "Clear filters"}
+            </button>
+          )}
         </div>
 
-        {/* =================================================
-            LOADING
-        ================================================= */}
-
+        {/* Loading */}
         {loading && (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-
-            <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600 dark:border-slate-700 dark:border-t-blue-400" />
-
-            <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-              Loading current affairs...
-            </p>
-
-            <p className="mt-2 text-xs text-slate-400">
-              Supabase se data fetch ho raha hai...
-            </p>
-
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            {[1, 2, 3, 4].map((item) => (
+              <div
+                key={item}
+                className={`animate-pulse rounded-3xl border p-6 ${
+                  isDark
+                    ? "border-white/10 bg-slate-900"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div
+                  className={`h-4 w-24 rounded ${
+                    isDark ? "bg-slate-800" : "bg-slate-200"
+                  }`}
+                />
+                <div
+                  className={`mt-5 h-6 w-4/5 rounded ${
+                    isDark ? "bg-slate-800" : "bg-slate-200"
+                  }`}
+                />
+                <div
+                  className={`mt-3 h-4 w-full rounded ${
+                    isDark ? "bg-slate-800" : "bg-slate-200"
+                  }`}
+                />
+                <div
+                  className={`mt-2 h-4 w-3/4 rounded ${
+                    isDark ? "bg-slate-800" : "bg-slate-200"
+                  }`}
+                />
+                <div
+                  className={`mt-6 h-10 w-32 rounded-xl ${
+                    isDark ? "bg-slate-800" : "bg-slate-200"
+                  }`}
+                />
+              </div>
+            ))}
           </div>
         )}
 
-        {/* =================================================
-            ERROR
-        ================================================= */}
-
+        {/* Error */}
         {!loading && error && (
-          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950/30">
-
-            <div className="flex items-start gap-3">
-
-              <div className="text-2xl">
-                ⚠️
-              </div>
-
-              <div className="min-w-0">
-
-                <h3 className="font-bold text-red-700 dark:text-red-300">
-                  Unable to load current affairs
-                </h3>
-
-                <p className="mt-2 break-words text-sm leading-6 text-red-600 dark:text-red-400">
-                  {error}
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    void loadCurrentAffairs()
-                  }
-                  className="mt-4 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700"
-                >
-                  Try Again
-                </button>
-
-              </div>
-
+          <div
+            className={`mt-6 rounded-3xl border p-8 text-center ${
+              isDark
+                ? "border-red-500/20 bg-red-500/5"
+                : "border-red-200 bg-red-50"
+            }`}
+          >
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 text-2xl">
+              ⚠️
             </div>
 
-          </div>
-        )}
+            <h3 className="mt-4 text-lg font-black">
+              {isHindi ? "डेटा लोड नहीं हुआ" : "Unable to load data"}
+            </h3>
 
-        {/* =================================================
-            EMPTY
-        ================================================= */}
-
-        {!loading &&
-          !error &&
-          filteredAffairs.length === 0 && (
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-
-              <div className="text-5xl">
-                📰
-              </div>
-
-              <h3 className="mt-4 text-lg font-bold">
-                No current affairs found
-              </h3>
-
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
-                {affairs.length === 0
-                  ? "Database me abhi koi published current affair nahi mila."
-                  : "Try another search term or choose a different category."}
-              </p>
-
-              {(search ||
-                selectedCategory !==
-                  "All") && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="mt-5 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700"
-                >
-                  Clear Filters
-                </button>
-              )}
-
-            </div>
-          )}
-
-        {/* =================================================
-            AFFAIRS GRID
-        ================================================= */}
-
-        {!loading &&
-          !error &&
-          filteredAffairs.length > 0 && (
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-
-              {filteredAffairs.map(
-                (item) => {
-                  const category =
-                    item.category ||
-                    "Other";
-
-                  return (
-                    <article
-                      key={item.id}
-                      className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900"
-                    >
-
-                      {/* CARD TOP */}
-
-                      <div className="flex items-start justify-between gap-3">
-
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                          {category}
-                        </span>
-
-                        <span className="shrink-0 text-xs font-medium text-slate-400">
-                          {formatDate(
-                            item.affair_date,
-                          )}
-                        </span>
-
-                      </div>
-
-                      {/* META */}
-
-                      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-
-                        <span className="rounded-md bg-slate-100 px-2 py-1 font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                          #{item.serial_no}
-                        </span>
-
-                        {item.mcqs.length >
-                          0 && (
-                          <span className="rounded-md bg-green-50 px-2 py-1 font-semibold text-green-700 dark:bg-green-950/40 dark:text-green-300">
-                            📝{" "}
-                            {item.mcqs.length}{" "}
-                            MCQ
-                            {item.mcqs.length !==
-                            1
-                              ? "s"
-                              : ""}
-                          </span>
-                        )}
-
-                      </div>
-
-                      {/* TITLE */}
-
-                      <h3 className="mt-4 line-clamp-3 text-lg font-black leading-7 text-slate-900 dark:text-white">
-                        {item.title}
-                      </h3>
-
-                      {/* WHY IN NEWS */}
-
-                      <p className="mt-3 line-clamp-4 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                        {stripHtml(
-                          item.why_in_news,
-                        ) ||
-                          "Current affair details are available inside."}
-                      </p>
-
-                      {/* EXAM POINT */}
-
-                      {item.exam_point && (
-                        <div className="mt-4 rounded-xl bg-blue-50 px-4 py-3 dark:bg-blue-950/30">
-
-                          <p className="text-[11px] font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400">
-                            🎯 Exam Point
-                          </p>
-
-                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-blue-800 dark:text-blue-300">
-                            {stripHtml(
-                              item.exam_point,
-                            )}
-                          </p>
-
-                        </div>
-                      )}
-
-                      {/* READ MORE */}
-
-                      <div className="mt-auto pt-5">
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openAffair(
-                              item.id,
-                            )
-                          }
-                          className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 group-hover:shadow-md"
-                        >
-                          Read Full Current Affair
-
-                          <span className="ml-2">
-                            →
-                          </span>
-                        </button>
-
-                      </div>
-
-                    </article>
-                  );
-                },
-              )}
-
-            </div>
-          )}
-
-        {/* =================================================
-            DAILY NEWSPAPER
-        ================================================= */}
-
-        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-
-            <div>
-
-              <div className="flex flex-wrap items-center gap-2">
-
-                <span className="text-2xl">
-                  🗞️
-                </span>
-
-                <h2 className="text-lg font-black">
-                  Daily Newspaper
-                </h2>
-
-                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                  Premium
-                </span>
-
-              </div>
-
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Daily curated newspaper with
-                exam-focused important news,
-                available for premium students.
-              </p>
-
-            </div>
+            <p
+              className={`mx-auto mt-2 max-w-md text-sm ${
+                isDark ? "text-slate-400" : "text-slate-600"
+              }`}
+            >
+              {error}
+            </p>
 
             <button
-              type="button"
-              onClick={() =>
-                navigate(
-                  "/student/daily-newspaper",
-                )
-              }
-              className="shrink-0 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+              onClick={retry}
+              className="mt-5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700"
             >
-              View Premium →
+              {isHindi ? "दोबारा प्रयास करें" : "Try again"}
             </button>
-
           </div>
+        )}
 
-        </section>
-
-        {/* =================================================
-            EXAM TIP
-        ================================================= */}
-
-        <section className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-5 dark:border-blue-900/50 dark:bg-blue-950/30">
-
-          <h3 className="font-bold text-blue-900 dark:text-blue-200">
-            🎯 Exam Tip
-          </h3>
-
-          <p className="mt-2 text-sm leading-6 text-blue-800 dark:text-blue-300">
-            Current affairs ko sirf read mat karo.
-            Important names, dates, awards,
-            appointments, places aur numbers ko
-            revise karo. Regular revision se
-            retention better hoti hai.
-          </p>
-
-        </section>
-
-        {/* =================================================
-            BACK TO DASHBOARD
-        ================================================= */}
-
-        <div className="mt-8 flex justify-center">
-
-          <button
-            type="button"
-            onClick={() =>
-              navigate(
-                "/student/dashboard",
-              )
-            }
-            className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        {/* Empty */}
+        {!loading && !error && filteredAffairs.length === 0 && (
+          <div
+            className={`mt-6 rounded-3xl border p-10 text-center ${
+              isDark
+                ? "border-white/10 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
           >
-            ← Back to Dashboard
-          </button>
+            <div
+              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-2xl ${
+                isDark ? "bg-slate-800" : "bg-slate-100"
+              }`}
+            >
+              <Search
+                size={28}
+                className={
+                  isDark ? "text-slate-500" : "text-slate-400"
+                }
+              />
+            </div>
 
-        </div>
+            <h3 className="mt-5 text-lg font-black">
+              {isHindi
+                ? "कोई करंट अफेयर नहीं मिला"
+                : "No current affairs found"}
+            </h3>
 
+            <p
+              className={`mx-auto mt-2 max-w-md text-sm ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
+              {isHindi
+                ? "अपनी search या category बदलकर दोबारा देखें।"
+                : "Try changing your search or category filter."}
+            </p>
+          </div>
+        )}
+
+        {/* Cards */}
+        {!loading && !error && filteredAffairs.length > 0 && (
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            {filteredAffairs.map((item, index) => {
+              const mcqs = normalizeMcqs(item.mcqs);
+              const title = getTitle(item);
+              const whyInNews = getWhyInNews(item);
+
+              return (
+                <article
+                  key={item.id}
+                  className={`group relative overflow-hidden rounded-3xl border p-5 transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-6 ${
+                    isDark
+                      ? "border-white/10 bg-slate-900 hover:border-indigo-500/30"
+                      : "border-slate-200 bg-white hover:border-indigo-200"
+                  }`}
+                >
+                  <div className="absolute right-0 top-0 h-28 w-28 rounded-full bg-indigo-500/5 blur-2xl transition group-hover:bg-indigo-500/10" />
+
+                  <div className="relative">
+                    {/* Meta */}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-lg bg-indigo-500/10 px-2.5 py-1 text-xs font-black text-indigo-500">
+                          #{item.serial_no ?? index + 1}
+                        </span>
+
+                        {item.category && (
+                          <span
+                            className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                              isDark
+                                ? "bg-white/5 text-slate-300"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {item.category}
+                          </span>
+                        )}
+                      </div>
+
+                      <div
+                        className={`flex items-center gap-1.5 text-xs font-medium ${
+                          isDark
+                            ? "text-slate-500"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        <CalendarDays size={14} />
+                        {formatDate(item.affair_date, language)}
+                      </div>
+                    </div>
+
+                    {/* Title */}
+                    <h3 className="mt-5 text-xl font-black leading-snug tracking-tight">
+                      {title}
+                    </h3>
+
+                    {/* Why in News */}
+                    {whyInNews && (
+                      <div
+                        className={`mt-4 rounded-2xl border p-4 ${
+                          isDark
+                            ? "border-white/5 bg-slate-950/60"
+                            : "border-slate-100 bg-slate-50"
+                        }`}
+                      >
+                        <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-indigo-500">
+                          <Clock size={14} />
+                          {isHindi ? "चर्चा में क्यों" : "Why in News"}
+                        </div>
+
+                        <p
+                          className={`line-clamp-3 text-sm leading-6 ${
+                            isDark
+                              ? "text-slate-300"
+                              : "text-slate-600"
+                          }`}
+                        >
+                          {stripHtml(whyInNews)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Exam Point */}
+                    {(item.exam_point || item.exam_point_hi) && (
+                      <div className="mt-4 flex gap-3">
+                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                          <Trophy size={16} />
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wider text-emerald-500">
+                            {isHindi ? "परीक्षा बिंदु" : "Exam Point"}
+                          </p>
+
+                          <p
+                            className={`mt-1 line-clamp-2 text-sm leading-6 ${
+                              isDark
+                                ? "text-slate-400"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            {stripHtml(
+                              isHindi && item.exam_point_hi
+                                ? item.exam_point_hi
+                                : item.exam_point,
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    <div
+                      className={`mt-6 flex items-center justify-between border-t pt-4 ${
+                        isDark
+                          ? "border-white/10"
+                          : "border-slate-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold ${
+                            isDark
+                              ? "bg-white/5 text-slate-300"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          <FileText size={14} />
+                          {mcqs.length}{" "}
+                          {isHindi ? "MCQs" : "MCQs"}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/student/current-affairs/${item.id}`,
+                          )
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-700"
+                      >
+                        {isHindi ? "पूरा पढ़ें" : "Read Full"}
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Newspaper Section */}
+        <section className="mt-10">
+          <div
+            className={`relative overflow-hidden rounded-3xl border p-6 sm:p-8 ${
+              isDark
+                ? "border-white/10 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-purple-500/10 blur-3xl" />
+
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-lg">
+                  <BookOpen size={25} />
+                </div>
+
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-xl font-black">
+                      {isHindi
+                        ? "डेली न्यूज़पेपर"
+                        : "Daily Newspaper"}
+                    </h2>
+
+                    <span className="rounded-full bg-purple-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-purple-500">
+                      {isHindi ? "Premium" : "Premium"}
+                    </span>
+                  </div>
+
+                  <p
+                    className={`mt-2 max-w-2xl text-sm leading-6 ${
+                      isDark
+                        ? "text-slate-400"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    {isHindi
+                      ? "हिंदी और अंग्रेज़ी न्यूज़पेपर पढ़ें और रोज़ की महत्वपूर्ण खबरों से अपडेट रहें।"
+                      : "Read Hindi and English newspapers and stay updated with important daily news."}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() =>
+                  navigate("/student/daily-newspaper")
+                }
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-500/20 transition hover:scale-[1.02]"
+              >
+                {isHindi ? "न्यूज़पेपर खोलें" : "Open Newspaper"}
+                <ChevronRight size={17} />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Exam Tip */}
+        <section className="mt-6 pb-8">
+          <div
+            className={`rounded-3xl border p-5 sm:p-6 ${
+              isDark
+                ? "border-amber-500/10 bg-amber-500/5"
+                : "border-amber-200 bg-amber-50"
+            }`}
+          >
+            <div className="flex gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-xl">
+                💡
+              </div>
+
+              <div>
+                <h3 className="font-black">
+                  {isHindi ? "Exam Tip" : "Exam Tip"}
+                </h3>
+
+                <p
+                  className={`mt-1 text-sm leading-6 ${
+                    isDark
+                      ? "text-slate-400"
+                      : "text-slate-600"
+                  }`}
+                >
+                  {isHindi
+                    ? "करंट अफेयर्स पढ़ते समय केवल खबर याद न करें। उससे जुड़े Static GK और Exam Point को भी जरूर रिवाइज करें।"
+                    : "Don't just memorize the news. Revise the related Static GK and Exam Point to build stronger exam preparation."}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
 
+      {/* Footer */}
+      <footer
+        className={`border-t py-6 ${
+          isDark
+            ? "border-white/10 bg-slate-950"
+            : "border-slate-200 bg-white"
+        }`}
+      >
+        <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+          <p
+            className={`text-xs ${
+              isDark ? "text-slate-500" : "text-slate-400"
+            }`}
+          >
+            © {new Date().getFullYear()} Ranker Bhaiya •{" "}
+            {isHindi
+              ? "सीखें स्मार्ट, तैयारी करें बेहतर।"
+              : "Learn smarter, prepare better."}
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
-
-/* =====================================================
-   MCQ NORMALIZER
-===================================================== */
-
-function normalizeMCQs(
-  value: unknown,
-): MCQ[] {
-  let parsedValue: unknown = value;
-
-  /* -----------------------------------------------------
-     Supabase agar JSON string return kare,
-     to usko parse karo.
-  ----------------------------------------------------- */
-
-  if (typeof parsedValue === "string") {
-    try {
-      parsedValue = JSON.parse(
-        parsedValue,
-      );
-    } catch {
-      return [];
-    }
-  }
-
-  if (!Array.isArray(parsedValue)) {
-    return [];
-  }
-
-  /*
-   * IMPORTANT:
-   *
-   * Yahan map() + filter(type predicate)
-   * intentionally use nahi kiya gaya.
-   *
-   * Isse ye dono TypeScript errors solve hote hain:
-   *
-   * 1. Type '(... | null)[]' is not assignable to type 'MCQ[]'
-   *
-   * 2. A type predicate's type must be assignable
-   *    to its parameter's type.
-   */
-
-  const result: MCQ[] = [];
-
-  for (const item of parsedValue) {
-    /* ---------------------------------------------------
-       BASIC OBJECT CHECK
-    --------------------------------------------------- */
-
-    if (
-      !item ||
-      typeof item !== "object" ||
-      Array.isArray(item)
-    ) {
-      continue;
-    }
-
-    const row =
-      item as Record<
-        string,
-        unknown
-      >;
-
-    /* ---------------------------------------------------
-       QUESTION
-    --------------------------------------------------- */
-
-    const question =
-      typeof row.question === "string"
-        ? row.question.trim()
-        : "";
-
-    if (!question) {
-      continue;
-    }
-
-    /* ---------------------------------------------------
-       OPTIONS
-    --------------------------------------------------- */
-
-    const options: string[] = [];
-
-    if (Array.isArray(row.options)) {
-      for (const option of row.options) {
-        if (
-          typeof option !==
-          "string"
-        ) {
-          continue;
-        }
-
-        const cleanedOption =
-          option.trim();
-
-        if (cleanedOption) {
-          options.push(
-            cleanedOption,
-          );
-        }
-      }
-    }
-
-    /* Exactly 4 options required */
-
-    if (options.length !== 4) {
-      continue;
-    }
-
-    /* ---------------------------------------------------
-       ANSWER
-    --------------------------------------------------- */
-
-    const answer =
-      typeof row.answer === "string"
-        ? row.answer.trim()
-        : "";
-
-    if (!answer) {
-      continue;
-    }
-
-    /* ---------------------------------------------------
-       ANSWER MUST MATCH ONE OPTION
-    --------------------------------------------------- */
-
-    if (!options.includes(answer)) {
-      continue;
-    }
-
-    /* ---------------------------------------------------
-       EXPLANATION
-    --------------------------------------------------- */
-
-    const explanation =
-      typeof row.explanation ===
-      "string"
-        ? row.explanation.trim()
-        : "";
-
-    /* ---------------------------------------------------
-       PUSH VALID MCQ
-    --------------------------------------------------- */
-
-    result.push({
-      question,
-      options,
-      answer,
-      explanation,
-    });
-  }
-
-  return result;
-}
-
-/* =====================================================
-   STRIP HTML
-===================================================== */
-
-function stripHtml(
-  value: string,
-): string {
-  if (!value) {
-    return "";
-  }
-
-  return value
-    .replace(
-      /<br\s*\/?>/gi,
-      " ",
-    )
-    .replace(
-      /<\/p>/gi,
-      " ",
-    )
-    .replace(
-      /<[^>]+>/g,
-      "",
-    )
-    .replace(
-      /&nbsp;/gi,
-      " ",
-    )
-    .replace(
-      /&amp;/gi,
-      "&",
-    )
-    .replace(
-      /&quot;/gi,
-      '"',
-    )
-    .replace(
-      /&#39;/gi,
-      "'",
-    )
-    .replace(
-      /\s+/g,
-      " ",
-    )
-    .trim();
-}
-
-/* =====================================================
-   DEFAULT EXPORT
-===================================================== */
 
 export default WeeklyCurrentAffairs;
