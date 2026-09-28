@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { getDailyMindset } from "../../data/dailyMindsets";
 
 export function StudentDashboard() {
   const navigate = useNavigate();
@@ -10,6 +11,8 @@ export function StudentDashboard() {
   const { theme } = useTheme();
 
   const isDark = theme === "dark";
+
+  const dailyMindset = getDailyMindset();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -42,10 +45,7 @@ export function StudentDashboard() {
     document.addEventListener("mousedown", handleOutsideClick);
 
     return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleOutsideClick,
-      );
+      document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, []);
 
@@ -178,7 +178,9 @@ export function StudentDashboard() {
           : "bg-slate-50 text-slate-900"
       }`}
     >
-      {/* Header */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
       <header
         className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
           isDark
@@ -312,9 +314,12 @@ export function StudentDashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-        {/* Welcome Hero */}
+        {/* =====================================================
+            WELCOME HERO
+        ===================================================== */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-purple-700 to-fuchsia-700 p-6 text-white shadow-2xl sm:p-8 lg:p-10">
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+
           <div className="absolute -bottom-20 left-1/3 h-64 w-64 rounded-full bg-fuchsia-400/20 blur-3xl" />
 
           <div className="relative z-10">
@@ -356,7 +361,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* Profile Completion */}
+        {/* =====================================================
+            PROFILE COMPLETION
+        ===================================================== */}
         {profileIncomplete && (
           <section
             className={`mt-6 rounded-2xl border p-5 ${
@@ -378,8 +385,8 @@ export function StudentDashboard() {
                       : "text-slate-600"
                   }`}
                 >
-                  Add your class, board and exam details for
-                  a better Ranker Bhaiya experience.
+                  Add your class, board and exam details
+                  for a better Ranker Bhaiya experience.
                 </p>
               </div>
 
@@ -393,7 +400,66 @@ export function StudentDashboard() {
           </section>
         )}
 
-        {/* Preparation Tools */}
+        {/* =====================================================
+            DAILY MINDSET
+        ===================================================== */}
+        <section className="mt-8">
+          <div
+            className={`relative overflow-hidden rounded-3xl border p-6 shadow-lg sm:p-7 ${
+              isDark
+                ? "border-white/10 bg-gradient-to-br from-slate-900 via-indigo-950/40 to-purple-950/40"
+                : "border-indigo-100 bg-gradient-to-br from-white via-indigo-50 to-purple-50"
+            }`}
+          >
+            <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl" />
+
+            <div className="absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-purple-500/10 blur-3xl" />
+
+            <div className="relative z-10 flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl shadow-lg">
+                🧠
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`text-xs font-black uppercase tracking-wider ${
+                      isDark
+                        ? "text-indigo-300"
+                        : "text-indigo-600"
+                    }`}
+                  >
+                    Daily Mindset
+                  </span>
+
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
+                      isDark
+                        ? "bg-white/10 text-slate-300"
+                        : "bg-indigo-100 text-indigo-700"
+                    }`}
+                  >
+                    💡 TODAY'S THOUGHT
+                  </span>
+                </div>
+
+                <p
+                  className={`mt-3 text-lg font-black leading-8 sm:text-xl ${
+                    isDark
+                      ? "text-white"
+                      : "text-slate-900"
+                  }`}
+                >
+                  {dailyMindset.en}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =====================================================
+            PREPARATION TOOLS
+        ===================================================== */}
         <section className="mt-10">
           <div className="mb-5">
             <h2 className="text-2xl font-black">
@@ -451,7 +517,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* Learning Hub */}
+        {/* =====================================================
+            LEARNING HUB
+        ===================================================== */}
         <section className="mt-10">
           <div className="mb-5">
             <h2 className="text-2xl font-black">
@@ -512,7 +580,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* Daily Challenge Feature */}
+        {/* =====================================================
+            DAILY CHALLENGE
+        ===================================================== */}
         <section className="mt-10">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-red-500 to-pink-600 p-6 text-white shadow-2xl sm:p-8">
             <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
@@ -545,7 +615,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* About */}
+        {/* =====================================================
+            ABOUT
+        ===================================================== */}
         <section className="mt-10 pb-8">
           <div
             className={`rounded-3xl border p-6 sm:p-8 ${
@@ -587,6 +659,9 @@ export function StudentDashboard() {
         </section>
       </main>
 
+      {/* =====================================================
+          FOOTER
+      ===================================================== */}
       <footer
         className={`border-t py-6 ${
           isDark
