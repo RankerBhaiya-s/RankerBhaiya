@@ -2,1070 +2,912 @@ import {
   useEffect,
   useMemo,
   useState,
-  type FormEvent,
-  type ReactNode,
+  type CSSProperties,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { useTheme } from "../../context/ThemeContext";
+/* =====================================================
+   TYPES
+===================================================== */
 
-interface HandwrittenNotesLocationState {
-  topic?: string;
-  content?: string;
-  source?: string;
-}
-
-interface StructuredNotes {
+interface NoteSection {
   title: string;
-  introduction: string;
-  keyConcepts: string[];
-  importantFacts: string[];
-  examPoint: string;
+  points: string[];
+}
+
+interface NoteData {
+  topic: string;
+  introduction?: string;
+  sections: NoteSection[];
+  importantPoints: string[];
+  examPoint?: string;
   quickRevision: string[];
-  memoryTrick: string;
+  memoryTrick?: string;
 }
 
-interface NotePage {
-  pageNumber: number;
-  notes: StructuredNotes;
-}
+/* =====================================================
+   HELPERS
+===================================================== */
 
-interface NoteStyle {
-  id: string;
-  name: string;
-  font: string;
-  description: string;
-}
-
-const NOTE_STYLES: NoteStyle[] = [
-  {
-    id: "classic",
-    name: "Classic Handwritten",
-    font: '"Segoe Print", "Comic Sans MS", cursive',
-    description: "Clean classroom-notes look",
-  },
-  {
-    id: "exam",
-    name: "Exam Revision",
-    font: '"Bradley Hand", "Segoe Print", cursive',
-    description: "Compact competitive-exam style",
-  },
-  {
-    id: "study",
-    name: "Study Notes",
-    font: '"Comic Sans MS", "Segoe Print", cursive',
-    description: "Natural handwritten appearance",
-  },
-];
-
-const DEMO_TOPIC = "Photosynthesis";
-
-const DEMO_CONTENT = `Photosynthesis is the process by which green plants prepare their own food using sunlight, carbon dioxide and water.
-
-This process mainly takes place in the green parts of plants because they contain chlorophyll.
-
-Roots absorb water from the soil while carbon dioxide enters the leaves through tiny pores called stomata.
-
-Chlorophyll captures sunlight and provides the energy needed for photosynthesis.
-
-The food produced is mainly glucose, which can later be stored as starch.
-
-Photosynthesis also releases oxygen into the atmosphere.
-
-The process is important because it provides food for plants and releases oxygen required by living organisms.`;
-
-function cleanText(value: string) {
+function cleanText(value: string): string {
   return value
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .replace(/\u00a0/g, " ")
-    .trim();
-}
-
-function splitSentences(value: string): string[] {
-  return value
-    .replace(/\n+/g, " ")
-    .split(/(?<=[.!?])\s+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function makeShortPoint(value: string, maxLength = 145) {
-  const cleaned = value
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\*\*/g, "")
+    .replace(/__/g, "")
+    .replace(/`/g, "")
     .replace(/\s+/g, " ")
-    .replace(/^[-•*]\s*/, "")
     .trim();
+}
 
-  if (cleaned.length <= maxLength) {
-    return cleaned;
+function removeMarkdownTable(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) return true;
+
+      if (
+        /^\|?\s*:?-+:?\s*\|/.test(trimmed) ||
+        /^\|?\s*-{3,}\s*\|/.test(trimmed)
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .join("\n");
+}
+
+function extractBullets(text: string): string[] {
+  return text
+    .split(/\n|•|(?<=\.)\s+(?=[A-Z][^.!?]{3,80}:)/)
+    .map((item) =>
+      cleanText(
+        item
+          .replace(/^[-*•]\s*/, "")
+          .replace(/^\d+[.)]\s*/, ""),
+      ),
+    )
+    .filter((item) => item.length > 2)
+    .filter(
+      (item, index, array) =>
+        array.findIndex(
+          (x) =>
+            x.toLowerCase() === item.toLowerCase(),
+        ) === index,
+    );
+}
+
+/* =====================================================
+   PARSER
+===================================================== */
+
+function parseNotes(rawContent: string): NoteData {
+  const source = removeMarkdownTable(rawContent);
+
+  const lines = source
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let topic = "Study Notes";
+
+  const titleLine = lines.find((line) => {
+    const clean = cleanText(line);
+
+    return (
+      clean.length > 2 &&
+      clean.length < 120 &&
+      !clean.includes("|") &&
+      !/^important points$/i.test(clean) &&
+      !/^exam revision$/i.test(clean) &&
+      !/^quick revision$/i.test(clean)
+    );
+  });
+
+  if (titleLine) {
+    topic = cleanText(
+      titleLine
+        .replace(/^#+\s*/, "")
+        .replace(/^topic\s*:/i, ""),
+    );
   }
 
-  return `${cleaned.slice(0, maxLength).trim()}…`;
-}
+  const sections: NoteSection[] = [];
 
-function removeDuplicatePoints(points: string[]) {
-  const seen = new Set<string>();
+  let currentSection: NoteSection | null = null;
 
-  return points.filter((point) => {
-    const key = point.toLowerCase().replace(/\W/g, "");
+  const importantPoints: string[] = [];
+  const quickRevision: string[] = [];
 
-    if (!key || seen.has(key)) {
-      return false;
+  let examPoint = "";
+  let memoryTrick = "";
+  let introduction = "";
+
+  for (const rawLine of lines) {
+    const line = cleanText(
+      rawLine
+        .replace(/^#+\s*/, "")
+        .replace(/^\|/, "")
+        .replace(/\|$/, ""),
+    );
+
+    if (!line) continue;
+
+    /* Ignore branding / duplicate headings */
+
+    if (
+      /^ranker bhaiya$/i.test(line) ||
+      /^ask vidhya/i.test(line) ||
+      /^ai notes$/i.test(line) ||
+      /^important points$/i.test(line) ||
+      /^exam revision$/i.test(line)
+    ) {
+      continue;
     }
 
-    seen.add(key);
-    return true;
-  });
-}
+    /* Exam point */
 
-function getTopicKeywords(topic: string) {
-  return topic
-    .split(/\s+/)
-    .map((word) => word.replace(/[^\w]/g, "").toLowerCase())
-    .filter((word) => word.length > 3);
-}
+    if (
+      /^exam point\s*:?\s*/i.test(line) ||
+      /^exam tip\s*:?\s*/i.test(line)
+    ) {
+      examPoint = line
+        .replace(
+          /^exam (point|tip)\s*:?\s*/i,
+          "",
+        )
+        .trim();
 
-function buildStructuredNotes(
-  topicInput: string,
-  contentInput: string,
-): StructuredNotes {
-  const topic = topicInput.trim() || "Study Notes";
-  const content = cleanText(contentInput);
+      continue;
+    }
 
-  const paragraphs = content
-    .split(/\n\s*\n/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+    /* Memory trick */
 
-  const sentences = splitSentences(content);
+    if (
+      /^memory trick\s*:?\s*/i.test(line) ||
+      /^mnemonic\s*:?\s*/i.test(line)
+    ) {
+      memoryTrick = line
+        .replace(
+          /^(memory trick|mnemonic)\s*:?\s*/i,
+          "",
+        )
+        .trim();
 
-  const usableSentences =
-    sentences.length > 0
-      ? sentences
-      : paragraphs.flatMap(splitSentences);
+      continue;
+    }
 
-  const intro =
-    paragraphs[0] ||
-    usableSentences[0] ||
-    `Key study notes on ${topic}.`;
+    /* Quick revision */
 
-  const remaining = usableSentences.slice(1);
+    if (
+      /^quick revision\s*:?\s*/i.test(line)
+    ) {
+      continue;
+    }
 
-  const keyConcepts = removeDuplicatePoints(
-    remaining
-      .slice(0, 5)
-      .map((item) => makeShortPoint(item)),
-  );
+    if (
+      /^[-•*]\s*/.test(rawLine) &&
+      currentSection
+    ) {
+      const point = cleanText(
+        rawLine.replace(/^[-•*]\s*/, ""),
+      );
 
-  const importantFacts = removeDuplicatePoints(
-    [
-      ...remaining.slice(5, 10),
-      ...paragraphs.slice(1, 4),
-    ].map((item) => makeShortPoint(item)),
-  ).slice(0, 6);
+      if (
+        point &&
+        !currentSection.points.some(
+          (item) =>
+            item.toLowerCase() ===
+            point.toLowerCase(),
+        )
+      ) {
+        currentSection.points.push(point);
+      }
 
-  const allFacts = removeDuplicatePoints(
-    usableSentences.map((item) => makeShortPoint(item)),
-  );
+      continue;
+    }
 
-  const quickRevisionSource =
-    allFacts.length > 0
-      ? allFacts.slice(0, 5)
-      : [makeShortPoint(content)];
+    /* Section headings */
 
-  const keywords = getTopicKeywords(topic);
+    const headingMatch =
+      line.match(
+        /^(?:\d+[.)]\s*)?(.{3,80})$/,
+      );
 
-  const keywordText =
-    keywords.length > 0
-      ? keywords.slice(0, 3).join(", ")
-      : "the main concepts";
+    const looksLikeHeading =
+      /^(\d+[.)]\s*)?(constitutional|legislative|executive|military|foreign|introduction|overview|powers|functions|features|causes|effects|advantages|disadvantages|types|importance|definition|meaning)/i.test(
+        line,
+      );
 
-  const examPoint =
-    importantFacts[0] ||
-    keyConcepts[0] ||
-    `Focus on the main concepts, facts and keywords related to ${topic}.`;
+    if (
+      looksLikeHeading &&
+      !line.includes(". ")
+    ) {
+      currentSection = {
+        title: line.replace(
+          /^\d+[.)]\s*/,
+          "",
+        ),
+        points: [],
+      };
 
-  const memoryTrick =
-    keyConcepts.length >= 2
-      ? `${topic}: remember the core idea first, then connect it with ${keywordText}.`
-      : `Revise ${topic} using the highlighted facts and one-line revision points.`;
+      sections.push(currentSection);
+
+      continue;
+    }
+
+    /* Important points */
+
+    if (
+      /important|key fact|मुख्य तथ्य|महत्वपूर्ण/i.test(
+        line,
+      )
+    ) {
+      continue;
+    }
+
+    /* Table-like content */
+
+    if (line.includes("|")) {
+      const cells = line
+        .split("|")
+        .map((cell) =>
+          cleanText(cell),
+        )
+        .filter(Boolean);
+
+      if (cells.length >= 2) {
+        const heading = cells[0];
+        const detail = cells
+          .slice(1)
+          .join(" — ");
+
+        if (
+          heading &&
+          detail &&
+          !/^क्षेत्र$/i.test(
+            heading,
+          )
+        ) {
+          const section = {
+            title: heading,
+            points: [detail],
+          };
+
+          sections.push(section);
+          currentSection = section;
+        }
+
+        continue;
+      }
+    }
+
+    /* Normal bullet-like content */
+
+    if (
+      line.length > 15 &&
+      currentSection
+    ) {
+      if (
+        !currentSection.points.some(
+          (item) =>
+            item.toLowerCase() ===
+            line.toLowerCase(),
+        )
+      ) {
+        currentSection.points.push(
+          line,
+        );
+      }
+
+      continue;
+    }
+
+    /* Introduction */
+
+    if (
+      !introduction &&
+      line.length > 30 &&
+      !line.includes(":")
+    ) {
+      introduction = line;
+    }
+  }
+
+  /*
+   * If parser could not identify sections,
+   * create a clean general section.
+   */
+
+  if (sections.length === 0) {
+    const fallbackPoints =
+      extractBullets(source);
+
+    if (fallbackPoints.length > 0) {
+      sections.push({
+        title: "मुख्य बातें",
+        points:
+          fallbackPoints.slice(0, 12),
+      });
+    }
+  }
+
+  /*
+   * Remove duplicate sections.
+   */
+
+  const uniqueSections =
+    sections.filter(
+      (section, index, array) => {
+        const signature =
+          section.title
+            .toLowerCase()
+            .replace(/\s+/g, " ");
+
+        return (
+          array.findIndex(
+            (item) =>
+              item.title
+                .toLowerCase()
+                .replace(/\s+/g, " ") ===
+              signature,
+          ) === index
+        );
+      },
+    );
+
+  /*
+   * Generate important points from
+   * section content if AI didn't provide
+   * a dedicated section.
+   */
+
+  if (importantPoints.length === 0) {
+    for (const section of uniqueSections) {
+      for (const point of section.points) {
+        if (
+          importantPoints.length >= 5
+        ) {
+          break;
+        }
+
+        if (
+          point.length > 20 &&
+          !importantPoints.some(
+            (item) =>
+              item.toLowerCase() ===
+              point.toLowerCase(),
+          )
+        ) {
+          importantPoints.push(
+            point,
+          );
+        }
+      }
+    }
+  }
+
+  /*
+   * Quick revision should contain short
+   * section names, not duplicated paragraphs.
+   */
+
+  for (const section of uniqueSections) {
+    if (
+      quickRevision.length >= 6
+    ) {
+      break;
+    }
+
+    const title =
+      section.title.trim();
+
+    if (
+      title.length > 2 &&
+      !quickRevision.some(
+        (item) =>
+          item.toLowerCase() ===
+          title.toLowerCase(),
+      )
+    ) {
+      quickRevision.push(title);
+    }
+  }
 
   return {
-    title: topic,
-    introduction: makeShortPoint(intro, 240),
-    keyConcepts:
-      keyConcepts.length > 0
-        ? keyConcepts
-        : [makeShortPoint(content, 150)],
-    importantFacts:
-      importantFacts.length > 0
-        ? importantFacts
-        : allFacts.slice(0, 5),
-    examPoint: makeShortPoint(examPoint, 220),
-    quickRevision: quickRevisionSource,
-    memoryTrick: makeShortPoint(memoryTrick, 220),
-  };
-}
-
-function createPages(
-  topic: string,
-  content: string,
-): NotePage[] {
-  const structured = buildStructuredNotes(
     topic,
-    content,
-  );
-
-  const pageOne: StructuredNotes = {
-    ...structured,
-    importantFacts: structured.importantFacts.slice(
-      0,
-      3,
-    ),
-    quickRevision: structured.quickRevision.slice(
-      0,
-      3,
-    ),
+    introduction,
+    sections:
+      uniqueSections.filter(
+        (section) =>
+          section.points.length > 0,
+      ),
+    importantPoints:
+      importantPoints.slice(0, 6),
+    examPoint,
+    quickRevision:
+      quickRevision.slice(0, 6),
+    memoryTrick,
   };
-
-  const pageTwoNeeded =
-    structured.importantFacts.length > 3 ||
-    structured.quickRevision.length > 3;
-
-  const pages: NotePage[] = [
-    {
-      pageNumber: 1,
-      notes: pageOne,
-    },
-  ];
-
-  if (pageTwoNeeded) {
-    pages.push({
-      pageNumber: 2,
-      notes: {
-        ...structured,
-        introduction: structured.examPoint,
-        keyConcepts: structured.keyConcepts.slice(0, 5),
-        importantFacts:
-          structured.importantFacts.slice(3, 6),
-        quickRevision:
-          structured.quickRevision.slice(3, 6),
-      },
-    });
-  }
-
-  return pages;
 }
 
-function SectionTitle({
-  number,
-  title,
-}: {
-  number: string;
-  title: string;
-}) {
-  return (
-    <div className="mb-3 flex items-center gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-indigo-500 text-xs font-black text-indigo-700">
-        {number}
-      </div>
+/* =====================================================
+   COMPONENT
+===================================================== */
 
-      <h2 className="text-[19px] font-black uppercase tracking-wide text-indigo-800">
-        {title}
-      </h2>
-    </div>
-  );
-}
-
-function BulletList({
-  items,
-  marker = "•",
-}: {
-  items: string[];
-  marker?: string;
-}) {
-  return (
-    <ul className="space-y-2.5">
-      {items.map((item, index) => (
-        <li
-          key={`${item}-${index}`}
-          className="flex gap-3 text-[15px] font-semibold leading-7 text-slate-700"
-        >
-          <span className="mt-0.5 shrink-0 font-black text-indigo-600">
-            {marker}
-          </span>
-
-          <span>{item}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function NotebookPage({
-  page,
-  font,
-  darkMode,
-}: {
-  page: NotePage;
-  font: string;
-  darkMode: boolean;
-}) {
-  const { notes } = page;
-
-  return (
-    <div
-      className={`relative mx-auto min-h-[820px] w-full max-w-[850px] overflow-hidden rounded-[4px] border shadow-2xl ${
-        darkMode
-          ? "border-slate-700"
-          : "border-slate-300"
-      }`}
-      style={{
-        fontFamily: font,
-        backgroundColor: "#fffdf5",
-      }}
-    >
-      {/* Ruled paper */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(to bottom, transparent 0px, transparent 34px, rgba(70,130,200,0.18) 35px)",
-          backgroundPosition: "0 48px",
-        }}
-      />
-
-      {/* Red margin */}
-      <div className="pointer-events-none absolute bottom-0 left-[74px] top-0 w-[2px] bg-red-300/80" />
-
-      {/* Spiral */}
-      <div className="absolute bottom-0 left-0 top-0 z-20 flex w-[30px] flex-col items-center justify-around py-8">
-        {Array.from({ length: 17 }).map((_, index) => (
-          <div
-            key={index}
-            className="h-4 w-4 rounded-full border-2 border-slate-500 bg-slate-200 shadow-inner"
-          />
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="relative z-10 px-8 pb-10 pl-[98px] pt-10 sm:pr-12">
-        {/* Branding */}
-        <div className="mb-7 flex items-start justify-between gap-4 border-b-2 border-indigo-200 pb-4">
-          <div>
-            <div className="text-[18px] font-black tracking-[0.08em] text-indigo-700">
-              RANKER BHAIYA
-            </div>
-
-            <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              Ask Vidhya • Handwritten Revision Notes
-            </div>
-          </div>
-
-          <div className="rounded-lg border-2 border-indigo-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-indigo-600">
-            Exam Notes
-          </div>
-        </div>
-
-        {/* Topic */}
-        <div className="mb-7">
-          <div className="mb-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-            Topic
-          </div>
-
-          <h1 className="text-[29px] font-black leading-tight text-slate-900">
-            {notes.title}
-          </h1>
-        </div>
-
-        {/* 01 Introduction */}
-        <section className="mb-7">
-          <SectionTitle
-            number="01"
-            title="Introduction"
-          />
-
-          <p className="pl-11 text-[16px] font-semibold leading-8 text-slate-700">
-            {notes.introduction}
-          </p>
-        </section>
-
-        {/* 02 Key Concepts */}
-        <section className="mb-7">
-          <SectionTitle
-            number="02"
-            title="Key Concepts"
-          />
-
-          <div className="pl-11">
-            <BulletList items={notes.keyConcepts} />
-          </div>
-        </section>
-
-        {/* 03 Important Facts */}
-        {notes.importantFacts.length > 0 && (
-          <section className="mb-7">
-            <SectionTitle
-              number="03"
-              title="Important Facts"
-            />
-
-            <div className="rounded-xl border-2 border-amber-300 bg-amber-50/80 p-4 pl-5">
-              <BulletList
-                items={notes.importantFacts}
-                marker="★"
-              />
-            </div>
-          </section>
-        )}
-
-        {/* 04 Exam Point */}
-        <section className="mb-7">
-          <SectionTitle
-            number="04"
-            title="Exam Point"
-          />
-
-          <div className="rounded-xl border-2 border-indigo-400 bg-indigo-50/90 p-5">
-            <div className="mb-2 text-[11px] font-black uppercase tracking-[0.15em] text-indigo-700">
-              🎯 Remember for the exam
-            </div>
-
-            <p className="text-[15px] font-bold leading-7 text-slate-700">
-              {notes.examPoint}
-            </p>
-          </div>
-        </section>
-
-        {/* 05 Quick Revision */}
-        <section className="mb-7">
-          <SectionTitle
-            number="05"
-            title="Quick Revision"
-          />
-
-          <div className="pl-11">
-            <BulletList
-              items={notes.quickRevision}
-              marker="→"
-            />
-          </div>
-        </section>
-
-        {/* 06 Memory Trick */}
-        <section className="mb-7">
-          <SectionTitle
-            number="06"
-            title="Memory Trick"
-          />
-
-          <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50/80 p-4">
-            <p className="text-[15px] font-bold leading-7 text-slate-700">
-              🧠 {notes.memoryTrick}
-            </p>
-          </div>
-        </section>
-
-        {/* Footer */}
-        <div className="mt-8 flex items-center justify-between border-t-2 border-slate-300 pt-4 text-[10px] font-black uppercase tracking-wider text-slate-400">
-          <span>RANKER BHAIYA</span>
-
-          <span>
-            ASK VIDHYA • PAGE {page.pageNumber}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Feature({
-  icon,
-  title,
-  description,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-xl dark:bg-indigo-950">
-        {icon}
-      </div>
-
-      <h3 className="font-bold text-slate-900 dark:text-white">
-        {title}
-      </h3>
-
-      <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-export default function HandwrittenNotes() {
-  const location = useLocation();
+export function HandwrittenNotes() {
   const navigate = useNavigate();
-  const { theme } = useTheme();
+  const location = useLocation();
 
-  const noteState =
-    location.state as
-      | HandwrittenNotesLocationState
-      | null;
+  const [rawContent, setRawContent] =
+    useState("");
 
-  const incomingTopic =
-    noteState?.topic?.trim() || "";
+  const [topic, setTopic] =
+    useState("");
 
-  const incomingContent =
-    noteState?.content?.trim() || "";
+  const [generating, setGenerating] =
+    useState(false);
 
-  const [topic, setTopic] = useState(
-    incomingTopic || DEMO_TOPIC,
-  );
+  const [error, setError] =
+    useState("");
 
-  const [content, setContent] = useState(
-    incomingContent || DEMO_CONTENT,
-  );
-
-  const [selectedStyle, setSelectedStyle] =
-    useState("exam");
-
-  const [pages, setPages] = useState<NotePage[]>(() =>
-    createPages(
-      incomingTopic || DEMO_TOPIC,
-      incomingContent || DEMO_CONTENT,
-    ),
-  );
-
-  const [currentPage, setCurrentPage] = useState(0);
-
-  const [generated, setGenerated] = useState(
-    Boolean(incomingContent),
-  );
+  /* ===================================================
+     RECEIVE CONTENT
+  =================================================== */
 
   useEffect(() => {
-    if (!incomingTopic && !incomingContent) {
-      return;
+    const state =
+      location.state as
+        | {
+            content?: string;
+            topic?: string;
+          }
+        | null;
+
+    const stored =
+      sessionStorage.getItem(
+        "ranker_bhaiya_handwritten_notes",
+      );
+
+    const content =
+      state?.content ||
+      stored ||
+      "";
+
+    const incomingTopic =
+      state?.topic || "";
+
+    setRawContent(content);
+    setTopic(incomingTopic);
+
+    if (content) {
+      sessionStorage.setItem(
+        "ranker_bhaiya_handwritten_notes",
+        content,
+      );
     }
+  }, [location.state]);
 
-    const nextTopic =
-      incomingTopic || "AI Generated Notes";
+  /* ===================================================
+     PARSED NOTES
+  =================================================== */
 
-    const nextContent =
-      incomingContent || DEMO_CONTENT;
-
-    setTopic(nextTopic);
-    setContent(nextContent);
-
-    setPages(
-      createPages(nextTopic, nextContent),
-    );
-
-    setCurrentPage(0);
-    setGenerated(true);
-  }, [incomingTopic, incomingContent]);
-
-  const activeStyle = useMemo(
+  const notes = useMemo(
     () =>
-      NOTE_STYLES.find(
-        (style) => style.id === selectedStyle,
-      ) || NOTE_STYLES[0],
-    [selectedStyle],
+      parseNotes(
+        rawContent || topic,
+      ),
+    [rawContent, topic],
   );
 
-  const darkMode = theme === "dark";
+  /* ===================================================
+     PRINT
+  =================================================== */
 
-  const handleGenerate = (event: FormEvent) => {
-    event.preventDefault();
-
-    const cleanTopic =
-      topic.trim() || "Study Notes";
-
-    const cleanContent = cleanText(content);
-
-    if (!cleanContent) {
-      return;
-    }
-
-    setPages(
-      createPages(
-        cleanTopic,
-        cleanContent,
-      ),
-    );
-
-    setTopic(cleanTopic);
-    setContent(cleanContent);
-    setCurrentPage(0);
-    setGenerated(true);
-  };
-
-  const handleReset = () => {
-    setTopic(DEMO_TOPIC);
-    setContent(DEMO_CONTENT);
-
-    setPages(
-      createPages(
-        DEMO_TOPIC,
-        DEMO_CONTENT,
-      ),
-    );
-
-    setCurrentPage(0);
-    setGenerated(false);
-  };
-
-  const handlePrint = () => {
+  function handlePrint() {
     window.print();
-  };
+  }
 
-  const handleDownloadText = () => {
-    const structured = buildStructuredNotes(
-      topic,
-      content,
-    );
+  /* ===================================================
+     BACK
+  =================================================== */
 
-    const text = [
-      "RANKER BHAIYA",
-      "ASK VIDHYA — HANDWRITTEN REVISION NOTES",
-      "",
-      `TOPIC: ${structured.title}`,
-      "",
-      "01. INTRODUCTION",
-      structured.introduction,
-      "",
-      "02. KEY CONCEPTS",
-      ...structured.keyConcepts.map(
-        (item) => `• ${item}`,
-      ),
-      "",
-      "03. IMPORTANT FACTS",
-      ...structured.importantFacts.map(
-        (item) => `★ ${item}`,
-      ),
-      "",
-      "04. EXAM POINT",
-      structured.examPoint,
-      "",
-      "05. QUICK REVISION",
-      ...structured.quickRevision.map(
-        (item) => `→ ${item}`,
-      ),
-      "",
-      "06. MEMORY TRICK",
-      structured.memoryTrick,
-      "",
-      "Generated by Ranker Bhaiya • Ask Vidhya",
-    ].join("\n");
+  function handleBack() {
+    navigate("/student/ask");
+  }
 
-    const blob = new Blob([text], {
-      type: "text/plain;charset=utf-8",
-    });
+  /* ===================================================
+     EMPTY STATE
+  =================================================== */
 
-    const url = URL.createObjectURL(blob);
+  if (!rawContent && !topic) {
+    return (
+      <div className="min-h-screen bg-[#f6f1e7] px-4 py-10">
+        <div className="mx-auto max-w-xl rounded-3xl bg-white p-8 text-center shadow-lg">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 text-4xl">
+            ✍️
+          </div>
 
-    const anchor = document.createElement("a");
+          <h1 className="mt-5 text-2xl font-black text-slate-900">
+            No Notes Found
+          </h1>
 
-    anchor.href = url;
-
-    anchor.download =
-      `${topic
-        .replace(/[^a-z0-9]+/gi, "-")
-        .toLowerCase()
-        .replace(/^-+|-+$/g, "") ||
-        "ranker-bhaiya-notes"}.txt`;
-
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div
-      className={`min-h-screen ${
-        darkMode
-          ? "bg-slate-950 text-white"
-          : "bg-slate-50 text-slate-900"
-      }`}
-    >
-      <style>
-        {`
-          @media print {
-            body {
-              background: white !important;
-            }
-
-            .no-print {
-              display: none !important;
-            }
-
-            .print-area {
-              display: block !important;
-            }
-
-            .notebook-print-page {
-              page-break-after: always;
-            }
-
-            @page {
-              size: A4;
-              margin: 0;
-            }
-          }
-        `}
-      </style>
-
-      {/* HEADER */}
-      <header className="no-print sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <button
-            type="button"
-            onClick={() =>
-              navigate("/student/ask")
-            }
-            className="flex items-center gap-3"
-          >
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-lg font-black text-white shadow-lg">
-              R
-            </div>
-
-            <div className="text-left">
-              <div className="font-black tracking-wide">
-                RANKER BHAIYA
-              </div>
-
-              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Ask Vidhya • Handwritten Notes
-              </div>
-            </div>
-          </button>
+          <p className="mt-2 text-sm text-slate-500">
+            Ask Vidhya se notes generate
+            karne ke baad yahan handwritten
+            notes appear honge.
+          </p>
 
           <button
             type="button"
-            onClick={() =>
-              navigate("/student/ask")
-            }
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold dark:border-slate-700"
+            onClick={handleBack}
+            className="mt-6 rounded-xl bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700"
           >
             ← Ask Vidhya
           </button>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* HERO */}
-        <section className="no-print overflow-hidden rounded-[30px] bg-gradient-to-br from-indigo-700 via-violet-700 to-fuchsia-700 p-7 text-white shadow-2xl sm:p-9 lg:p-11">
-          <div className="max-w-4xl">
-            <div className="mb-4 inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-wider">
-              ✍️ AI Handwritten Revision Notes
-            </div>
+  /* ===================================================
+     PAGE
+  =================================================== */
 
-            <h1 className="text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">
-              Convert Ask Vidhya answers into exam-ready handwritten notes.
-            </h1>
+  return (
+    <div className="min-h-screen bg-[#e8e2d6] px-3 py-6 text-[#252525] print:bg-white print:px-0 print:py-0">
+      {/* =================================================
+          ACTION BAR
+      ================================================= */}
 
-            <p className="mt-5 max-w-3xl text-sm leading-7 text-indigo-100 sm:text-base">
-              Structured for competitive-exam preparation with
-              key concepts, important facts, exam points,
-              quick revision and memory tricks.
-            </p>
+      <div className="mx-auto mb-5 flex max-w-[900px] items-center justify-between gap-3 print:hidden">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          ← Ask Vidhya
+        </button>
 
-            <div className="mt-6 flex flex-wrap gap-3 text-xs font-black">
-              <span className="rounded-full bg-white/15 px-4 py-2">
-                RANKER BHAIYA
-              </span>
+        <button
+          type="button"
+          onClick={handlePrint}
+          className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
+        >
+          🖨️ Download / Print PDF
+        </button>
+      </div>
 
-              <span className="rounded-full bg-white/15 px-4 py-2">
-                ASK VIDHYA
-              </span>
+      {/* =================================================
+          NOTEBOOK PAGE
+      ================================================= */}
 
-              <span className="rounded-full bg-white/15 px-4 py-2">
-                EXAM READY
-              </span>
-            </div>
-          </div>
-        </section>
+      <main
+        className="note-page relative mx-auto max-w-[900px] overflow-hidden bg-[#fffdf7] shadow-2xl print:max-w-none print:shadow-none"
+        style={
+          {
+            "--line-height":
+              "34px",
+          } as CSSProperties
+        }
+      >
+        {/* =================================================
+            PAPER LINES
+        ================================================= */}
 
-        {/* FEATURES */}
-        <section className="no-print mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Feature
-            icon="📌"
-            title="Structured Notes"
-            description="Proper exam-oriented hierarchy instead of casual paragraphs."
-          />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-70"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(to bottom, transparent 0px, transparent 33px, rgba(91,132,180,0.20) 34px)",
+          }}
+        />
 
-          <Feature
-            icon="⭐"
-            title="Important Facts"
-            description="Key facts are separated for faster revision."
-          />
+        {/* LEFT RED MARGIN */}
 
-          <Feature
-            icon="🎯"
-            title="Exam Point"
-            description="A dedicated section for examination relevance."
-          />
+        <div className="pointer-events-none absolute bottom-0 left-[58px] top-0 w-px bg-red-300/70" />
 
-          <Feature
-            icon="🧠"
-            title="Memory Trick"
-            description="Quick memory support for last-minute revision."
-          />
-        </section>
+        {/* =================================================
+            CONTENT
+        ================================================= */}
 
-        {/* GENERATOR */}
-        <section className="no-print mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
-          <div className="mb-6">
-            <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">
-              Note Generator
-            </div>
+        <div className="relative px-[82px] py-10">
+          {/* =================================================
+              BRANDING
+          ================================================= */}
 
-            <h2 className="mt-2 text-2xl font-black">
-              Create exam-ready handwritten notes
-            </h2>
+          <header className="border-b-2 border-blue-900/20 pb-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[24px] font-black tracking-[0.08em] text-blue-900">
+                  RANKER BHAIYA
+                </div>
 
-            <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Ask Vidhya ka answer automatically receive hoga,
-              ya tum manually content paste kar sakte ho.
-            </p>
-          </div>
+                <div className="mt-1 text-[13px] font-bold tracking-[0.12em] text-slate-600">
+                  ✍️ ASK VIDHYA
+                </div>
+              </div>
 
-          <form
-            onSubmit={handleGenerate}
-            className="space-y-5"
-          >
-            <div>
-              <label className="mb-2 block text-sm font-bold">
-                Topic
-              </label>
-
-              <input
-                value={topic}
-                onChange={(event) =>
-                  setTopic(event.target.value)
-                }
-                placeholder="e.g. Fundamental Rights"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-semibold outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold">
-                Ask Vidhya Answer
-              </label>
-
-              <textarea
-                value={content}
-                onChange={(event) =>
-                  setContent(event.target.value)
-                }
-                rows={11}
-                placeholder="Paste your Ask Vidhya answer here..."
-                className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </div>
-
-            <div>
-              <label className="mb-3 block text-sm font-bold">
-                Handwriting Style
-              </label>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                {NOTE_STYLES.map((style) => {
-                  const active =
-                    selectedStyle === style.id;
-
-                  return (
-                    <button
-                      key={style.id}
-                      type="button"
-                      onClick={() =>
-                        setSelectedStyle(style.id)
-                      }
-                      className={`rounded-2xl border p-4 text-left transition ${
-                        active
-                          ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500/20 dark:bg-indigo-950/40"
-                          : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950"
-                      }`}
-                    >
-                      <div
-                        className="text-xl font-bold"
-                        style={{
-                          fontFamily: style.font,
-                        }}
-                      >
-                        Aa Notes
-                      </div>
-
-                      <div className="mt-2 text-sm font-black">
-                        {style.name}
-                      </div>
-
-                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {style.description}
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="rounded-full border-2 border-blue-900/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-blue-900">
+                Study Notes
               </div>
             </div>
+          </header>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="submit"
-                className="flex-1 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-4 text-sm font-black text-white shadow-lg transition hover:scale-[1.01]"
-              >
-                ✍️ Generate Exam Notes
-              </button>
+          {/* =================================================
+              TOPIC
+          ================================================= */}
 
-              <button
-                type="button"
-                onClick={handleReset}
-                className="rounded-2xl border border-slate-200 px-6 py-4 text-sm font-bold dark:border-slate-700"
-              >
-                Reset
-              </button>
-            </div>
-          </form>
-        </section>
-
-        {/* PREVIEW HEADER */}
-        <section className="no-print mt-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">
-              Preview
+          <section className="pt-7">
+            <div className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">
+              Topic
             </div>
 
-            <h2 className="mt-1 text-2xl font-black">
-              Handwritten Exam Notes
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Page {currentPage + 1} of {pages.length}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handleDownloadText}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm dark:border-slate-700 dark:bg-slate-900"
+            <h1
+              className="font-black text-slate-900"
+              style={{
+                fontSize:
+                  notes.topic.length > 55
+                    ? "28px"
+                    : "34px",
+                lineHeight: 1.25,
+              }}
             >
-              📄 Download Text
-            </button>
+              {notes.topic}
+            </h1>
 
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white dark:bg-white dark:text-slate-900"
-            >
-              🖨️ Print / Save PDF
-            </button>
-          </div>
-        </section>
-
-        {/* NOTEBOOK */}
-        <section className="print-area mt-6">
-          {generated && pages[currentPage] ? (
-            <div className="notebook-print-page">
-              <NotebookPage
-                page={pages[currentPage]}
-                font={activeStyle.font}
-                darkMode={darkMode}
-              />
-            </div>
-          ) : (
-            <div className="no-print rounded-3xl border border-dashed border-slate-300 p-12 text-center dark:border-slate-700">
-              <div className="text-5xl">📒</div>
-
-              <h3 className="mt-4 text-xl font-black">
-                Your exam notes will appear here
-              </h3>
-
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Ask Vidhya se answer generate karo aur
-                structured handwritten revision notes banao.
-              </p>
-            </div>
-          )}
-        </section>
-
-        {/* PAGINATION */}
-        {pages.length > 1 && (
-          <section className="no-print mt-6 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              disabled={currentPage === 0}
-              onClick={() =>
-                setCurrentPage((page) =>
-                  Math.max(0, page - 1),
-                )
-              }
-              className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold disabled:opacity-40 dark:border-slate-700"
-            >
-              ← Previous
-            </button>
-
-            <div className="rounded-xl bg-indigo-50 px-5 py-3 text-sm font-black text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-              {currentPage + 1} / {pages.length}
-            </div>
-
-            <button
-              type="button"
-              disabled={
-                currentPage === pages.length - 1
-              }
-              onClick={() =>
-                setCurrentPage((page) =>
-                  Math.min(
-                    pages.length - 1,
-                    page + 1,
-                  ),
-                )
-              }
-              className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold disabled:opacity-40 dark:border-slate-700"
-            >
-              Next →
-            </button>
+            <div className="mt-4 h-[3px] w-24 rounded-full bg-blue-700" />
           </section>
-        )}
 
-        {/* INFO */}
-        <section className="no-print mt-10 rounded-3xl border border-indigo-100 bg-indigo-50/70 p-6 dark:border-indigo-900/50 dark:bg-indigo-950/20">
-          <div className="flex gap-4">
-            <div className="text-3xl">🎯</div>
+          {/* =================================================
+              INTRODUCTION
+          ================================================= */}
 
-            <div>
-              <h3 className="font-black text-indigo-900 dark:text-indigo-200">
-                Built for competitive-exam revision
-              </h3>
+          {notes.introduction && (
+            <section className="mt-8 rounded-2xl border border-blue-200 bg-blue-50/50 p-5">
+              <h2 className="mb-2 text-lg font-black text-blue-900">
+                परिचय
+              </h2>
 
-              <p className="mt-2 text-sm leading-7 text-indigo-800/80 dark:text-indigo-300/80">
-                Notes ko intentionally short, structured aur
-                revision-friendly rakha gaya hai, taaki long AI
-                answers ko quickly revise kiya ja sake.
+              <p className="text-[16px] font-medium leading-8">
+                {notes.introduction}
               </p>
+            </section>
+          )}
+
+          {/* =================================================
+              MAIN SECTIONS
+          ================================================= */}
+
+          <section className="mt-8 space-y-7">
+            {notes.sections.map(
+              (section, index) => (
+                <article
+                  key={`${section.title}-${index}`}
+                  className="relative"
+                >
+                  <div className="mb-3 flex items-start gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-blue-700 text-sm font-black text-blue-800">
+                      {String(
+                        index + 1,
+                      ).padStart(2, "0")}
+                    </div>
+
+                    <h2 className="pt-0.5 text-[21px] font-black text-slate-900">
+                      {section.title}
+                    </h2>
+                  </div>
+
+                  <div className="ml-11 space-y-2">
+                    {section.points.map(
+                      (point, pointIndex) => (
+                        <div
+                          key={`${point}-${pointIndex}`}
+                          className="flex items-start gap-3 text-[16px] font-medium leading-8"
+                        >
+                          <span className="mt-[11px] h-2 w-2 shrink-0 rounded-full bg-blue-700" />
+
+                          <p className="flex-1">
+                            {point}
+                          </p>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </article>
+              ),
+            )}
+          </section>
+
+          {/* =================================================
+              IMPORTANT POINTS
+          ================================================= */}
+
+          {notes.importantPoints
+            .length > 0 && (
+            <section className="mt-10 rounded-2xl border-2 border-amber-300 bg-amber-50/70 p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <span className="text-xl">
+                  ⭐
+                </span>
+
+                <h2 className="text-xl font-black text-amber-900">
+                  Important Points
+                </h2>
+              </div>
+
+              <div className="space-y-2">
+                {notes.importantPoints.map(
+                  (point, index) => (
+                    <div
+                      key={`${point}-${index}`}
+                      className="flex items-start gap-3 text-[15px] font-semibold leading-7"
+                    >
+                      <span className="font-black text-amber-700">
+                        •
+                      </span>
+
+                      <span>
+                        {point}
+                      </span>
+                    </div>
+                  ),
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* =================================================
+              EXAM POINT
+          ================================================= */}
+
+          {notes.examPoint && (
+            <section className="mt-7 rounded-2xl border-2 border-purple-300 bg-purple-50/60 p-5">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-xl">
+                  🎯
+                </span>
+
+                <h2 className="text-xl font-black text-purple-900">
+                  Exam Point
+                </h2>
+              </div>
+
+              <p className="text-[16px] font-semibold leading-8">
+                {notes.examPoint}
+              </p>
+            </section>
+          )}
+
+          {/* =================================================
+              QUICK REVISION
+          ================================================= */}
+
+          {notes.quickRevision
+            .length > 0 && (
+            <section className="mt-7 rounded-2xl border-2 border-green-300 bg-green-50/60 p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <span className="text-xl">
+                  ⚡
+                </span>
+
+                <h2 className="text-xl font-black text-green-900">
+                  Quick Revision
+                </h2>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {notes.quickRevision.map(
+                  (item, index) => (
+                    <span
+                      key={`${item}-${index}`}
+                      className="rounded-full border border-green-300 bg-white px-3 py-1.5 text-sm font-bold text-green-800"
+                    >
+                      {item}
+                    </span>
+                  ),
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* =================================================
+              MEMORY TRICK
+          ================================================= */}
+
+          {notes.memoryTrick && (
+            <section className="mt-7 rounded-2xl border-2 border-pink-300 bg-pink-50/60 p-5">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-xl">
+                  🧠
+                </span>
+
+                <h2 className="text-xl font-black text-pink-900">
+                  Memory Trick
+                </h2>
+              </div>
+
+              <p className="text-[16px] font-bold leading-8">
+                {notes.memoryTrick}
+              </p>
+            </section>
+          )}
+
+          {/* =================================================
+              FOOTER
+          ================================================= */}
+
+          <footer className="mt-12 border-t-2 border-blue-900/20 pt-5 text-center">
+            <div className="text-sm font-black tracking-[0.12em] text-blue-900">
+              RANKER BHAIYA
             </div>
-          </div>
-        </section>
+
+            <div className="mt-1 text-xs font-semibold text-slate-500">
+              Ask Vidhya • Smart Study •
+              Better Revision
+            </div>
+          </footer>
+        </div>
       </main>
 
-      {/* FOOTER */}
-      <footer className="no-print mt-12 border-t border-slate-200 py-8 dark:border-slate-800">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-center text-xs font-semibold text-slate-400 sm:flex-row sm:px-6 lg:px-8">
-          <span>
-            © {new Date().getFullYear()} RANKER BHAIYA
-          </span>
+      {/* =================================================
+          PRINT CSS
+      ================================================= */}
 
-          <span>
-            ASK VIDHYA • SMART LEARNING • SMART REVISION
-          </span>
-        </div>
-      </footer>
+      <style>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 0;
+          }
+
+          html,
+          body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          .note-page {
+            width: 210mm;
+            min-height: 297mm;
+          }
+        }
+
+        .note-page {
+          font-family:
+            "Comic Sans MS",
+            "Segoe Print",
+            "Bradley Hand",
+            "Noto Sans Devanagari",
+            "Noto Sans",
+            cursive;
+        }
+
+        @media screen and (max-width: 700px) {
+          .note-page > div.relative {
+            padding-left: 72px;
+            padding-right: 28px;
+          }
+
+          .note-page > div.absolute {
+            left: 48px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
+
+export default HandwrittenNotes;
