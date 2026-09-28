@@ -1,639 +1,1062 @@
+/* =========================================================
+   RANKER BHAIYA — HANDWRITTEN NOTES
+   Visual notebook renderer
+========================================================= */
+
 .hw-renderer-wrapper {
   width: 100%;
+  min-height: 100vh;
   overflow-x: auto;
-  padding: 30px 20px 60px;
+  padding: 34px 20px 70px;
+
   background:
     radial-gradient(
-      circle at top,
-      #f7f1e5 0,
-      #e8dfce 45%,
-      #d8ccb9 100%
+      circle at 20% 0%,
+      #faf7ef 0%,
+      #eee7d9 42%,
+      #d8cdbb 100%
     );
 }
 
+/* =========================================================
+   NOTEBOOK PAGE
+========================================================= */
+
 .hw-page {
   position: relative;
+
   width: 100%;
   max-width: 1120px;
   min-height: 1480px;
+
   margin: 0 auto;
-  padding: 38px 58px 34px 82px;
+  padding: 42px 62px 42px 88px;
 
-  background-color: #fffef8;
+  overflow: hidden;
 
-  background-image:
-    linear-gradient(
-      rgba(74, 138, 196, 0.16) 1px,
-      transparent 1px
-    );
+  color: #172033;
 
-  background-size:
-    100% 34px;
-
-  box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.18);
-
-  border-radius: 5px;
-
+  /*
+    Important:
+    Use a font stack that supports Hindi properly.
+  */
   font-family:
     "Segoe Print",
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
     "Comic Sans MS",
     "Bradley Hand",
     cursive;
 
-  color: #172554;
+  background-color: #fffdf4;
+
+  /*
+    Notebook horizontal lines
+  */
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 33px,
+      rgba(73, 133, 185, 0.18) 34px,
+      transparent 35px
+    );
+
+  box-shadow:
+    0 30px 70px rgba(30, 35, 45, 0.22),
+    0 5px 15px rgba(30, 35, 45, 0.12);
+
+  border-radius: 7px;
 }
 
-/* Spiral margin */
+/* =========================================================
+   NOTEBOOK RED MARGIN
+========================================================= */
+
+.hw-page::after {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  bottom: 0;
+  left: 72px;
+
+  width: 2px;
+
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(218, 70, 70, 0.35),
+      rgba(218, 70, 70, 0.65),
+      rgba(218, 70, 70, 0.35)
+    );
+
+  pointer-events: none;
+}
+
+/* =========================================================
+   SPIRAL BINDING
+========================================================= */
 
 .hw-page::before {
   content: "";
+
   position: absolute;
+
   top: 0;
-  left: 20px;
-  width: 28px;
+  left: 17px;
+
+  width: 34px;
   height: 100%;
 
   background:
     repeating-linear-gradient(
       to bottom,
       transparent 0,
-      transparent 22px,
-      #222 23px,
-      #222 27px,
-      transparent 28px,
-      transparent 42px
+      transparent 12px,
+      #171717 13px,
+      #171717 17px,
+      transparent 18px,
+      transparent 34px
     );
 
-  opacity: 0.8;
+  opacity: 0.82;
+
+  filter:
+    drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.35));
+
+  pointer-events: none;
 }
 
-/* Branding */
+/* =========================================================
+   BRAND HEADER
+========================================================= */
 
 .hw-brand-header {
+  position: relative;
+  z-index: 2;
+
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 30px;
-  padding-bottom: 14px;
 
-  border-bottom: 2px solid
-    rgba(30, 64, 175, 0.18);
+  gap: 30px;
+
+  padding-bottom: 15px;
+
+  border-bottom:
+    2px solid rgba(30, 64, 175, 0.16);
 }
 
 .hw-ranker-brand,
 .hw-vidhya-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
 }
 
 .hw-brand-icon,
 .hw-vidhya-icon {
-  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 38px;
+  height: 38px;
+
+  font-size: 25px;
+
+  border-radius: 10px;
+
+  background: rgba(219, 234, 254, 0.65);
 }
 
 .hw-brand-name {
   color: #1746a2;
+
+  font-family:
+    "Segoe UI",
+    "Noto Sans",
+    sans-serif;
+
   font-size: 25px;
   font-weight: 900;
+
   letter-spacing: 1px;
 }
 
 .hw-brand-tagline {
-  color: #274c9b;
-  font-size: 12px;
+  margin-top: 1px;
+
+  color: #46629a;
+
+  font-family:
+    "Segoe UI",
+    "Noto Sans",
+    sans-serif;
+
+  font-size: 11px;
   font-weight: 600;
 }
 
 .hw-vidhya-name {
   color: #1746a2;
-  font-size: 23px;
+
+  font-family:
+    "Segoe UI",
+    "Noto Sans",
+    sans-serif;
+
+  font-size: 22px;
   font-weight: 900;
 }
 
 .hw-vidhya-tagline {
-  color: #3157a4;
-  font-size: 12px;
+  margin-top: 1px;
+
+  color: #46629a;
+
+  font-family:
+    "Segoe UI",
+    "Noto Sans",
+    sans-serif;
+
+  font-size: 11px;
 }
 
-/* Title */
+/* =========================================================
+   TITLE
+========================================================= */
 
 .hw-title-area {
+  position: relative;
+  z-index: 2;
+
   text-align: center;
-  margin: 22px 0 28px;
+
+  margin: 28px 0 32px;
 }
 
 .hw-title-area h1 {
-  display: inline-block;
+  display: inline;
+
   margin: 0;
-  padding: 3px 16px;
 
-  color: #123e8c;
-  font-size: clamp(30px, 4vw, 45px);
-  line-height: 1.15;
+  color: #111827;
 
+  font-family:
+    "Segoe Print",
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
+    cursive;
+
+  font-size: clamp(28px, 4vw, 43px);
+
+  font-weight: 900;
+
+  line-height: 1.35;
+
+  /*
+    Cyan marker effect
+  */
   background:
     linear-gradient(
-      transparent 52%,
-      #ffe65c 52%,
-      #ffe65c 84%,
+      transparent 58%,
+      rgba(64, 214, 235, 0.68) 58%,
+      rgba(64, 214, 235, 0.68) 84%,
       transparent 84%
     );
 
-  transform: rotate(-0.5deg);
+  padding: 0 8px;
+
+  transform: rotate(-0.35deg);
+
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .hw-title-roman {
-  color: #24417e;
-  font-size: 18px;
+  margin-top: 7px;
+
+  color: #40557f;
+
+  font-family:
+    "Segoe UI",
+    sans-serif;
+
+  font-size: 16px;
   font-weight: 600;
-  margin-top: 4px;
 }
 
 .hw-subtitle {
-  margin-top: 8px;
+  margin-top: 10px;
+
   color: #475569;
-  font-size: 16px;
+
+  font-family:
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Segoe UI",
+    sans-serif;
+
+  font-size: 15px;
+  font-weight: 600;
 }
 
-/* Content */
+/* =========================================================
+   CONTENT
+========================================================= */
 
 .hw-content {
+  position: relative;
+  z-index: 2;
+
   display: flex;
   flex-direction: column;
-  gap: 24px;
+
+  gap: 27px;
 }
+
+/* =========================================================
+   SECTION
+========================================================= */
 
 .hw-section {
   position: relative;
+
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .hw-section-heading {
   display: inline-flex;
+
   align-items: center;
   gap: 8px;
 
-  margin-bottom: 10px;
-  padding: 3px 12px;
+  margin-bottom: 12px;
+  padding: 2px 10px;
 
-  color: #1746a2;
-  font-size: 23px;
-  font-weight: 800;
+  color: #132e70;
 
+  font-family:
+    "Segoe Print",
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
+    cursive;
+
+  font-size: 22px;
+  font-weight: 900;
+
+  line-height: 1.5;
+
+  /*
+    Cyan handwritten highlighter
+  */
   background:
     linear-gradient(
       transparent 55%,
-      #8be7f5 55%,
-      #8be7f5 88%,
-      transparent 88%
+      rgba(72, 221, 239, 0.62) 55%,
+      rgba(72, 221, 239, 0.62) 87%,
+      transparent 87%
     );
 }
 
 .hw-section-number {
+  color: #0f5eb7;
+
+  font-family:
+    "Segoe UI",
+    sans-serif;
+
+  font-size: 17px;
   font-weight: 900;
 }
 
 .hw-hindi {
-  color: #243b73;
+  color: #173b78;
+
+  font-family:
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
+    sans-serif;
 }
 
-/* Definitions */
+/* =========================================================
+   DEFINITIONS
+========================================================= */
 
 .hw-definition-list {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+
+  gap: 13px;
 }
 
 .hw-definition {
   display: flex;
+
+  align-items: flex-start;
+
   gap: 10px;
 
-  font-size: 18px;
-  line-height: 1.45;
+  padding-left: 4px;
+
+  font-size: 17px;
+
+  line-height: 1.5;
+
+  break-inside: avoid;
 }
 
 .hw-dot {
-  color: #26a9df;
-  font-size: 18px;
+  flex-shrink: 0;
+
+  margin-top: 4px;
+
+  color: #25a9dc;
+
+  font-size: 15px;
 }
 
 .hw-point-text {
-  color: #172554;
+  color: #182338;
+
+  font-family:
+    "Segoe Print",
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
+    cursive;
+
+  font-weight: 600;
 }
 
 .hw-point-text strong {
   color: #123e8c;
+
+  font-weight: 900;
 }
 
 .hw-hindi-line {
-  margin-top: 1px;
-  color: #1e3a8a;
-  font-size: 17px;
+  margin-top: 3px;
+
+  color: #173d7b;
+
+  font-family:
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
+    sans-serif;
+
+  font-size: 16px;
+
+  font-weight: 600;
+
+  line-height: 1.65;
 }
 
-/* Bullets */
+/* =========================================================
+   BULLETS
+========================================================= */
 
 .hw-bullet-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+
+  gap: 9px;
 }
 
 .hw-bullet {
   display: flex;
+
+  align-items: flex-start;
+
   gap: 10px;
-  font-size: 18px;
-  line-height: 1.45;
+
+  color: #172033;
+
+  font-size: 17px;
+
+  line-height: 1.55;
+
+  break-inside: avoid;
 }
 
 .hw-bullet > span {
-  color: #2563eb;
-  font-size: 24px;
+  flex-shrink: 0;
+
+  margin-top: 1px;
+
+  color: #1d72d8;
+
+  font-size: 23px;
+
+  line-height: 1;
 }
 
-/* Plant diagram */
+/* =========================================================
+   PLANT CELL DIAGRAM
+========================================================= */
 
 .hw-plant-diagram {
   position: relative;
-  width: 390px;
-  min-height: 330px;
-  margin: 8px auto;
+
+  width: min(100%, 470px);
+
+  min-height: 350px;
+
+  margin: 15px auto;
+
+  padding: 5px;
 }
 
 .hw-plant-title {
+  margin-bottom: 8px;
+
   text-align: center;
-  font-size: 21px;
-  font-weight: 800;
+
   color: #23458f;
+
+  font-size: 20px;
+
+  font-weight: 900;
 }
 
 .hw-plant-cell {
   position: relative;
-  width: 250px;
-  height: 240px;
-  margin: 20px auto;
 
-  border: 7px solid #58a94b;
-  border-radius: 34% 38% 30% 35%;
+  width: 260px;
+  height: 245px;
+
+  margin: 25px auto;
+
+  border: 7px solid #55a34a;
+
+  border-radius:
+    35% 40% 33% 38%;
 
   background:
     radial-gradient(
-      circle,
-      #d7f6d0,
-      #a9e6a1
+      circle at 45% 40%,
+      #e4f9de 0%,
+      #b7e8ad 65%,
+      #98d692 100%
     );
 
   box-shadow:
-    inset 0 0 0 5px #d8f4c8;
+    inset 0 0 0 5px rgba(224, 250, 210, 0.9),
+    3px 5px 0 rgba(47, 117, 58, 0.15);
 }
 
 .hw-cell-nucleus {
   position: absolute;
-  width: 65px;
-  height: 65px;
 
-  top: 83px;
-  left: 91px;
+  top: 84px;
+  left: 96px;
+
+  width: 67px;
+  height: 67px;
 
   border-radius: 50%;
 
-  background: #a68be4;
-  border: 4px solid #7459b9;
+  background:
+    radial-gradient(
+      circle at 40% 40%,
+      #c6b1f3,
+      #9276d2
+    );
+
+  border: 4px solid #684cae;
+
+  box-shadow:
+    2px 3px 0 rgba(75, 55, 135, 0.2);
 }
 
 .hw-cell-nucleus span {
   position: absolute;
+
+  top: 23px;
+  left: 24px;
+
   width: 15px;
   height: 15px;
+
   border-radius: 50%;
 
-  top: 22px;
-  left: 23px;
-
-  background: #6f55aa;
+  background: #684da9;
 }
 
 .hw-chloroplast {
   position: absolute;
-  width: 46px;
-  height: 22px;
+
+  width: 47px;
+  height: 23px;
 
   border-radius: 50%;
 
   background:
     repeating-linear-gradient(
       to bottom,
-      #2f8d40 0,
-      #2f8d40 3px,
-      #9ddc82 4px,
-      #9ddc82 7px
+      #2e8c3f 0,
+      #2e8c3f 3px,
+      #a4df8b 4px,
+      #a4df8b 7px
     );
 
-  border: 3px solid #247438;
+  border: 3px solid #257239;
 }
 
 .hw-c1 {
-  top: 30px;
-  left: 32px;
+  top: 31px;
+  left: 31px;
+
   transform: rotate(-30deg);
 }
 
 .hw-c2 {
-  top: 42px;
+  top: 40px;
   right: 25px;
+
   transform: rotate(28deg);
 }
 
 .hw-c3 {
   bottom: 30px;
   left: 27px;
+
   transform: rotate(24deg);
 }
 
 .hw-c4 {
   bottom: 25px;
   right: 31px;
+
   transform: rotate(-28deg);
 }
 
 .hw-cell-label {
   position: absolute;
-  font-size: 14px;
-  color: #1e3a8a;
-  font-weight: 700;
+
+  color: #173c7a;
+
+  font-family:
+    "Segoe UI",
+    "Noto Sans Devanagari",
+    sans-serif;
+
+  font-size: 13px;
+
+  font-weight: 800;
+
+  white-space: nowrap;
 }
 
 .hw-label-wall {
-  left: -110px;
-  top: 90px;
+  left: -118px;
+  top: 91px;
 }
 
 .hw-label-nucleus {
-  right: -100px;
-  top: 110px;
+  right: -106px;
+  top: 111px;
 }
 
 .hw-label-chloro {
-  left: -125px;
-  bottom: 30px;
+  left: -132px;
+  bottom: 29px;
 }
 
-/* Chloroplast */
+/* =========================================================
+   CHLOROPLAST
+========================================================= */
 
 .hw-chloroplast-diagram {
-  width: 430px;
-  margin: 10px auto;
+  width: min(100%, 470px);
+
+  margin: 15px auto;
+
   text-align: center;
 }
 
 .hw-chloro-title {
-  font-size: 21px;
-  font-weight: 800;
   color: #23458f;
+
+  font-size: 20px;
+
+  font-weight: 900;
 }
 
 .hw-chloro-body {
   position: relative;
-  width: 360px;
-  height: 180px;
-  margin: 15px auto;
+
+  width: 370px;
+  height: 185px;
+
+  margin: 16px auto;
 
   border-radius: 50%;
 
-  background: #a9e4a2;
+  background:
+    radial-gradient(
+      ellipse at center,
+      #d0f1c8,
+      #9ddd96
+    );
+
   border: 6px solid #438f47;
+
   box-shadow:
-    inset 0 0 0 5px #d4f4c9;
+    inset 0 0 0 5px #d4f4c9,
+    3px 5px 0 rgba(47, 117, 58, 0.15);
 }
 
 .hw-thylakoid-stack {
   position: absolute;
-  top: 53px;
-  left: 75px;
+
+  top: 55px;
+  left: 72px;
 
   display: flex;
   flex-direction: column;
+
   gap: 4px;
 }
 
 .hw-thylakoid-stack.second {
   left: auto;
-  right: 75px;
+  right: 72px;
 }
 
 .hw-thylakoid-stack span {
-  width: 65px;
+  width: 66px;
   height: 10px;
 
   border-radius: 50%;
 
   background: #3e963f;
+
   border: 2px solid #23722d;
 }
 
 .hw-stroma-label {
   position: absolute;
-  right: 20px;
-  top: 12px;
 
-  font-size: 16px;
-  font-weight: 700;
+  top: 13px;
+  right: 22px;
+
   color: #1d5d2c;
+
+  font-size: 15px;
+
+  font-weight: 900;
 }
 
 .hw-chloro-label {
   color: #23458f;
-  font-size: 17px;
-  font-weight: 700;
+
+  font-size: 16px;
+
+  font-weight: 800;
 }
 
-/* Generic diagram */
+/* =========================================================
+   GENERIC DIAGRAM
+========================================================= */
 
 .hw-generic-diagram {
-  width: 90%;
-  margin: 15px auto;
-  padding: 15px;
+  width: 92%;
+
+  margin: 17px auto;
+
+  padding: 18px;
 
   border: 2px dashed #4773c8;
+
   border-radius: 18px;
-  background: rgba(224, 240, 255, 0.4);
+
+  background:
+    rgba(224, 240, 255, 0.42);
 
   text-align: center;
+
+  break-inside: avoid;
 }
 
 .hw-generic-title {
   color: #1746a2;
+
   font-size: 20px;
-  font-weight: 800;
+
+  font-weight: 900;
 }
 
 .hw-generic-visual {
   display: flex;
+
   justify-content: center;
   align-items: center;
-  gap: 25px;
+
+  gap: 26px;
+
   margin: 20px;
 }
 
 .hw-generic-circle {
+  display: grid;
+
+  place-items: center;
+
   width: 85px;
   height: 85px;
 
-  display: grid;
-  place-items: center;
-
   border-radius: 50%;
+
   border: 4px solid #3974cf;
 
   background: #dbeafe;
 
-  font-size: 35px;
+  font-size: 32px;
 }
 
 .hw-generic-arrows {
   display: flex;
-  gap: 20px;
-  font-size: 30px;
+
+  gap: 18px;
+
   color: #178a64;
+
+  font-size: 30px;
+
+  font-weight: 900;
 }
 
 .hw-generic-labels {
   display: flex;
-  flex-wrap: wrap;
+
   justify-content: center;
+
+  flex-wrap: wrap;
+
   gap: 8px;
 }
 
 .hw-generic-labels span {
-  padding: 4px 12px;
+  padding: 5px 12px;
+
   border-radius: 20px;
-  background: #fef08a;
+
+  background: #fff2a8;
+
   color: #1e3a8a;
-  font-size: 14px;
+
+  font-family:
+    "Segoe UI",
+    "Noto Sans Devanagari",
+    sans-serif;
+
+  font-size: 13px;
+
+  font-weight: 700;
 }
 
-/* Flowchart */
+/* =========================================================
+   FLOWCHART
+========================================================= */
 
 .hw-flow {
   display: flex;
+
   align-items: center;
   justify-content: center;
-  gap: 8px;
+
   flex-wrap: wrap;
 
-  margin-top: 14px;
+  gap: 9px;
+
+  margin-top: 15px;
+
+  break-inside: avoid;
 }
 
 .hw-flow-item {
   display: flex;
+
   align-items: center;
-  gap: 8px;
+
+  gap: 9px;
 }
 
 .hw-flow-box {
-  width: 210px;
-  min-height: 110px;
+  width: 205px;
+  min-height: 105px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
 
   padding: 12px;
 
-  border: 2px solid #334155;
+  border: 2px solid #394150;
+
   border-radius: 9px;
 
   text-align: center;
 
   box-shadow:
-    2px 3px 0 rgba(30, 64, 175, 0.18);
+    3px 4px 0 rgba(30, 64, 175, 0.13);
 }
 
 .hw-flow-yellow {
-  background: #fff5a8;
+  background: #fff3a6;
 }
 
 .hw-flow-blue {
-  background: #dbeafe;
+  background: #dcecff;
 }
 
 .hw-flow-green {
-  background: #d9f7df;
+  background: #daf5de;
 }
 
 .hw-flow-pink {
-  background: #fce7f3;
+  background: #fce3f0;
 }
 
 .hw-flow-title {
-  font-size: 18px;
+  color: #172033;
+
+  font-size: 17px;
+
   font-weight: 900;
-  color: #172554;
+
+  line-height: 1.35;
 }
 
 .hw-flow-hindi {
+  margin-top: 4px;
+
   color: #243b73;
-  font-size: 15px;
-  margin-top: 3px;
+
+  font-family:
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
+    sans-serif;
+
+  font-size: 14px;
+
+  font-weight: 700;
+
+  line-height: 1.5;
 }
 
 .hw-flow-description {
   margin-top: 5px;
+
   color: #334155;
-  font-size: 14px;
+
+  font-family:
+    "Segoe UI",
+    "Noto Sans Devanagari",
+    sans-serif;
+
+  font-size: 12px;
+
+  line-height: 1.4;
 }
 
 .hw-flow-arrow {
-  font-size: 30px;
-  color: #16956c;
+  color: #15956b;
+
+  font-family:
+    "Segoe UI",
+    sans-serif;
+
+  font-size: 29px;
+
   font-weight: 900;
 }
 
-/* Equation */
+/* =========================================================
+   EQUATION
+========================================================= */
 
 .hw-equation-box {
   width: 92%;
-  margin: 12px auto;
-  padding: 14px;
+
+  margin: 15px auto;
+
+  padding: 16px 18px;
 
   border: 2px solid #394bb8;
+
   border-radius: 12px;
 
+  background:
+    rgba(239, 246, 255, 0.58);
+
   text-align: center;
-  background: rgba(239, 246, 255, 0.55);
+
+  break-inside: avoid;
 }
 
 .hw-equation-heading {
   color: #243a91;
-  font-size: 19px;
+
+  font-family:
+    "Segoe UI",
+    "Noto Sans Devanagari",
+    sans-serif;
+
+  font-size: 18px;
+
   font-weight: 900;
 }
 
 .hw-equation {
-  margin-top: 13px;
+  margin-top: 12px;
+
+  color: #111827;
 
   font-family:
     "Times New Roman",
+    "Cambria",
     serif;
 
-  color: #172554;
-  font-size: 27px;
+  font-size: clamp(21px, 3vw, 28px);
+
   font-weight: 700;
+
+  letter-spacing: 0.3px;
 }
 
-/* Exam */
+/* =========================================================
+   EXAM BOX
+========================================================= */
 
 .hw-exam-box {
-  padding: 14px 18px;
+  padding: 15px 18px;
+
+  border-left: 6px solid #eab308;
 
   border-radius: 13px;
 
   background:
     linear-gradient(
       90deg,
-      rgba(255, 241, 118, 0.55),
+      rgba(255, 241, 118, 0.65),
       rgba(255, 251, 214, 0.35)
     );
 
-  border-left: 6px solid #eab308;
+  break-inside: avoid;
 }
 
 .hw-exam-heading {
@@ -641,14 +1064,16 @@
 
   margin-bottom: 9px;
 
-  color: #1746a2;
-  font-size: 21px;
+  color: #173b78;
+
+  font-size: 20px;
+
   font-weight: 900;
 
   background:
     linear-gradient(
-      transparent 50%,
-      #ffe65c 50%,
+      transparent 52%,
+      #ffe65c 52%,
       #ffe65c 88%,
       transparent 88%
     );
@@ -656,58 +1081,104 @@
 
 .hw-exam-item {
   display: flex;
+
+  align-items: flex-start;
+
   gap: 9px;
 
   margin: 6px 0;
 
-  font-size: 17px;
-  line-height: 1.4;
+  color: #202938;
+
+  font-family:
+    "Segoe Print",
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
+    cursive;
+
+  font-size: 16px;
+
+  line-height: 1.55;
 }
 
 .hw-exam-item span:first-child {
+  flex-shrink: 0;
+
   color: #159947;
+
   font-weight: 900;
 }
 
-/* Revision */
+/* =========================================================
+   QUICK REVISION
+========================================================= */
 
 .hw-revision-box {
-  padding: 14px 18px;
+  padding: 15px 18px;
 
   border: 2px solid #db72a4;
+
   border-radius: 15px;
 
-  background: rgba(252, 231, 243, 0.42);
+  background:
+    rgba(252, 231, 243, 0.48);
+
+  break-inside: avoid;
 }
 
 .hw-revision-heading {
+  margin-bottom: 8px;
+
   color: #8b315c;
-  font-size: 20px;
+
+  font-size: 19px;
+
   font-weight: 900;
-  margin-bottom: 7px;
 }
 
 .hw-revision-item {
   display: flex;
+
+  align-items: flex-start;
+
   gap: 8px;
+
   margin: 5px 0;
 
-  color: #1e3a8a;
-  font-size: 16px;
+  color: #243b73;
+
+  font-family:
+    "Segoe Print",
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
+    cursive;
+
+  font-size: 15px;
+
+  line-height: 1.55;
 }
 
 .hw-revision-item span:first-child {
   color: #168653;
+
+  font-weight: 900;
 }
 
-/* Mnemonic */
+/* =========================================================
+   MEMORY TRICK
+========================================================= */
 
 .hw-mnemonic {
   width: 75%;
-  margin: 10px auto;
-  padding: 18px;
+
+  margin: 12px auto;
+
+  padding: 17px 20px;
 
   border: 2px solid #d946ef;
+
   border-radius: 45%;
 
   background: #fff1fa;
@@ -715,71 +1186,170 @@
   text-align: center;
 
   color: #4c1d95;
-  font-size: 18px;
+
+  font-size: 17px;
+
   font-weight: 700;
 
+  line-height: 1.6;
+
   transform: rotate(-1deg);
+
+  break-inside: avoid;
 }
 
 .hw-mnemonic-label {
-  font-size: 15px;
   margin-bottom: 5px;
+
+  color: #8b319e;
+
+  font-family:
+    "Segoe UI",
+    sans-serif;
+
+  font-size: 13px;
+
+  font-weight: 900;
 }
 
-/* Footer */
+/* =========================================================
+   FOOTER TIP
+========================================================= */
 
 .hw-footer-tip {
-  margin-top: 22px;
-  padding: 10px 15px;
+  position: relative;
+  z-index: 2;
+
+  margin-top: 24px;
+
+  padding: 11px 15px;
+
+  border-radius: 12px;
+
+  background: #eef6ff;
 
   color: #1e3a8a;
 
-  border-radius: 12px;
-  background: #eef6ff;
+  font-family:
+    "Segoe Print",
+    "Noto Sans Devanagari",
+    "Nirmala UI",
+    "Mangal",
+    cursive;
 
-  font-size: 16px;
+  font-size: 15px;
+
+  font-weight: 600;
+
+  line-height: 1.55;
+
+  break-inside: avoid;
 }
+
+/* =========================================================
+   FOOTER BRANDING
+========================================================= */
 
 .hw-footer {
+  position: relative;
+  z-index: 2;
+
   display: flex;
+
   justify-content: center;
   align-items: center;
+
+  flex-wrap: wrap;
+
   gap: 7px;
 
-  margin-top: 25px;
-  padding-top: 12px;
+  margin-top: 28px;
 
-  border-top: 2px solid
-    rgba(30, 64, 175, 0.18);
+  padding-top: 13px;
+
+  border-top:
+    2px solid rgba(30, 64, 175, 0.16);
 
   color: #3157a4;
-  font-size: 14px;
+
+  font-family:
+    "Segoe UI",
+    "Noto Sans Devanagari",
+    sans-serif;
+
+  font-size: 13px;
 }
 
-/* Print */
+.hw-footer strong {
+  color: #1746a2;
+
+  font-weight: 900;
+}
+
+/* =========================================================
+   PRINT / PDF
+========================================================= */
 
 @media print {
+  html,
   body {
+    margin: 0 !important;
+    padding: 0 !important;
+
     background: white !important;
   }
 
   .hw-renderer-wrapper {
+    width: 100%;
+    min-height: auto;
+
     padding: 0;
-    background: white;
+
+    overflow: visible;
+
+    background: white !important;
   }
 
   .hw-page {
-    max-width: none;
-    min-height: 0;
+    width: 210mm;
 
-    box-shadow: none;
+    max-width: none;
+
+    min-height: 297mm;
+
+    margin: 0;
+
+    padding:
+      35px
+      45px
+      35px
+      78px;
+
     border-radius: 0;
 
-    page-break-after: always;
+    box-shadow: none;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  .hw-page::before {
-    display: block;
+  .hw-section,
+  .hw-flow,
+  .hw-equation-box,
+  .hw-exam-box,
+  .hw-revision-box,
+  .hw-mnemonic,
+  .hw-generic-diagram,
+  .hw-plant-diagram,
+  .hw-chloroplast-diagram {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .hw-page::before,
+  .hw-page::after {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   @page {
@@ -788,16 +1358,23 @@
   }
 }
 
-/* Mobile */
+/* =========================================================
+   MOBILE
+========================================================= */
 
 @media (max-width: 800px) {
   .hw-renderer-wrapper {
-    padding: 10px;
+    padding: 12px;
   }
 
   .hw-page {
-    min-width: 850px;
-    padding: 28px 45px 28px 70px;
+    min-width: 820px;
+
+    padding:
+      30px
+      48px
+      30px
+      76px;
   }
 
   .hw-brand-name {
@@ -806,5 +1383,23 @@
 
   .hw-vidhya-name {
     font-size: 19px;
+  }
+
+  .hw-title-area h1 {
+    font-size: 31px;
+  }
+}
+
+/* =========================================================
+   SMALL MOBILE VIEW
+========================================================= */
+
+@media (max-width: 520px) {
+  .hw-renderer-wrapper {
+    padding: 8px;
+  }
+
+  .hw-page {
+    min-width: 760px;
   }
 }
