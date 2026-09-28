@@ -142,6 +142,7 @@ export function AskVidhya() {
     conversationId: string,
   ) {
     setError("");
+
     setSelectedConversationId(
       conversationId,
     );
@@ -227,8 +228,7 @@ export function AskVidhya() {
 
     try {
       /*
-       * Delete messages first so this also works
-       * when ON DELETE CASCADE is not configured.
+       * Delete messages first.
        */
 
       const {
@@ -245,7 +245,9 @@ export function AskVidhya() {
         throw messagesDeleteError;
       }
 
-      /* Delete conversation */
+      /*
+       * Delete conversation.
+       */
 
       const {
         error: conversationDeleteError,
@@ -265,7 +267,9 @@ export function AskVidhya() {
         throw conversationDeleteError;
       }
 
-      /* Update local history */
+      /*
+       * Update local history.
+       */
 
       setConversations(
         (previous) =>
@@ -276,7 +280,9 @@ export function AskVidhya() {
           ),
       );
 
-      /* Reset if currently opened */
+      /*
+       * Reset currently opened chat.
+       */
 
       if (
         selectedConversationId ===
@@ -481,8 +487,7 @@ export function AskVidhya() {
       setQuestion("");
 
       /*
-       * Refresh chat history so the newly
-       * created conversation/title appears.
+       * Refresh chat history.
        */
 
       await loadConversations();
@@ -513,6 +518,59 @@ export function AskVidhya() {
     } finally {
       setLoading(false);
     }
+  }
+
+  /* ===================================================
+     HANDWRITTEN NOTES
+  =================================================== */
+
+  function openHandwrittenNotes(
+    message: Message,
+  ) {
+    /*
+     * Find the closest previous user message.
+     * This gives the notes page the original
+     * question/topic instead of using a generic title.
+     */
+
+    const messageIndex =
+      messages.findIndex(
+        (item) =>
+          item.id === message.id,
+      );
+
+    let topic =
+      "Ask Vidhya Notes";
+
+    if (messageIndex > 0) {
+      for (
+        let index = messageIndex - 1;
+        index >= 0;
+        index--
+      ) {
+        if (
+          messages[index].role ===
+          "user"
+        ) {
+          topic =
+            messages[index].content.trim() ||
+            topic;
+
+          break;
+        }
+      }
+    }
+
+    navigate(
+      "/student/handwritten-notes",
+      {
+        state: {
+          topic,
+          content: message.content,
+          source: "ask-vidhya",
+        },
+      },
+    );
   }
 
   /* ===================================================
@@ -732,7 +790,7 @@ export function AskVidhya() {
                         "chat"
                       }`}
                       title="Delete chat"
-                      className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-950/30 dark:hover:text-red-400 sm:opacity-100"
+                      className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-950/30 dark:hover:text-red-400"
                     >
                       {deletingChatId ===
                       conversation.id
@@ -831,6 +889,10 @@ export function AskVidhya() {
                       <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                         💡 Explanations
                       </span>
+
+                      <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                        ✍️ Handwritten Notes
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -874,202 +936,261 @@ export function AskVidhya() {
                         {/* AI */}
 
                         {isAssistant ? (
-                          <div className="padhai-markdown text-sm leading-7">
-                            <ReactMarkdown
-                              remarkPlugins={[
-                                remarkGfm,
-                              ]}
-                              components={{
-                                h1: ({
-                                  children,
-                                }) => (
-                                  <h1 className="mb-4 mt-2 text-xl font-bold text-slate-900 dark:text-white">
-                                    {
-                                      children
-                                    }
-                                  </h1>
-                                ),
-
-                                h2: ({
-                                  children,
-                                }) => (
-                                  <h2 className="mb-3 mt-5 text-lg font-bold text-slate-900 dark:text-white">
-                                    {
-                                      children
-                                    }
-                                  </h2>
-                                ),
-
-                                h3: ({
-                                  children,
-                                }) => (
-                                  <h3 className="mb-2 mt-4 text-base font-bold text-slate-900 dark:text-white">
-                                    {
-                                      children
-                                    }
-                                  </h3>
-                                ),
-
-                                p: ({
-                                  children,
-                                }) => (
-                                  <p className="mb-3 last:mb-0">
-                                    {
-                                      children
-                                    }
-                                  </p>
-                                ),
-
-                                strong: ({
-                                  children,
-                                }) => (
-                                  <strong className="font-bold text-slate-900 dark:text-white">
-                                    {
-                                      children
-                                    }
-                                  </strong>
-                                ),
-
-                                em: ({
-                                  children,
-                                }) => (
-                                  <em className="italic">
-                                    {
-                                      children
-                                    }
-                                  </em>
-                                ),
-
-                                ul: ({
-                                  children,
-                                }) => (
-                                  <ul className="mb-4 ml-5 list-disc space-y-1">
-                                    {
-                                      children
-                                    }
-                                  </ul>
-                                ),
-
-                                ol: ({
-                                  children,
-                                }) => (
-                                  <ol className="mb-4 ml-5 list-decimal space-y-1">
-                                    {
-                                      children
-                                    }
-                                  </ol>
-                                ),
-
-                                li: ({
-                                  children,
-                                }) => (
-                                  <li className="pl-1">
-                                    {
-                                      children
-                                    }
-                                  </li>
-                                ),
-
-                                blockquote: ({
-                                  children,
-                                }) => (
-                                  <blockquote className="my-4 border-l-4 border-blue-400 pl-4 italic text-slate-600 dark:text-slate-300">
-                                    {
-                                      children
-                                    }
-                                  </blockquote>
-                                ),
-
-                                code: ({
-                                  children,
-                                }) => (
-                                  <code className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-mono text-slate-800 dark:bg-slate-700 dark:text-slate-100">
-                                    {
-                                      children
-                                    }
-                                  </code>
-                                ),
-
-                                pre: ({
-                                  children,
-                                }) => (
-                                  <pre className="my-4 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100">
-                                    {
-                                      children
-                                    }
-                                  </pre>
-                                ),
-
-                                table: ({
-                                  children,
-                                }) => (
-                                  <div className="my-4 overflow-x-auto rounded-xl border border-slate-300 dark:border-slate-700">
-                                    <table className="min-w-full border-collapse text-sm">
+                          <>
+                            <div className="padhai-markdown text-sm leading-7">
+                              <ReactMarkdown
+                                remarkPlugins={[
+                                  remarkGfm,
+                                ]}
+                                components={{
+                                  h1: ({
+                                    children,
+                                  }) => (
+                                    <h1 className="mb-4 mt-2 text-xl font-bold text-slate-900 dark:text-white">
                                       {
                                         children
                                       }
-                                    </table>
-                                  </div>
-                                ),
+                                    </h1>
+                                  ),
 
-                                thead: ({
-                                  children,
-                                }) => (
-                                  <thead className="bg-slate-200 dark:bg-slate-700">
-                                    {
-                                      children
-                                    }
-                                  </thead>
-                                ),
+                                  h2: ({
+                                    children,
+                                  }) => (
+                                    <h2 className="mb-3 mt-5 text-lg font-bold text-slate-900 dark:text-white">
+                                      {
+                                        children
+                                      }
+                                    </h2>
+                                  ),
 
-                                th: ({
-                                  children,
-                                }) => (
-                                  <th className="border-b border-slate-300 px-3 py-2 text-left font-bold dark:border-slate-600">
-                                    {
-                                      children
-                                    }
-                                  </th>
-                                ),
+                                  h3: ({
+                                    children,
+                                  }) => (
+                                    <h3 className="mb-2 mt-4 text-base font-bold text-slate-900 dark:text-white">
+                                      {
+                                        children
+                                      }
+                                    </h3>
+                                  ),
 
-                                td: ({
-                                  children,
-                                }) => (
-                                  <td className="border-b border-slate-200 px-3 py-2 dark:border-slate-700">
-                                    {
-                                      children
-                                    }
-                                  </td>
-                                ),
+                                  p: ({
+                                    children,
+                                  }) => (
+                                    <p className="mb-3 last:mb-0">
+                                      {
+                                        children
+                                      }
+                                    </p>
+                                  ),
 
-                                hr: () => (
-                                  <hr className="my-5 border-slate-300 dark:border-slate-700" />
-                                ),
+                                  strong: ({
+                                    children,
+                                  }) => (
+                                    <strong className="font-bold text-slate-900 dark:text-white">
+                                      {
+                                        children
+                                      }
+                                    </strong>
+                                  ),
 
-                                a: ({
-                                  children,
-                                  href,
-                                }) => (
-                                  <a
-                                    href={
-                                      href
-                                    }
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-semibold text-blue-600 underline dark:text-blue-400"
-                                  >
-                                    {
-                                      children
-                                    }
-                                  </a>
-                                ),
-                              }}
-                            >
-                              {
-                                message.content
-                              }
-                            </ReactMarkdown>
-                          </div>
+                                  em: ({
+                                    children,
+                                  }) => (
+                                    <em className="italic">
+                                      {
+                                        children
+                                      }
+                                    </em>
+                                  ),
+
+                                  ul: ({
+                                    children,
+                                  }) => (
+                                    <ul className="mb-4 ml-5 list-disc space-y-1">
+                                      {
+                                        children
+                                      }
+                                    </ul>
+                                  ),
+
+                                  ol: ({
+                                    children,
+                                  }) => (
+                                    <ol className="mb-4 ml-5 list-decimal space-y-1">
+                                      {
+                                        children
+                                      }
+                                    </ol>
+                                  ),
+
+                                  li: ({
+                                    children,
+                                  }) => (
+                                    <li className="pl-1">
+                                      {
+                                        children
+                                      }
+                                    </li>
+                                  ),
+
+                                  blockquote: ({
+                                    children,
+                                  }) => (
+                                    <blockquote className="my-4 border-l-4 border-blue-400 pl-4 italic text-slate-600 dark:text-slate-300">
+                                      {
+                                        children
+                                      }
+                                    </blockquote>
+                                  ),
+
+                                  code: ({
+                                    children,
+                                  }) => (
+                                    <code className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-mono text-slate-800 dark:bg-slate-700 dark:text-slate-100">
+                                      {
+                                        children
+                                      }
+                                    </code>
+                                  ),
+
+                                  pre: ({
+                                    children,
+                                  }) => (
+                                    <pre className="my-4 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100">
+                                      {
+                                        children
+                                      }
+                                    </pre>
+                                  ),
+
+                                  table: ({
+                                    children,
+                                  }) => (
+                                    <div className="my-4 overflow-x-auto rounded-xl border border-slate-300 dark:border-slate-700">
+                                      <table className="min-w-full border-collapse text-sm">
+                                        {
+                                          children
+                                        }
+                                      </table>
+                                    </div>
+                                  ),
+
+                                  thead: ({
+                                    children,
+                                  }) => (
+                                    <thead className="bg-slate-200 dark:bg-slate-700">
+                                      {
+                                        children
+                                      }
+                                    </thead>
+                                  ),
+
+                                  th: ({
+                                    children,
+                                  }) => (
+                                    <th className="border-b border-slate-300 px-3 py-2 text-left font-bold dark:border-slate-600">
+                                      {
+                                        children
+                                      }
+                                    </th>
+                                  ),
+
+                                  td: ({
+                                    children,
+                                  }) => (
+                                    <td className="border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+                                      {
+                                        children
+                                      }
+                                    </td>
+                                  ),
+
+                                  hr: () => (
+                                    <hr className="my-5 border-slate-300 dark:border-slate-700" />
+                                  ),
+
+                                  a: ({
+                                    children,
+                                    href,
+                                  }) => (
+                                    <a
+                                      href={
+                                        href
+                                      }
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-semibold text-blue-600 underline dark:text-blue-400"
+                                    >
+                                      {
+                                        children
+                                      }
+                                    </a>
+                                  ),
+                                }}
+                              >
+                                {
+                                  message.content
+                                }
+                              </ReactMarkdown>
+                            </div>
+
+                            {/* =================================================
+                                HANDWRITTEN NOTES BUTTON
+                            ================================================= */}
+
+                            <div className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openHandwrittenNotes(
+                                    message,
+                                  )
+                                }
+                                className="
+                                  inline-flex
+                                  items-center
+                                  gap-2
+                                  rounded-xl
+                                  border
+                                  border-violet-200
+                                  bg-gradient-to-r
+                                  from-violet-50
+                                  to-blue-50
+                                  px-4
+                                  py-2.5
+                                  text-sm
+                                  font-black
+                                  text-violet-700
+                                  shadow-sm
+                                  transition
+                                  hover:-translate-y-0.5
+                                  hover:border-violet-300
+                                  hover:shadow-md
+                                  dark:border-violet-900
+                                  dark:from-violet-950/50
+                                  dark:to-blue-950/50
+                                  dark:text-violet-300
+                                "
+                              >
+                                <span className="text-base">
+                                  ✍️
+                                </span>
+
+                                <span>
+                                  Create
+                                  Handwritten
+                                  Notes
+                                </span>
+                              </button>
+
+                              <p className="mt-2 text-[11px] text-slate-400">
+                                Convert this Vidhya
+                                explanation into
+                                notebook-style
+                                revision notes.
+                              </p>
+                            </div>
+                          </>
                         ) : (
                           <div className="whitespace-pre-wrap text-sm leading-7">
                             {
