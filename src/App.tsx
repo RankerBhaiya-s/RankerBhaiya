@@ -37,6 +37,12 @@ import ProgressTracker from "./pages/student/ProgressTracker";
 import DailyChallenge from "./pages/student/DailyChallenge";
 
 /* =====================================================
+   HANDWRITTEN NOTES
+===================================================== */
+
+import HandwrittenNotes from "./pages/student/HandwrittenNotes";
+
+/* =====================================================
    ADMIN
 ===================================================== */
 
@@ -137,6 +143,15 @@ export default function App() {
                   <Route
                     path="student/ask"
                     element={<AskVidhya />}
+                  />
+
+                  {/* =================================================
+                      HANDWRITTEN NOTES
+                  ================================================= */}
+
+                  <Route
+                    path="student/handwritten-notes"
+                    element={<HandwrittenNotes />}
                   />
 
                   {/* =================================================
