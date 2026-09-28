@@ -1,387 +1,323 @@
 import {
+  useEffect,
   useMemo,
   useState,
   type FormEvent,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
 import { useTheme } from "../../context/ThemeContext";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
-type NoteStyle = "blue" | "purple" | "green";
+interface NoteStyle {
+  id: string;
+  name: string;
+  font: string;
+  description: string;
+}
 
 interface NoteSection {
-  heading: string;
-  content: string[];
-  points?: string[];
+  title: string;
+  content: string;
+  points: string[];
 }
 
 interface NotePage {
   pageNumber: number;
-  title: string;
   sections: NoteSection[];
 }
 
-/* =========================================================
-   DEFAULT DEMO CONTENT
-========================================================= */
+interface HandwrittenNotesLocationState {
+  topic?: string;
+  content?: string;
+  source?: string;
+}
 
-const defaultPages: NotePage[] = [
+const NOTE_STYLES: NoteStyle[] = [
   {
-    pageNumber: 1,
-    title: "Photosynthesis",
-    sections: [
-      {
-        heading: "What is Photosynthesis?",
-        content: [
-          "Photosynthesis is the process by which green plants prepare their own food using sunlight, carbon dioxide and water.",
-          "This process mainly takes place in the green parts of plants because they contain chlorophyll.",
-        ],
-        points: [
-          "Occurs mainly in green leaves",
-          "Sunlight provides energy",
-          "Chlorophyll absorbs light energy",
-        ],
-      },
-      {
-        heading: "Main Raw Materials",
-        content: [],
-        points: [
-          "Carbon dioxide (CO₂)",
-          "Water (H₂O)",
-          "Sunlight",
-          "Chlorophyll",
-        ],
-      },
-      {
-        heading: "Exam Point",
-        content: [
-          "The food produced during photosynthesis is mainly glucose, which can later be stored as starch.",
-        ],
-      },
-    ],
+    id: "classic",
+    name: "Classic Notes",
+    font: '"Comic Sans MS", "Segoe Print", cursive',
+    description: "Clean school-notebook style",
   },
   {
-    pageNumber: 2,
-    title: "Process of Photosynthesis",
-    sections: [
-      {
-        heading: "How does it happen?",
-        content: [
-          "Roots absorb water from the soil. Carbon dioxide enters the leaves through tiny pores called stomata.",
-          "Chlorophyll captures sunlight and provides the energy needed for the reaction.",
-        ],
-        points: [
-          "Roots → absorb water",
-          "Stomata → allow CO₂ to enter",
-          "Chlorophyll → captures sunlight",
-          "Leaves → prepare food",
-        ],
-      },
-      {
-        heading: "Chemical Equation",
-        content: [
-          "Carbon dioxide + Water → Glucose + Oxygen",
-          "The reaction takes place in the presence of sunlight and chlorophyll.",
-        ],
-      },
-      {
-        heading: "Remember",
-        content: [
-          "Photosynthesis converts light energy into chemical energy stored in food.",
-        ],
-      },
-    ],
+    id: "study",
+    name: "Study Notes",
+    font: '"Segoe Print", "Comic Sans MS", cursive',
+    description: "Natural handwritten look",
+  },
+  {
+    id: "exam",
+    name: "Exam Revision",
+    font: '"Bradley Hand", "Comic Sans MS", cursive',
+    description: "Quick revision style",
   },
 ];
 
-/* =========================================================
-   HELPERS
-========================================================= */
+const DEMO_CONTENT = `Photosynthesis is the process by which green plants prepare their own food using sunlight, carbon dioxide and water.
 
-function createPagesFromText(
+This process mainly takes place in the green parts of plants because they contain chlorophyll.
+
+Roots absorb water from the soil while carbon dioxide enters the leaves through tiny pores called stomata.
+
+Chlorophyll captures sunlight and provides the energy needed for photosynthesis.
+
+The food produced is mainly glucose, which can later be stored as starch.
+
+Photosynthesis also releases oxygen into the atmosphere.
+
+The process is extremely important because it provides food for plants and releases oxygen required by living organisms.`;
+
+function cleanText(value: string) {
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .trim();
+}
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function createSectionsFromText(
+  text: string,
   topic: string,
-  rawContent: string,
-): NotePage[] {
-  const cleanTopic = topic.trim() || "My Study Notes";
+): NoteSection[] {
+  const cleaned = cleanText(text);
 
-  const paragraphs = rawContent
-    .split(/\n+/)
+  if (!cleaned) {
+    return [
+      {
+        title: topic || "Study Notes",
+        content: "No content available.",
+        points: [],
+      },
+    ];
+  }
+
+  const paragraphs = cleaned
+    .split(/\n\s*\n/)
     .map((item) => item.trim())
     .filter(Boolean);
 
-  if (!paragraphs.length) {
-    return defaultPages.map((page) => ({
-      ...page,
-      title:
-        page.pageNumber === 1
-          ? cleanTopic
-          : page.title,
-    }));
-  }
+  const sourceBlocks =
+    paragraphs.length > 0
+      ? paragraphs
+      : cleaned
+          .split(/\n/)
+          .map((item) => item.trim())
+          .filter(Boolean);
 
-  const chunkSize = 4;
-  const chunks: string[][] = [];
+  const sections: NoteSection[] = [];
 
-  for (let i = 0; i < paragraphs.length; i += chunkSize) {
-    chunks.push(paragraphs.slice(i, i + chunkSize));
-  }
+  sourceBlocks.forEach((block, index) => {
+    const sentences = splitSentences(block);
 
-  return chunks.map((chunk, index) => ({
-    pageNumber: index + 1,
-    title:
-      index === 0
-        ? cleanTopic
-        : `${cleanTopic} — Part ${index + 1}`,
-    sections: [
-      {
-        heading:
-          index === 0
-            ? "Quick Understanding"
-            : "Important Points",
-        content: chunk,
-        points:
-          chunk.length > 2
-            ? chunk.slice(0, Math.min(3, chunk.length))
-            : undefined,
-      },
-    ],
-  }));
+    let title = "";
+
+    if (index === 0) {
+      title = topic || "Introduction";
+    } else if (sentences.length > 0) {
+      title = sentences[0]
+        .replace(/[.!?]+$/, "")
+        .slice(0, 70);
+    }
+
+    if (!title) {
+      title = `Important Point ${index + 1}`;
+    }
+
+    const points =
+      sentences.length > 1
+        ? sentences.slice(0, 4)
+        : block
+            .split(/[,;:]/)
+            .map((item) => item.trim())
+            .filter((item) => item.length > 10)
+            .slice(0, 4);
+
+    sections.push({
+      title,
+      content: block,
+      points,
+    });
+  });
+
+  return sections;
 }
 
-/* =========================================================
-   NOTEBOOK PAPER
-========================================================= */
+function createPagesFromText(
+  text: string,
+  topic: string,
+): NotePage[] {
+  const sections = createSectionsFromText(text, topic);
+
+  const pages: NotePage[] = [];
+
+  for (let i = 0; i < sections.length; i += 3) {
+    pages.push({
+      pageNumber: pages.length + 1,
+      sections: sections.slice(i, i + 3),
+    });
+  }
+
+  if (pages.length === 0) {
+    pages.push({
+      pageNumber: 1,
+      sections: [
+        {
+          title: topic || "Study Notes",
+          content: text || "No notes available.",
+          points: [],
+        },
+      ],
+    });
+  }
+
+  return pages;
+}
 
 function NotebookPage({
   page,
-  style,
+  topic,
+  font,
+  darkMode,
 }: {
   page: NotePage;
-  style: NoteStyle;
+  topic: string;
+  font: string;
+  darkMode: boolean;
 }) {
-  const accentClass = {
-    blue: "text-blue-700",
-    purple: "text-violet-700",
-    green: "text-emerald-700",
-  }[style];
-
-  const badgeClass = {
-    blue: "bg-blue-100 text-blue-700 border-blue-200",
-    purple:
-      "bg-violet-100 text-violet-700 border-violet-200",
-    green:
-      "bg-emerald-100 text-emerald-700 border-emerald-200",
-  }[style];
-
   return (
     <div
-      className="
-        relative
-        min-h-[780px]
-        overflow-hidden
-        rounded-[4px]
-        border border-slate-200
-        bg-[#fffdf7]
-        shadow-2xl
-        dark:border-slate-700
-        dark:bg-[#fffdf7]
-      "
+      className={`relative mx-auto min-h-[760px] w-full max-w-[820px] overflow-hidden rounded-[4px] border shadow-2xl ${
+        darkMode
+          ? "border-slate-700 bg-[#f8f4e8] text-slate-800"
+          : "border-slate-300 bg-[#fffdf4] text-slate-800"
+      }`}
+      style={{
+        fontFamily: font,
+      }}
     >
-      {/* Red margin */}
-      <div
-        className="
-          absolute
-          left-[64px]
-          top-0
-          bottom-0
-          z-10
-          w-px
-          bg-red-300/70
-        "
-      />
+      {/* Notebook top margin */}
+      <div className="absolute left-0 right-0 top-0 h-10 bg-[#fffdf4]" />
 
-      {/* Notebook lines */}
+      {/* Red notebook margin */}
+      <div className="absolute bottom-0 left-[68px] top-0 w-[2px] bg-red-300/80" />
+
+      {/* Blue ruled lines */}
       <div
-        className="
-          absolute
-          inset-0
-          opacity-70
-          pointer-events-none
-          bg-[repeating-linear-gradient(to_bottom,transparent_0px,transparent_31px,#bfdbfe_32px)]
-        "
+        className="absolute inset-0 opacity-60"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(to bottom, transparent 0px, transparent 34px, rgba(80,140,210,0.22) 35px)",
+          backgroundPosition: "0 38px",
+        }}
       />
 
       {/* Spiral holes */}
-      <div className="absolute left-3 top-0 bottom-0 z-20 flex flex-col justify-evenly">
-        {Array.from({ length: 18 }).map((_, index) => (
+      <div className="absolute left-0 top-0 z-20 flex h-full w-[28px] flex-col items-center justify-around py-8">
+        {Array.from({ length: 16 }).map((_, index) => (
           <div
             key={index}
-            className="
-              h-3.5
-              w-3.5
-              rounded-full
-              border-2
-              border-slate-400
-              bg-slate-200
-              shadow-inner
-            "
+            className="h-4 w-4 rounded-full border-2 border-slate-500 bg-slate-200 shadow-inner"
           />
         ))}
       </div>
 
       {/* Content */}
-      <div className="relative z-20 px-20 pb-16 pt-12">
+      <div className="relative z-10 px-12 pb-12 pl-[88px] pt-12">
         {/* Branding */}
-        <div className="mb-7 flex items-start justify-between gap-4">
+        <div className="mb-7 flex items-start justify-between gap-4 border-b border-slate-300/70 pb-4">
           <div>
-            <div className="mb-1 text-[10px] font-black tracking-[0.28em] text-slate-400">
+            <div className="text-[18px] font-black tracking-[0.08em] text-indigo-700">
               RANKER BHAIYA
             </div>
 
-            <div className="text-[11px] font-bold tracking-widest text-violet-500">
-              ASK VIDHYA • HANDWRITTEN NOTES
+            <div className="mt-1 text-[13px] font-bold text-slate-500">
+              ✍️ Ask Vidhya • Handwritten Study Notes
             </div>
           </div>
 
-          <div
-            className={`
-              flex h-10 w-10 shrink-0
-              items-center justify-center
-              rounded-full
-              border-2
-              bg-white
-              font-black
-              ${badgeClass}
-            `}
-          >
-            R
+          <div className="rounded-full border-2 border-indigo-500 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-indigo-600">
+            AI Notes
           </div>
         </div>
 
-        {/* Page title */}
+        {/* Topic */}
         <div className="mb-8">
-          <div
-            className={`
-              mb-2 inline-block
-              rounded-full
-              border
-              px-3 py-1
-              text-[10px]
-              font-black
-              uppercase
-              tracking-wider
-              ${badgeClass}
-            `}
-          >
-            Page {page.pageNumber}
+          <div className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
+            Topic
           </div>
 
-          <h2
-            className={`
-              text-4xl
-              font-black
-              leading-tight
-              ${accentClass}
-              [font-family:cursive]
-            `}
-          >
-            {page.title}
-          </h2>
-
-          <div className="mt-2 h-1 w-32 rounded-full bg-violet-300" />
+          <h1 className="text-3xl font-black leading-tight text-slate-900">
+            {topic || "Study Notes"}
+          </h1>
         </div>
 
         {/* Sections */}
-        <div className="space-y-8">
+        <div className="space-y-7">
           {page.sections.map((section, index) => (
-            <section key={`${section.heading}-${index}`}>
-              <h3
-                className="
-                  mb-3
-                  inline-block
-                  text-2xl
-                  font-bold
-                  text-slate-800
-                  [font-family:cursive]
-                "
-              >
-                {section.heading}
-              </h3>
+            <section key={`${section.title}-${index}`}>
+              <h2 className="mb-2 text-[22px] font-black leading-tight text-indigo-800">
+                {section.title}
+              </h2>
 
-              <div className="space-y-3">
-                {section.content.map((paragraph, paragraphIndex) => (
-                  <p
-                    key={paragraphIndex}
-                    className="
-                      max-w-3xl
-                      text-[18px]
-                      leading-[1.85]
-                      text-slate-700
-                      [font-family:cursive]
-                    "
-                  >
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
+              <p className="whitespace-pre-line text-[17px] font-medium leading-[2.05] text-slate-700">
+                {section.content}
+              </p>
 
-              {section.points?.length ? (
-                <div
-                  className="
-                    mt-4
-                    rounded-2xl
-                    border-2
-                    border-dashed
-                    border-blue-300
-                    bg-blue-50/70
-                    px-5
-                    py-4
-                  "
-                >
-                  <div className="mb-2 text-xs font-black uppercase tracking-widest text-blue-600">
-                    Important Points
+              {section.points.length > 0 && (
+                <div className="mt-4 rounded-xl border-2 border-amber-300/80 bg-amber-50/80 p-4">
+                  <div className="mb-2 text-sm font-black uppercase tracking-wider text-amber-700">
+                    ⭐ Important Points
                   </div>
 
                   <ul className="space-y-2">
                     {section.points.map((point, pointIndex) => (
                       <li
                         key={pointIndex}
-                        className="
-                          flex
-                          gap-3
-                          text-[17px]
-                          leading-7
-                          text-slate-700
-                          [font-family:cursive]
-                        "
+                        className="flex gap-2 text-[15px] font-semibold leading-7 text-slate-700"
                       >
-                        <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                        <span className="font-black text-indigo-600">
+                          •
+                        </span>
+
                         <span>{point}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
-              ) : null}
+              )}
             </section>
           ))}
         </div>
 
+        {/* Exam box */}
+        <div className="mt-8 rounded-2xl border-2 border-indigo-300 bg-indigo-50/80 p-5">
+          <div className="mb-2 text-sm font-black uppercase tracking-wider text-indigo-700">
+            🎯 Exam Revision
+          </div>
+
+          <p className="text-[15px] font-semibold leading-7 text-slate-700">
+            Revise the highlighted concepts and important points before
+            attempting practice questions.
+          </p>
+        </div>
+
         {/* Footer */}
-        <div className="absolute bottom-5 left-20 right-10 flex items-center justify-between border-t border-slate-300/70 pt-3">
-          <span className="text-[10px] font-black tracking-widest text-slate-400">
-            ASK VIDHYA
-          </span>
+        <div className="mt-10 flex items-center justify-between border-t border-slate-300 pt-4 text-xs font-bold text-slate-400">
+          <span>RANKER BHAIYA</span>
 
-          <span className="text-[10px] font-bold text-slate-400">
-            RANKER BHAIYA
-          </span>
-
-          <span className="text-[10px] font-bold text-slate-400">
-            {page.pageNumber}
+          <span>
+            ASK VIDHYA • PAGE {page.pageNumber}
           </span>
         </div>
       </div>
@@ -389,126 +325,160 @@ function NotebookPage({
   );
 }
 
-/* =========================================================
-   SMALL UI HELPERS
-========================================================= */
-
 function Feature({
   icon,
   title,
-  children,
+  description,
 }: {
-  icon: string;
+  icon: ReactNode;
   title: string;
-  children: ReactNode;
+  description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-      <div className="mb-2 flex items-center gap-3">
-        <span className="text-xl">{icon}</span>
-        <h3 className="font-bold text-slate-900 dark:text-white">
-          {title}
-        </h3>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-xl dark:bg-indigo-950">
+        {icon}
       </div>
 
-      <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
-        {children}
+      <h3 className="font-bold text-slate-900 dark:text-white">
+        {title}
+      </h3>
+
+      <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        {description}
       </p>
     </div>
   );
 }
 
-/* =========================================================
-   MAIN COMPONENT
-========================================================= */
-
 export default function HandwrittenNotes() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useTheme();
 
-  const [topic, setTopic] = useState("Photosynthesis");
+  const noteState =
+    location.state as
+      | HandwrittenNotesLocationState
+      | null;
 
-  const [content, setContent] = useState(
-    `Photosynthesis is the process by which green plants prepare their own food using sunlight, carbon dioxide and water.
-This process mainly takes place in the green parts of plants because they contain chlorophyll.
-Roots absorb water from the soil while carbon dioxide enters the leaves through tiny pores called stomata.
-Chlorophyll captures sunlight and provides the energy needed for photosynthesis.
-The food produced is mainly glucose, which can later be stored as starch.
-Photosynthesis also releases oxygen into the atmosphere.`,
+  const incomingTopic = noteState?.topic?.trim() || "";
+  const incomingContent = noteState?.content?.trim() || "";
+
+  const [topic, setTopic] = useState(
+    incomingTopic || "Photosynthesis",
   );
 
-  const [style, setStyle] = useState<NoteStyle>("blue");
+  const [content, setContent] = useState(
+    incomingContent || DEMO_CONTENT,
+  );
 
-  const [pages, setPages] =
-    useState<NotePage[]>(defaultPages);
+  const [selectedStyle, setSelectedStyle] =
+    useState("classic");
+
+  const [pages, setPages] = useState<NotePage[]>(() =>
+    createPagesFromText(
+      incomingContent || DEMO_CONTENT,
+      incomingTopic || "Photosynthesis",
+    ),
+  );
 
   const [currentPage, setCurrentPage] = useState(0);
+  const [generated, setGenerated] = useState(
+    Boolean(incomingContent),
+  );
 
-  const [generated, setGenerated] = useState(true);
+  /*
+   * Ask Vidhya se navigation hone par
+   * topic/content automatically update karega.
+   */
+  useEffect(() => {
+    if (!incomingContent && !incomingTopic) {
+      return;
+    }
 
-  const totalPages = pages.length;
+    const nextTopic =
+      incomingTopic || "AI Generated Notes";
 
-  const current = pages[currentPage];
+    const nextContent =
+      incomingContent || DEMO_CONTENT;
 
-  const progress = useMemo(() => {
-    if (!totalPages) return 0;
-
-    return Math.round(
-      ((currentPage + 1) / totalPages) * 100,
+    setTopic(nextTopic);
+    setContent(nextContent);
+    setPages(
+      createPagesFromText(
+        nextContent,
+        nextTopic,
+      ),
     );
-  }, [currentPage, totalPages]);
-
-  /* =======================================================
-     GENERATE
-  ======================================================= */
-
-  function handleGenerate(event: FormEvent) {
-    event.preventDefault();
-
-    const nextPages = createPagesFromText(
-      topic,
-      content,
-    );
-
-    setPages(nextPages);
     setCurrentPage(0);
     setGenerated(true);
-  }
+  }, [incomingTopic, incomingContent]);
 
-  /* =======================================================
-     PRINT / PDF
-  ======================================================= */
+  const activeStyle = useMemo(
+    () =>
+      NOTE_STYLES.find(
+        (style) => style.id === selectedStyle,
+      ) || NOTE_STYLES[0],
+    [selectedStyle],
+  );
 
-  function handlePrint() {
+  const darkMode = theme === "dark";
+
+  const handleGenerate = (event: FormEvent) => {
+    event.preventDefault();
+
+    const cleanTopic =
+      topic.trim() || "Study Notes";
+
+    const cleanContent = cleanText(content);
+
+    if (!cleanContent) {
+      return;
+    }
+
+    const generatedPages = createPagesFromText(
+      cleanContent,
+      cleanTopic,
+    );
+
+    setTopic(cleanTopic);
+    setContent(cleanContent);
+    setPages(generatedPages);
+    setCurrentPage(0);
+    setGenerated(true);
+  };
+
+  const handleReset = () => {
+    const defaultTopic = "Photosynthesis";
+    const defaultContent = DEMO_CONTENT;
+
+    setTopic(defaultTopic);
+    setContent(defaultContent);
+    setPages(
+      createPagesFromText(
+        defaultContent,
+        defaultTopic,
+      ),
+    );
+    setCurrentPage(0);
+    setGenerated(false);
+  };
+
+  const handlePrint = () => {
     window.print();
-  }
+  };
 
-  /* =======================================================
-     DOWNLOAD TEXT
-  ======================================================= */
-
-  function handleDownloadText() {
-    const text = pages
-      .map((page) => {
-        const sections = page.sections
-          .map((section) => {
-            const contentText =
-              section.content.join("\n");
-
-            const pointsText =
-              section.points?.length
-                ? `\n${section.points
-                    .map((point) => `• ${point}`)
-                    .join("\n")}`
-                : "";
-
-            return `${section.heading}\n\n${contentText}${pointsText}`;
-          })
-          .join("\n\n");
-
-        return `PAGE ${page.pageNumber}\n${page.title}\n\n${sections}`;
-      })
-      .join("\n\n============================\n\n");
+  const handleDownloadText = () => {
+    const text = [
+      `RANKER BHAIYA`,
+      `ASK VIDHYA - HANDWRITTEN STUDY NOTES`,
+      ``,
+      `TOPIC: ${topic}`,
+      ``,
+      content,
+      ``,
+      `Generated with Ranker Bhaiya • Ask Vidhya`,
+    ].join("\n");
 
     const blob = new Blob([text], {
       type: "text/plain;charset=utf-8",
@@ -517,187 +487,213 @@ Photosynthesis also releases oxygen into the atmosphere.`,
     const url = URL.createObjectURL(blob);
 
     const anchor = document.createElement("a");
-
     anchor.href = url;
-    anchor.download = `${topic || "ranker-bhaiya-notes"}.txt`;
+    anchor.download = `${topic
+      .replace(/[^a-z0-9]+/gi, "-")
+      .toLowerCase()
+      .replace(/^-+|-+$/g, "") || "ranker-bhaiya-notes"}.txt`;
 
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
 
     URL.revokeObjectURL(url);
-  }
+  };
 
-  /* =======================================================
-     RESET
-  ======================================================= */
-
-  function handleReset() {
-    setTopic("Photosynthesis");
-
-    setContent(
-      `Photosynthesis is the process by which green plants prepare their own food using sunlight, carbon dioxide and water.
-This process mainly takes place in the green parts of plants because they contain chlorophyll.
-Roots absorb water from the soil while carbon dioxide enters the leaves through tiny pores called stomata.
-Chlorophyll captures sunlight and provides the energy needed for photosynthesis.
-The food produced is mainly glucose, which can later be stored as starch.
-Photosynthesis also releases oxygen into the atmosphere.`,
-    );
-
-    setPages(defaultPages);
-    setCurrentPage(0);
-    setStyle("blue");
-    setGenerated(true);
-  }
+  const handleBackToAskVidhya = () => {
+    navigate("/student/ask");
+  };
 
   return (
     <div
-      className={`
-        min-h-screen
-        ${
-          theme === "dark"
-            ? "bg-slate-950"
-            : "bg-slate-50"
-        }
-      `}
+      className={`min-h-screen transition-colors ${
+        darkMode
+          ? "bg-slate-950 text-white"
+          : "bg-slate-50 text-slate-900"
+      }`}
     >
-      {/* =====================================================
-          TOP HEADER
-      ===================================================== */}
+      {/* Print-only CSS */}
+      <style>
+        {`
+          @media print {
+            body {
+              background: white !important;
+            }
 
-      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90 print:hidden">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+            .no-print {
+              display: none !important;
+            }
+
+            .print-area {
+              display: block !important;
+            }
+
+            .notebook-print-page {
+              page-break-after: always;
+            }
+
+            @page {
+              size: A4;
+              margin: 0;
+            }
+          }
+        `}
+      </style>
+
+      {/* Header */}
+      <header className="no-print sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <button
             type="button"
-            onClick={() =>
-              navigate("/student/dashboard")
-            }
+            onClick={handleBackToAskVidhya}
             className="flex items-center gap-3"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-blue-600 text-lg font-black text-white shadow-lg">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-lg font-black text-white shadow-lg">
               R
             </div>
 
             <div className="text-left">
-              <div className="text-sm font-black tracking-wide text-slate-900 dark:text-white">
+              <div className="font-black tracking-wide text-slate-900 dark:text-white">
                 RANKER BHAIYA
               </div>
 
-              <div className="text-[10px] font-bold uppercase tracking-widest text-violet-500">
-                Learning Platform
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Ask Vidhya • Handwritten Notes
               </div>
             </div>
           </button>
 
           <button
             type="button"
-            onClick={() =>
-              navigate("/student/ask")
-            }
-            className="
-              rounded-xl
-              border
-              border-violet-200
-              bg-violet-50
-              px-4
-              py-2
-              text-sm
-              font-bold
-              text-violet-700
-              transition
-              hover:bg-violet-100
-              dark:border-violet-900
-              dark:bg-violet-950/40
-              dark:text-violet-300
-            "
+            onClick={handleBackToAskVidhya}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             ← Ask Vidhya
           </button>
         </div>
       </header>
 
-      {/* =====================================================
-          MAIN
-      ===================================================== */}
-
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
+      {/* Main */}
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Hero */}
-        <section className="mb-8 overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-700 via-indigo-700 to-blue-700 p-6 text-white shadow-2xl sm:p-8">
-          <div className="flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold backdrop-blur">
-                ✍️ ASK VIDHYA • HANDWRITTEN NOTES
+        <section className="no-print overflow-hidden rounded-[28px] bg-gradient-to-br from-indigo-700 via-violet-700 to-fuchsia-700 p-6 text-white shadow-2xl sm:p-8 lg:p-10">
+          <div className="grid items-center gap-8 lg:grid-cols-[1.4fr_0.6fr]">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider backdrop-blur">
+                ✍️ AI Handwritten Notes
               </div>
 
-              <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
-                Learn it.
-                <br />
-                <span className="text-violet-200">
-                  Write it.
-                </span>
-                <br />
-                Remember it.
+              <h1 className="max-w-3xl text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">
+                Turn your Ask Vidhya answers into handwritten-style notes.
               </h1>
 
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-white/80 sm:text-base">
-                Convert your study content into beautiful
-                notebook-style handwritten notes powered by
-                the Ranker Bhaiya learning experience.
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-indigo-100 sm:text-base">
+                Generate clean notebook-style revision notes from your
+                AI answers and study them like your own handwritten
+                notes.
               </p>
+
+              <div className="mt-6 flex flex-wrap gap-3 text-xs font-bold">
+                <span className="rounded-full bg-white/15 px-4 py-2">
+                  RANKER BHAIYA
+                </span>
+
+                <span className="rounded-full bg-white/15 px-4 py-2">
+                  ASK VIDHYA
+                </span>
+
+                <span className="rounded-full bg-white/15 px-4 py-2">
+                  EXAM READY
+                </span>
+              </div>
             </div>
 
-            <div className="shrink-0">
-              <div className="rounded-3xl border border-white/20 bg-white/10 p-5 backdrop-blur-xl">
-                <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/60">
-                  Powered by
+            <div className="hidden justify-center lg:flex">
+              <div className="relative rotate-[-4deg] rounded-2xl bg-[#fffdf4] p-5 text-slate-800 shadow-2xl">
+                <div className="absolute -left-3 top-6 space-y-5">
+                  {Array.from({ length: 6 }).map(
+                    (_, index) => (
+                      <div
+                        key={index}
+                        className="h-3 w-3 rounded-full border border-slate-500 bg-slate-200"
+                      />
+                    ),
+                  )}
                 </div>
 
-                <div className="mt-2 text-xl font-black">
-                  RANKER BHAIYA
-                </div>
+                <div className="w-64">
+                  <div className="text-xs font-black text-indigo-700">
+                    RANKER BHAIYA
+                  </div>
 
-                <div className="mt-1 text-sm font-semibold text-violet-200">
-                  Ask Vidhya
+                  <div className="mt-1 text-[10px] font-bold text-slate-400">
+                    ASK VIDHYA
+                  </div>
+
+                  <div className="mt-5 text-2xl font-black">
+                    Smart Revision
+                  </div>
+
+                  <div className="mt-4 space-y-2 text-sm leading-7">
+                    <div className="border-b border-blue-200">
+                      Important concept
+                    </div>
+
+                    <div className="border-b border-blue-200">
+                      Key facts
+                    </div>
+
+                    <div className="border-b border-blue-200">
+                      Exam point
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ===================================================
-            FEATURES
-        =================================================== */}
+        {/* Features */}
+        <section className="no-print mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Feature
+            icon="📒"
+            title="Notebook Style"
+            description="Ruled-paper handwritten presentation."
+          />
 
-        <div className="mb-8 grid gap-4 md:grid-cols-3 print:hidden">
-          <Feature icon="📓" title="Notebook Style">
-            Clean ruled-paper layout with handwritten-style
-            typography.
-          </Feature>
+          <Feature
+            icon="🧠"
+            title="AI Powered"
+            description="Use answers generated by Ask Vidhya."
+          />
 
-          <Feature icon="🧠" title="Exam Focused">
-            Important points and quick-revision sections are
-            clearly highlighted.
-          </Feature>
+          <Feature
+            icon="🎯"
+            title="Exam Focused"
+            description="Important points are highlighted."
+          />
 
-          <Feature icon="⚡" title="Local Renderer">
-            The visual notebook rendering happens directly
-            inside the browser.
-          </Feature>
-        </div>
+          <Feature
+            icon="🖨️"
+            title="Print / PDF"
+            description="Print the notes or save them as PDF."
+          />
+        </section>
 
-        {/* ===================================================
-            GENERATOR
-        =================================================== */}
-
-        <section className="mb-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 print:hidden sm:p-7">
+        {/* Generator */}
+        <section className="no-print mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
           <div className="mb-6">
-            <h2 className="text-xl font-black text-slate-900 dark:text-white">
-              Create Handwritten Notes
+            <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">
+              Note Generator
+            </div>
+
+            <h2 className="mt-2 text-2xl font-black">
+              Create your handwritten notes
             </h2>
 
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Enter your topic and study content. The local
-              renderer will convert it into notebook pages.
+            <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Ask Vidhya ka answer yahan automatically aa sakta
+              hai, ya tum apna content manually paste kar sakte ho.
             </p>
           </div>
 
@@ -705,167 +701,95 @@ Photosynthesis also releases oxygen into the atmosphere.`,
             onSubmit={handleGenerate}
             className="space-y-5"
           >
-            {/* Topic */}
             <div>
-              <label
-                htmlFor="notes-topic"
-                className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300"
-              >
+              <label className="mb-2 block text-sm font-bold">
                 Topic
               </label>
 
               <input
-                id="notes-topic"
+                type="text"
                 value={topic}
                 onChange={(event) =>
                   setTopic(event.target.value)
                 }
-                placeholder="e.g. Photosynthesis"
-                className="
-                  w-full
-                  rounded-2xl
-                  border
-                  border-slate-200
-                  bg-slate-50
-                  px-4
-                  py-3
-                  text-sm
-                  font-semibold
-                  outline-none
-                  transition
-                  focus:border-violet-500
-                  focus:ring-4
-                  focus:ring-violet-500/10
-                  dark:border-slate-700
-                  dark:bg-slate-950
-                  dark:text-white
-                "
+                placeholder="e.g. Indian Polity"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-semibold outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-slate-700 dark:bg-slate-950"
               />
             </div>
 
-            {/* Content */}
             <div>
-              <label
-                htmlFor="notes-content"
-                className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-300"
-              >
-                Study Content
+              <label className="mb-2 block text-sm font-bold">
+                AI Answer / Notes Content
               </label>
 
               <textarea
-                id="notes-content"
                 value={content}
                 onChange={(event) =>
                   setContent(event.target.value)
                 }
-                rows={8}
-                placeholder="Paste your study content here..."
-                className="
-                  w-full
-                  resize-y
-                  rounded-2xl
-                  border
-                  border-slate-200
-                  bg-slate-50
-                  px-4
-                  py-4
-                  text-sm
-                  leading-7
-                  outline-none
-                  transition
-                  focus:border-violet-500
-                  focus:ring-4
-                  focus:ring-violet-500/10
-                  dark:border-slate-700
-                  dark:bg-slate-950
-                  dark:text-white
-                "
+                rows={10}
+                placeholder="Paste your Ask Vidhya answer here..."
+                className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-slate-700 dark:bg-slate-950"
               />
             </div>
 
-            {/* Style */}
             <div>
-              <div className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-300">
-                Notebook Style
-              </div>
+              <label className="mb-3 block text-sm font-bold">
+                Handwriting Style
+              </label>
 
-              <div className="flex flex-wrap gap-3">
-                {(
-                  [
-                    ["blue", "🔵 Classic Blue"],
-                    ["purple", "🟣 Purple Study"],
-                    ["green", "🟢 Green Notes"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() =>
-                      setStyle(value)
-                    }
-                    className={`
-                      rounded-xl
-                      border
-                      px-4
-                      py-2.5
-                      text-sm
-                      font-bold
-                      transition
-                      ${
-                        style === value
-                          ? "border-violet-500 bg-violet-50 text-violet-700 shadow-sm dark:bg-violet-950/40 dark:text-violet-300"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-violet-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+              <div className="grid gap-3 sm:grid-cols-3">
+                {NOTE_STYLES.map((style) => {
+                  const active =
+                    selectedStyle === style.id;
+
+                  return (
+                    <button
+                      key={style.id}
+                      type="button"
+                      onClick={() =>
+                        setSelectedStyle(style.id)
                       }
-                    `}
-                  >
-                    {label}
-                  </button>
-                ))}
+                      className={`rounded-2xl border p-4 text-left transition ${
+                        active
+                          ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500/20 dark:bg-indigo-950/40"
+                          : "border-slate-200 bg-slate-50 hover:border-indigo-300 dark:border-slate-700 dark:bg-slate-950"
+                      }`}
+                    >
+                      <div
+                        className="text-lg font-bold"
+                        style={{
+                          fontFamily: style.font,
+                        }}
+                      >
+                        Aa Notes
+                      </div>
+
+                      <div className="mt-2 text-sm font-black">
+                        {style.name}
+                      </div>
+
+                      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {style.description}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="submit"
-                className="
-                  rounded-2xl
-                  bg-gradient-to-r
-                  from-violet-600
-                  to-blue-600
-                  px-6
-                  py-3
-                  text-sm
-                  font-black
-                  text-white
-                  shadow-lg
-                  shadow-violet-500/20
-                  transition
-                  hover:-translate-y-0.5
-                "
+                className="flex-1 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-4 text-sm font-black text-white shadow-lg shadow-indigo-600/20 transition hover:scale-[1.01] hover:shadow-xl"
               >
-                ✨ Generate Notes
+                ✍️ Generate Handwritten Notes
               </button>
 
               <button
                 type="button"
                 onClick={handleReset}
-                className="
-                  rounded-2xl
-                  border
-                  border-slate-200
-                  bg-white
-                  px-6
-                  py-3
-                  text-sm
-                  font-bold
-                  text-slate-600
-                  transition
-                  hover:bg-slate-50
-                  dark:border-slate-700
-                  dark:bg-slate-950
-                  dark:text-slate-300
-                "
+                className="rounded-2xl border border-slate-200 px-6 py-4 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Reset
               </button>
@@ -873,184 +797,140 @@ Photosynthesis also releases oxygen into the atmosphere.`,
           </form>
         </section>
 
-        {/* ===================================================
-            PREVIEW HEADER
-        =================================================== */}
-
-        {generated && current ? (
-          <section>
-            <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
-              <div>
-                <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-500">
-                  Handwritten Preview
-                </div>
-
-                <h2 className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-                  {topic || "My Study Notes"}
-                </h2>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handleDownloadText}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                >
-                  ↓ Text
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900"
-                >
-                  🖨 Print / PDF
-                </button>
-              </div>
+        {/* Preview controls */}
+        <section className="no-print mt-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">
+              Preview
             </div>
 
-            {/* Progress */}
-            <div className="mb-5 print:hidden">
-              <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
-                <span>
-                  Page {currentPage + 1} of {totalPages}
-                </span>
+            <h2 className="mt-1 text-2xl font-black">
+              Your Notebook
+            </h2>
 
-                <span>{progress}%</span>
-              </div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {pages.length} page
+              {pages.length === 1 ? "" : "s"} • Page{" "}
+              {currentPage + 1} of {pages.length}
+            </p>
+          </div>
 
-              <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-blue-500 transition-all"
-                  style={{
-                    width: `${progress}%`,
-                  }}
-                />
-              </div>
-            </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={handleDownloadText}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+            >
+              📄 Download Text
+            </button>
 
-            {/* Notebook */}
-            <div className="mx-auto max-w-4xl">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 dark:bg-white dark:text-slate-900"
+            >
+              🖨️ Print / Save PDF
+            </button>
+          </div>
+        </section>
+
+        {/* Notebook */}
+        <section className="print-area mt-6">
+          {generated && pages[currentPage] ? (
+            <div className="notebook-print-page">
               <NotebookPage
-                page={current}
-                style={style}
+                page={pages[currentPage]}
+                topic={topic}
+                font={activeStyle.font}
+                darkMode={darkMode}
               />
             </div>
+          ) : (
+            <div className="no-print rounded-3xl border border-dashed border-slate-300 p-12 text-center dark:border-slate-700">
+              <div className="text-5xl">📒</div>
 
-            {/* Pagination */}
-            <div className="mt-6 flex items-center justify-between print:hidden">
-              <button
-                type="button"
-                disabled={currentPage === 0}
-                onClick={() =>
-                  setCurrentPage(
-                    (page) =>
-                      Math.max(0, page - 1),
-                  )
-                }
-                className="
-                  rounded-xl
-                  border
-                  border-slate-200
-                  bg-white
-                  px-5
-                  py-3
-                  text-sm
-                  font-bold
-                  text-slate-700
-                  disabled:cursor-not-allowed
-                  disabled:opacity-40
-                  dark:border-slate-700
-                  dark:bg-slate-900
-                  dark:text-slate-200
-                "
-              >
-                ← Previous
-              </button>
+              <h3 className="mt-4 text-xl font-black">
+                Your notes will appear here
+              </h3>
 
-              <div className="flex max-w-[50%] gap-2 overflow-x-auto px-2">
-                {pages.map((page, index) => (
-                  <button
-                    key={page.pageNumber}
-                    type="button"
-                    onClick={() =>
-                      setCurrentPage(index)
-                    }
-                    className={`
-                      h-9
-                      min-w-9
-                      rounded-lg
-                      px-2
-                      text-xs
-                      font-black
-                      transition
-                      ${
-                        currentPage === index
-                          ? "bg-violet-600 text-white"
-                          : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
-                      }
-                    `}
-                  >
-                    {page.pageNumber}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                disabled={
-                  currentPage === totalPages - 1
-                }
-                onClick={() =>
-                  setCurrentPage(
-                    (page) =>
-                      Math.min(
-                        totalPages - 1,
-                        page + 1,
-                      ),
-                  )
-                }
-                className="
-                  rounded-xl
-                  border
-                  border-slate-200
-                  bg-white
-                  px-5
-                  py-3
-                  text-sm
-                  font-bold
-                  text-slate-700
-                  disabled:cursor-not-allowed
-                  disabled:opacity-40
-                  dark:border-slate-700
-                  dark:bg-slate-900
-                  dark:text-slate-200
-                "
-              >
-                Next →
-              </button>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Ask Vidhya se answer generate karo aur
+                handwritten-style revision notes create karo.
+              </p>
             </div>
+          )}
+        </section>
+
+        {/* Pagination */}
+        {pages.length > 1 && (
+          <section className="no-print mt-6 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              disabled={currentPage === 0}
+              onClick={() =>
+                setCurrentPage((page) =>
+                  Math.max(0, page - 1),
+                )
+              }
+              className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
+            >
+              ← Previous
+            </button>
+
+            <div className="rounded-xl bg-indigo-50 px-5 py-3 text-sm font-black text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+              {currentPage + 1} / {pages.length}
+            </div>
+
+            <button
+              type="button"
+              disabled={
+                currentPage === pages.length - 1
+              }
+              onClick={() =>
+                setCurrentPage((page) =>
+                  Math.min(
+                    pages.length - 1,
+                    page + 1,
+                  ),
+                )
+              }
+              className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700"
+            >
+              Next →
+            </button>
           </section>
-        ) : null}
+        )}
+
+        {/* Bottom info */}
+        <section className="no-print mt-10 rounded-3xl border border-indigo-100 bg-indigo-50/70 p-6 dark:border-indigo-900/50 dark:bg-indigo-950/20">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+            <div className="text-3xl">💡</div>
+
+            <div>
+              <h3 className="font-black text-indigo-900 dark:text-indigo-200">
+                Smart Revision Tip
+              </h3>
+
+              <p className="mt-2 text-sm leading-7 text-indigo-800/80 dark:text-indigo-300/80">
+                Handwritten-style notes ko short revision ke liye
+                use karo. Important points ko mark karke exam se
+                pehle quick revision karna aur bhi easy ho jayega.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
 
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
-
-      <footer className="border-t border-slate-200 py-8 dark:border-slate-800 print:hidden">
-        <div className="mx-auto max-w-7xl px-4 text-center sm:px-6">
-          <div className="text-sm font-black tracking-wider text-slate-700 dark:text-slate-200">
-            RANKER BHAIYA
+      {/* Footer */}
+      <footer className="no-print mt-12 border-t border-slate-200 py-8 dark:border-slate-800">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-center text-xs font-semibold text-slate-400 sm:flex-row sm:px-6 lg:px-8 sm:text-left">
+          <div>
+            © {new Date().getFullYear()} RANKER BHAIYA
           </div>
 
-          <div className="mt-1 text-xs font-semibold text-violet-500">
-            Ask Vidhya • Handwritten Notes
+          <div>
+            Powered by Ask Vidhya • Smart Learning • Smart Revision
           </div>
-
-          <p className="mt-3 text-xs text-slate-400">
-            Aapki Mehnat, Hamari Strategy.
-          </p>
         </div>
       </footer>
     </div>
