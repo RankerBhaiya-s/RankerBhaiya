@@ -39,7 +39,6 @@ function cleanText(value: string): string {
     .replace(/\*\*/g, "")
     .replace(/__/g, "")
     .replace(/`/g, "")
-    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -191,6 +190,8 @@ function parseNotes(rawContent: string): NoteData {
       continue;
     }
 
+    /* Bullet */
+
     if (
       /^[-•*]\s*/.test(rawLine) &&
       currentSection
@@ -215,11 +216,6 @@ function parseNotes(rawContent: string): NoteData {
 
     /* Section headings */
 
-    const headingMatch =
-      line.match(
-        /^(?:\d+[.)]\s*)?(.{3,80})$/,
-      );
-
     const looksLikeHeading =
       /^(\d+[.)]\s*)?(constitutional|legislative|executive|military|foreign|introduction|overview|powers|functions|features|causes|effects|advantages|disadvantages|types|importance|definition|meaning)/i.test(
         line,
@@ -242,7 +238,7 @@ function parseNotes(rawContent: string): NoteData {
       continue;
     }
 
-    /* Important points */
+    /* Important points heading */
 
     if (
       /important|key fact|मुख्य तथ्य|महत्वपूर्ण/i.test(
@@ -257,13 +253,12 @@ function parseNotes(rawContent: string): NoteData {
     if (line.includes("|")) {
       const cells = line
         .split("|")
-        .map((cell) =>
-          cleanText(cell),
-        )
+        .map((cell) => cleanText(cell))
         .filter(Boolean);
 
       if (cells.length >= 2) {
         const heading = cells[0];
+
         const detail = cells
           .slice(1)
           .join(" — ");
@@ -271,11 +266,9 @@ function parseNotes(rawContent: string): NoteData {
         if (
           heading &&
           detail &&
-          !/^क्षेत्र$/i.test(
-            heading,
-          )
+          !/^क्षेत्र$/i.test(heading)
         ) {
-          const section = {
+          const section: NoteSection = {
             title: heading,
             points: [detail],
           };
@@ -288,7 +281,7 @@ function parseNotes(rawContent: string): NoteData {
       }
     }
 
-    /* Normal bullet-like content */
+    /* Normal content */
 
     if (
       line.length > 15 &&
@@ -301,9 +294,7 @@ function parseNotes(rawContent: string): NoteData {
             line.toLowerCase(),
         )
       ) {
-        currentSection.points.push(
-          line,
-        );
+        currentSection.points.push(line);
       }
 
       continue;
@@ -320,10 +311,9 @@ function parseNotes(rawContent: string): NoteData {
     }
   }
 
-  /*
-   * If parser could not identify sections,
-   * create a clean general section.
-   */
+  /* ===================================================
+     FALLBACK SECTION
+  =================================================== */
 
   if (sections.length === 0) {
     const fallbackPoints =
@@ -332,15 +322,14 @@ function parseNotes(rawContent: string): NoteData {
     if (fallbackPoints.length > 0) {
       sections.push({
         title: "मुख्य बातें",
-        points:
-          fallbackPoints.slice(0, 12),
+        points: fallbackPoints.slice(0, 12),
       });
     }
   }
 
-  /*
-   * Remove duplicate sections.
-   */
+  /* ===================================================
+     REMOVE DUPLICATE SECTIONS
+  =================================================== */
 
   const uniqueSections =
     sections.filter(
@@ -348,32 +337,29 @@ function parseNotes(rawContent: string): NoteData {
         const signature =
           section.title
             .toLowerCase()
-            .replace(/\s+/g, " ");
+            .replace(/\s+/g, " ")
+            .trim();
 
         return (
           array.findIndex(
             (item) =>
               item.title
                 .toLowerCase()
-                .replace(/\s+/g, " ") ===
-              signature,
+                .replace(/\s+/g, " ")
+                .trim() === signature,
           ) === index
         );
       },
     );
 
-  /*
-   * Generate important points from
-   * section content if AI didn't provide
-   * a dedicated section.
-   */
+  /* ===================================================
+     IMPORTANT POINTS
+  =================================================== */
 
   if (importantPoints.length === 0) {
     for (const section of uniqueSections) {
       for (const point of section.points) {
-        if (
-          importantPoints.length >= 5
-        ) {
+        if (importantPoints.length >= 5) {
           break;
         }
 
@@ -385,28 +371,26 @@ function parseNotes(rawContent: string): NoteData {
               point.toLowerCase(),
           )
         ) {
-          importantPoints.push(
-            point,
-          );
+          importantPoints.push(point);
         }
+      }
+
+      if (importantPoints.length >= 5) {
+        break;
       }
     }
   }
 
-  /*
-   * Quick revision should contain short
-   * section names, not duplicated paragraphs.
-   */
+  /* ===================================================
+     QUICK REVISION
+  =================================================== */
 
   for (const section of uniqueSections) {
-    if (
-      quickRevision.length >= 6
-    ) {
+    if (quickRevision.length >= 6) {
       break;
     }
 
-    const title =
-      section.title.trim();
+    const title = section.title.trim();
 
     if (
       title.length > 2 &&
@@ -423,11 +407,10 @@ function parseNotes(rawContent: string): NoteData {
   return {
     topic,
     introduction,
-    sections:
-      uniqueSections.filter(
-        (section) =>
-          section.points.length > 0,
-      ),
+    sections: uniqueSections.filter(
+      (section) =>
+        section.points.length > 0,
+    ),
     importantPoints:
       importantPoints.slice(0, 6),
     examPoint,
@@ -451,14 +434,8 @@ export function HandwrittenNotes() {
   const [topic, setTopic] =
     useState("");
 
-  const [generating, setGenerating] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
   /* ===================================================
-     RECEIVE CONTENT
+     RECEIVE CONTENT FROM ASK VIDHYA
   =================================================== */
 
   useEffect(() => {
@@ -538,7 +515,7 @@ export function HandwrittenNotes() {
             No Notes Found
           </h1>
 
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm leading-6 text-slate-500">
             Ask Vidhya se notes generate
             karne ke baad yahan handwritten
             notes appear honge.
@@ -547,7 +524,7 @@ export function HandwrittenNotes() {
           <button
             type="button"
             onClick={handleBack}
-            className="mt-6 rounded-xl bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700"
+            className="mt-6 rounded-xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-700"
           >
             ← Ask Vidhya
           </button>
@@ -562,6 +539,7 @@ export function HandwrittenNotes() {
 
   return (
     <div className="min-h-screen bg-[#e8e2d6] px-3 py-6 text-[#252525] print:bg-white print:px-0 print:py-0">
+
       {/* =================================================
           ACTION BAR
       ================================================= */}
@@ -597,9 +575,8 @@ export function HandwrittenNotes() {
           } as CSSProperties
         }
       >
-        {/* =================================================
-            PAPER LINES
-        ================================================= */}
+
+        {/* PAPER LINES */}
 
         <div
           className="pointer-events-none absolute inset-0 opacity-70"
@@ -618,12 +595,14 @@ export function HandwrittenNotes() {
         ================================================= */}
 
         <div className="relative px-[82px] py-10">
+
           {/* =================================================
               BRANDING
           ================================================= */}
 
           <header className="border-b-2 border-blue-900/20 pb-5">
             <div className="flex items-start justify-between gap-4">
+
               <div>
                 <div className="text-[24px] font-black tracking-[0.08em] text-blue-900">
                   RANKER BHAIYA
@@ -637,6 +616,7 @@ export function HandwrittenNotes() {
               <div className="rounded-full border-2 border-blue-900/30 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-blue-900">
                 Study Notes
               </div>
+
             </div>
           </header>
 
@@ -693,6 +673,7 @@ export function HandwrittenNotes() {
                   className="relative"
                 >
                   <div className="mb-3 flex items-start gap-3">
+
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-blue-700 text-sm font-black text-blue-800">
                       {String(
                         index + 1,
@@ -702,11 +683,15 @@ export function HandwrittenNotes() {
                     <h2 className="pt-0.5 text-[21px] font-black text-slate-900">
                       {section.title}
                     </h2>
+
                   </div>
 
                   <div className="ml-11 space-y-2">
                     {section.points.map(
-                      (point, pointIndex) => (
+                      (
+                        point,
+                        pointIndex,
+                      ) => (
                         <div
                           key={`${point}-${pointIndex}`}
                           className="flex items-start gap-3 text-[16px] font-medium leading-8"
@@ -729,9 +714,10 @@ export function HandwrittenNotes() {
               IMPORTANT POINTS
           ================================================= */}
 
-          {notes.importantPoints
-            .length > 0 && (
+          {notes.importantPoints.length >
+            0 && (
             <section className="mt-10 rounded-2xl border-2 border-amber-300 bg-amber-50/70 p-5">
+
               <div className="mb-4 flex items-center gap-2">
                 <span className="text-xl">
                   ⭐
@@ -760,6 +746,7 @@ export function HandwrittenNotes() {
                   ),
                 )}
               </div>
+
             </section>
           )}
 
@@ -769,6 +756,7 @@ export function HandwrittenNotes() {
 
           {notes.examPoint && (
             <section className="mt-7 rounded-2xl border-2 border-purple-300 bg-purple-50/60 p-5">
+
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-xl">
                   🎯
@@ -782,6 +770,7 @@ export function HandwrittenNotes() {
               <p className="text-[16px] font-semibold leading-8">
                 {notes.examPoint}
               </p>
+
             </section>
           )}
 
@@ -789,9 +778,10 @@ export function HandwrittenNotes() {
               QUICK REVISION
           ================================================= */}
 
-          {notes.quickRevision
-            .length > 0 && (
+          {notes.quickRevision.length >
+            0 && (
             <section className="mt-7 rounded-2xl border-2 border-green-300 bg-green-50/60 p-5">
+
               <div className="mb-4 flex items-center gap-2">
                 <span className="text-xl">
                   ⚡
@@ -814,6 +804,7 @@ export function HandwrittenNotes() {
                   ),
                 )}
               </div>
+
             </section>
           )}
 
@@ -823,6 +814,7 @@ export function HandwrittenNotes() {
 
           {notes.memoryTrick && (
             <section className="mt-7 rounded-2xl border-2 border-pink-300 bg-pink-50/60 p-5">
+
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-xl">
                   🧠
@@ -836,6 +828,7 @@ export function HandwrittenNotes() {
               <p className="text-[16px] font-bold leading-8">
                 {notes.memoryTrick}
               </p>
+
             </section>
           )}
 
@@ -844,20 +837,22 @@ export function HandwrittenNotes() {
           ================================================= */}
 
           <footer className="mt-12 border-t-2 border-blue-900/20 pt-5 text-center">
+
             <div className="text-sm font-black tracking-[0.12em] text-blue-900">
               RANKER BHAIYA
             </div>
 
             <div className="mt-1 text-xs font-semibold text-slate-500">
-              Ask Vidhya • Smart Study •
-              Better Revision
+              Ask Vidhya • Smart Study • Better Revision
             </div>
+
           </footer>
+
         </div>
       </main>
 
       {/* =================================================
-          PRINT CSS
+          PRINT + FONT CSS
       ================================================= */}
 
       <style>{`
@@ -887,12 +882,13 @@ export function HandwrittenNotes() {
 
         .note-page {
           font-family:
+            "Noto Sans Devanagari",
+            "Nirmala UI",
+            "Mangal",
             "Comic Sans MS",
             "Segoe Print",
             "Bradley Hand",
-            "Noto Sans Devanagari",
-            "Noto Sans",
-            cursive;
+            sans-serif;
         }
 
         @media screen and (max-width: 700px) {
