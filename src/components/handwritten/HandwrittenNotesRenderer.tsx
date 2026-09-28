@@ -8,9 +8,9 @@ interface Props {
   notes: HandwrittenNotesData;
 }
 
-/* =========================================================
+/* =====================================================
    FLOW BOX
-========================================================= */
+===================================================== */
 
 function FlowBox({
   step,
@@ -47,15 +47,15 @@ function FlowBox({
   );
 }
 
-/* =========================================================
+/* =====================================================
    PLANT CELL DIAGRAM
-========================================================= */
+===================================================== */
 
 function PlantCellDiagram() {
   return (
     <div className="hw-plant-diagram">
       <div className="hw-plant-title">
-        Plant Cell / पादप कोशिका
+        Plant Cell
       </div>
 
       <div className="hw-plant-cell">
@@ -70,41 +70,29 @@ function PlantCellDiagram() {
 
         <div className="hw-cell-label hw-label-wall">
           Cell Wall
-          <br />
-          <span className="hw-hindi">
-            कोशिका भित्ति
-          </span>
         </div>
 
         <div className="hw-cell-label hw-label-nucleus">
           Nucleus
-          <br />
-          <span className="hw-hindi">
-            केन्द्रक
-          </span>
         </div>
 
         <div className="hw-cell-label hw-label-chloro">
           Chloroplasts
-          <br />
-          <span className="hw-hindi">
-            हरितलवक
-          </span>
         </div>
       </div>
     </div>
   );
 }
 
-/* =========================================================
+/* =====================================================
    CHLOROPLAST DIAGRAM
-========================================================= */
+===================================================== */
 
 function ChloroplastDiagram() {
   return (
     <div className="hw-chloroplast-diagram">
       <div className="hw-chloro-title">
-        Chloroplast / हरितलवक
+        Chloroplast
       </div>
 
       <div className="hw-chloro-body">
@@ -124,23 +112,19 @@ function ChloroplastDiagram() {
 
         <div className="hw-stroma-label">
           Stroma
-          <br />
-          <span className="hw-hindi">
-            स्ट्रोमा
-          </span>
         </div>
       </div>
 
       <div className="hw-chloro-label">
-        Thylakoids / थायलाकोइड
+        Thylakoids
       </div>
     </div>
   );
 }
 
-/* =========================================================
+/* =====================================================
    GENERIC DIAGRAM
-========================================================= */
+===================================================== */
 
 function GenericDiagram({
   title,
@@ -164,30 +148,28 @@ function GenericDiagram({
           <span>→</span>
           <span>→</span>
         </div>
-
-        <div className="hw-generic-circle">
-          ✓
-        </div>
       </div>
 
       {labels.length > 0 && (
         <div className="hw-generic-labels">
-          {labels.map((label, index) => (
-            <span
-              key={`${label}-${index}`}
-            >
-              {label}
-            </span>
-          ))}
+          {labels.map(
+            (label, index) => (
+              <span
+                key={`${label}-${index}`}
+              >
+                {label}
+              </span>
+            ),
+          )}
         </div>
       )}
     </div>
   );
 }
 
-/* =========================================================
-   DIAGRAM ROUTER
-========================================================= */
+/* =====================================================
+   DIAGRAM
+===================================================== */
 
 function Diagram({
   section,
@@ -220,32 +202,30 @@ function Diagram({
   );
 }
 
-/* =========================================================
-   DEFINITIONS
-========================================================= */
+/* =====================================================
+   BULLET LIST
+===================================================== */
 
-function DefinitionSection({
-  section,
+function BulletList({
+  points,
 }: {
-  section: HandwrittenNoteSection;
+  points: NonNullable<
+    HandwrittenNoteSection["points"]
+  >;
 }) {
-  if (!section.points?.length) {
-    return null;
-  }
-
   return (
-    <div className="hw-definition-list">
-      {section.points.map(
+    <div className="hw-bullet-list">
+      {points.map(
         (point, index) => (
           <div
-            className="hw-definition"
-            key={`${section.id}-definition-${index}`}
+            className="hw-bullet"
+            key={`${point.title ?? "point"}-${index}`}
           >
-            <span className="hw-dot">
-              ●
+            <span className="hw-bullet-mark">
+              •
             </span>
 
-            <div>
+            <div className="hw-bullet-content">
               <div className="hw-point-text">
                 {point.title && (
                   <strong>
@@ -269,216 +249,9 @@ function DefinitionSection({
   );
 }
 
-/* =========================================================
-   BULLETS
-========================================================= */
-
-function BulletSection({
-  section,
-}: {
-  section: HandwrittenNoteSection;
-}) {
-  if (!section.points?.length) {
-    return null;
-  }
-
-  return (
-    <div className="hw-bullet-list">
-      {section.points.map(
-        (point, index) => (
-          <div
-            className="hw-bullet"
-            key={`${section.id}-bullet-${index}`}
-          >
-            <span>•</span>
-
-            <div>
-              <div>
-                {point.title && (
-                  <strong>
-                    {point.title}:{" "}
-                  </strong>
-                )}
-
-                {point.text}
-              </div>
-
-              {point.hindi && (
-                <div className="hw-hindi-line">
-                  {point.hindi}
-                </div>
-              )}
-            </div>
-          </div>
-        ),
-      )}
-    </div>
-  );
-}
-
-/* =========================================================
-   FLOWCHART
-========================================================= */
-
-function FlowchartSection({
-  section,
-}: {
-  section: HandwrittenNoteSection;
-}) {
-  if (!section.flow?.length) {
-    return null;
-  }
-
-  return (
-    <div className="hw-flow">
-      {section.flow.map(
-        (step, index) => (
-          <div
-            className="hw-flow-item"
-            key={`${section.id}-flow-${index}`}
-          >
-            <FlowBox step={step} />
-
-            {index <
-              section.flow!.length -
-                1 && (
-              <div className="hw-flow-arrow">
-                →
-              </div>
-            )}
-          </div>
-        ),
-      )}
-    </div>
-  );
-}
-
-/* =========================================================
-   EQUATION
-========================================================= */
-
-function EquationSection({
-  section,
-}: {
-  section: HandwrittenNoteSection;
-}) {
-  if (!section.equation) {
-    return null;
-  }
-
-  return (
-    <div className="hw-equation-box">
-      <div className="hw-equation-heading">
-        {section.equation.label ??
-          "Chemical Equation / रासायनिक समीकरण"}
-      </div>
-
-      <div className="hw-equation">
-        {section.equation.equation}
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   EXAM POINTS
-========================================================= */
-
-function ExamPointsSection({
-  section,
-}: {
-  section: HandwrittenNoteSection;
-}) {
-  if (!section.items?.length) {
-    return null;
-  }
-
-  return (
-    <div className="hw-exam-box">
-      <div className="hw-exam-heading">
-        ⭐ Important Points for Exams
-      </div>
-
-      {section.items.map(
-        (item, index) => (
-          <div
-            className="hw-exam-item"
-            key={`${section.id}-exam-${index}`}
-          >
-            <span>✓</span>
-
-            <span>{item}</span>
-          </div>
-        ),
-      )}
-    </div>
-  );
-}
-
-/* =========================================================
-   QUICK REVISION
-========================================================= */
-
-function QuickRevisionSection({
-  section,
-}: {
-  section: HandwrittenNoteSection;
-}) {
-  if (!section.items?.length) {
-    return null;
-  }
-
-  return (
-    <div className="hw-revision-box">
-      <div className="hw-revision-heading">
-        💡 Quick Revision / झटपट याद रखें
-      </div>
-
-      {section.items.map(
-        (item, index) => (
-          <div
-            className="hw-revision-item"
-            key={`${section.id}-revision-${index}`}
-          >
-            <span>✓</span>
-
-            <span>{item}</span>
-          </div>
-        ),
-      )}
-    </div>
-  );
-}
-
-/* =========================================================
-   MEMORY TRICK
-========================================================= */
-
-function MnemonicSection({
-  section,
-}: {
-  section: HandwrittenNoteSection;
-}) {
-  if (!section.mnemonic) {
-    return null;
-  }
-
-  return (
-    <div className="hw-mnemonic">
-      <div className="hw-mnemonic-label">
-        🧠 Memory Trick
-      </div>
-
-      <div>
-        {section.mnemonic}
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
+/* =====================================================
    SECTION
-========================================================= */
+===================================================== */
 
 function Section({
   section,
@@ -486,18 +259,17 @@ function Section({
   section: HandwrittenNoteSection;
 }) {
   return (
-    <section
-      className="hw-section"
-      data-section-id={section.id}
-    >
-      {/* Section heading */}
+    <section className="hw-section">
+      {/* -----------------------------------------------
+          HEADING
+      ------------------------------------------------ */}
 
       <div className="hw-section-heading">
-        <span className="hw-section-number">
-          {section.id}
+        <span className="hw-heading-bullet">
+          ●
         </span>
 
-        <span>
+        <span className="hw-heading-text">
           {section.heading}
 
           {section.headingHindi && (
@@ -512,175 +284,358 @@ function Section({
         </span>
       </div>
 
-      {/* Definitions */}
+      {/* -----------------------------------------------
+          DEFINITIONS
+      ------------------------------------------------ */}
 
       {section.type ===
-        "definitions" && (
-        <DefinitionSection
-          section={section}
-        />
-      )}
+        "definitions" &&
+        section.points && (
+          <div className="hw-definition-list">
+            {section.points.map(
+              (point, index) => (
+                <div
+                  className="hw-definition"
+                  key={`${point.title ?? "definition"}-${index}`}
+                >
+                  <span className="hw-dot">
+                    •
+                  </span>
 
-      {/* Bullets */}
+                  <div>
+                    <div className="hw-point-text">
+                      {point.title && (
+                        <strong>
+                          {point.title}:{" "}
+                        </strong>
+                      )}
+
+                      {point.text}
+                    </div>
+
+                    {point.hindi && (
+                      <div className="hw-hindi-line">
+                        {point.hindi}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ),
+            )}
+          </div>
+        )}
+
+      {/* -----------------------------------------------
+          BULLETS
+      ------------------------------------------------ */}
 
       {section.type ===
-        "bullets" && (
-        <BulletSection
-          section={section}
-        />
-      )}
+        "bullets" &&
+        section.points && (
+          <BulletList
+            points={section.points}
+          />
+        )}
 
-      {/* Diagram */}
+      {/* -----------------------------------------------
+          DIAGRAM
+      ------------------------------------------------ */}
 
-      {section.type ===
-        "diagram" && (
+      {section.type === "diagram" && (
         <Diagram section={section} />
       )}
 
-      {/* Flowchart */}
+      {/* -----------------------------------------------
+          FLOWCHART
+      ------------------------------------------------ */}
 
       {section.type ===
-        "flowchart" && (
-        <FlowchartSection
-          section={section}
-        />
-      )}
+        "flowchart" &&
+        section.flow && (
+          <div className="hw-flow">
+            {section.flow.map(
+              (step, index) => (
+                <div
+                  className="hw-flow-item"
+                  key={`${step.title}-${index}`}
+                >
+                  <FlowBox step={step} />
 
-      {/* Equation */}
+                  {index <
+                    section.flow!.length -
+                      1 && (
+                    <div className="hw-flow-arrow">
+                      →
+                    </div>
+                  )}
+                </div>
+              ),
+            )}
+          </div>
+        )}
 
-      {section.type ===
-        "equation" && (
-        <EquationSection
-          section={section}
-        />
-      )}
-
-      {/* Exam Points */}
-
-      {section.type ===
-        "exam_points" && (
-        <ExamPointsSection
-          section={section}
-        />
-      )}
-
-      {/* Quick Revision */}
-
-      {section.type ===
-        "quick_revision" && (
-        <QuickRevisionSection
-          section={section}
-        />
-      )}
-
-      {/* Memory Trick */}
+      {/* -----------------------------------------------
+          EQUATION
+      ------------------------------------------------ */}
 
       {section.type ===
-        "mnemonic" && (
-        <MnemonicSection
-          section={section}
-        />
-      )}
+        "equation" &&
+        section.equation && (
+          <div className="hw-equation-box">
+            <div className="hw-equation-heading">
+              {section.equation.label ??
+                "Chemical Equation"}
+            </div>
+
+            <div className="hw-equation">
+              {
+                section.equation
+                  .equation
+              }
+            </div>
+          </div>
+        )}
+
+      {/* -----------------------------------------------
+          EXAM POINTS
+      ------------------------------------------------ */}
+
+      {section.type ===
+        "exam_points" &&
+        section.items && (
+          <div className="hw-exam-box">
+            <div className="hw-exam-heading">
+              ⭐ Important Points
+            </div>
+
+            <div className="hw-exam-list">
+              {section.items.map(
+                (item, index) => (
+                  <div
+                    className="hw-exam-item"
+                    key={`${item}-${index}`}
+                  >
+                    <span className="hw-check">
+                      ✓
+                    </span>
+
+                    <span>
+                      {item}
+                    </span>
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
+        )}
+
+      {/* -----------------------------------------------
+          QUICK REVISION
+      ------------------------------------------------ */}
+
+      {section.type ===
+        "quick_revision" &&
+        section.items && (
+          <div className="hw-revision-box">
+            <div className="hw-revision-heading">
+              ⚡ Quick Revision
+              <span>
+                / झटपट याद रखें
+              </span>
+            </div>
+
+            <div className="hw-revision-list">
+              {section.items.map(
+                (item, index) => (
+                  <div
+                    className="hw-revision-item"
+                    key={`${item}-${index}`}
+                  >
+                    <span className="hw-check">
+                      ✓
+                    </span>
+
+                    <span>
+                      {item}
+                    </span>
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
+        )}
+
+      {/* -----------------------------------------------
+          MEMORY TRICK
+      ------------------------------------------------ */}
+
+      {section.type ===
+        "mnemonic" &&
+        section.mnemonic && (
+          <div className="hw-mnemonic">
+            <div className="hw-mnemonic-label">
+              🧠 Memory Trick
+            </div>
+
+            <div className="hw-mnemonic-text">
+              {section.mnemonic}
+            </div>
+          </div>
+        )}
     </section>
   );
 }
 
-/* =========================================================
+/* =====================================================
+   PAGE HEADER
+   IMPORTANT:
+   This header stays on EVERY rendered notebook page.
+===================================================== */
+
+function PageBranding() {
+  return (
+    <header className="hw-brand-header">
+      <div className="hw-ranker-brand">
+        <div className="hw-brand-icon">
+          🎓
+        </div>
+
+        <div>
+          <div className="hw-brand-name">
+            RANKER BHAIYA
+          </div>
+
+          <div className="hw-brand-tagline">
+            Smart Study • Better Revision
+          </div>
+        </div>
+      </div>
+
+      <div className="hw-vidhya-brand">
+        <div className="hw-vidhya-icon">
+          ✍️
+        </div>
+
+        <div>
+          <div className="hw-vidhya-name">
+            ASK VIDHYA
+          </div>
+
+          <div className="hw-vidhya-tagline">
+            Your Learning Assistant
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* =====================================================
+   TITLE
+===================================================== */
+
+function NoteTitle({
+  notes,
+}: {
+  notes: HandwrittenNotesData;
+}) {
+  return (
+    <div className="hw-title-area">
+      <h1>
+        {notes.title}
+
+        {notes.titleHindi && (
+          <>
+            {" "}
+            /{" "}
+            <span className="hw-hindi">
+              {notes.titleHindi}
+            </span>
+          </>
+        )}
+      </h1>
+
+      {notes.titleRoman && (
+        <div className="hw-title-roman">
+          {notes.titleRoman}
+        </div>
+      )}
+
+      {notes.subtitle && (
+        <div className="hw-subtitle">
+          {notes.subtitle}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =====================================================
+   FOOTER
+===================================================== */
+
+function PageFooter({
+  footerTip,
+}: {
+  footerTip?: string;
+}) {
+  return (
+    <>
+      {footerTip && (
+        <div className="hw-footer-tip">
+          💡 {footerTip}
+        </div>
+      )}
+
+      <footer className="hw-footer">
+        <span>
+          RANKER BHAIYA
+        </span>
+
+        <span>•</span>
+
+        <span>
+          Ask Vidhya
+        </span>
+
+        <span>•</span>
+
+        <span>
+          Smart Study Notes
+        </span>
+      </footer>
+    </>
+  );
+}
+
+/* =====================================================
    MAIN RENDERER
-========================================================= */
+===================================================== */
 
 export default function HandwrittenNotesRenderer({
   notes,
 }: Props) {
-  const sections =
-    Array.isArray(notes.sections)
-      ? notes.sections
-      : [];
-
   return (
     <div className="hw-renderer-wrapper">
-      <div className="hw-page">
+      <article className="hw-page">
+        {/* ---------------------------------------------
+            EVERY PAGE BRANDING
+        ---------------------------------------------- */}
 
-        {/* =================================================
-            BRAND HEADER
-        ================================================= */}
+        <PageBranding />
 
-        <header className="hw-brand-header">
-          {/* Ranker Bhaiya */}
+        {/* ---------------------------------------------
+            MAIN TITLE
+        ---------------------------------------------- */}
 
-          <div className="hw-ranker-brand">
-            <div className="hw-brand-icon">
-              🎓
-            </div>
+        <NoteTitle notes={notes} />
 
-            <div>
-              <div className="hw-brand-name">
-                RANKER BHAIYA
-              </div>
-
-              <div className="hw-brand-tagline">
-                Better Students → Brighter Future
-              </div>
-            </div>
-          </div>
-
-          {/* Ask Vidhya */}
-
-          <div className="hw-vidhya-brand">
-            <div className="hw-vidhya-icon">
-              ✍️
-            </div>
-
-            <div>
-              <div className="hw-vidhya-name">
-                Ask Vidhya
-              </div>
-
-              <div className="hw-vidhya-tagline">
-                Your AI Learning Assistant
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* =================================================
-            TITLE
-        ================================================= */}
-
-        <div className="hw-title-area">
-          <h1>
-            {notes.title}
-
-            {notes.titleHindi && (
-              <>
-                {" "}
-                /{" "}
-                <span className="hw-hindi">
-                  {notes.titleHindi}
-                </span>
-              </>
-            )}
-          </h1>
-
-          {notes.titleRoman && (
-            <div className="hw-title-roman">
-              ({notes.titleRoman})
-            </div>
-          )}
-
-          {notes.subtitle && (
-            <div className="hw-subtitle">
-              {notes.subtitle}
-            </div>
-          )}
-        </div>
-
-        {/* =================================================
+        {/* ---------------------------------------------
             CONTENT
-        ================================================= */}
+        ---------------------------------------------- */}
 
         <main className="hw-content">
-          {sections.map(
+          {notes.sections.map(
             (section) => (
               <Section
                 key={section.id}
@@ -690,34 +645,14 @@ export default function HandwrittenNotesRenderer({
           )}
         </main>
 
-        {/* =================================================
-            FOOTER TIP
-        ================================================= */}
-
-        {notes.footerTip && (
-          <div className="hw-footer-tip">
-            💡 {notes.footerTip}
-          </div>
-        )}
-
-        {/* =================================================
+        {/* ---------------------------------------------
             FOOTER
-        ================================================= */}
+        ---------------------------------------------- */}
 
-        <footer className="hw-footer">
-          <span>
-            ✍️ Ask Vidhya
-          </span>
-
-          <span>•</span>
-
-          <strong>
-            RANKER BHAIYA
-          </strong>
-
-          <span>♥</span>
-        </footer>
-      </div>
+        <PageFooter
+          footerTip={notes.footerTip}
+        />
+      </article>
     </div>
   );
 }
