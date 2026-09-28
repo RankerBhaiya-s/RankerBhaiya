@@ -8,6 +8,10 @@ interface Props {
   notes: HandwrittenNotesData;
 }
 
+/* =========================================================
+   FLOW BOX
+========================================================= */
+
 function FlowBox({
   step,
 }: {
@@ -43,11 +47,15 @@ function FlowBox({
   );
 }
 
+/* =========================================================
+   PLANT CELL DIAGRAM
+========================================================= */
+
 function PlantCellDiagram() {
   return (
     <div className="hw-plant-diagram">
       <div className="hw-plant-title">
-        Plant Cell
+        Plant Cell / पादप कोशिका
       </div>
 
       <div className="hw-plant-cell">
@@ -62,25 +70,41 @@ function PlantCellDiagram() {
 
         <div className="hw-cell-label hw-label-wall">
           Cell Wall
+          <br />
+          <span className="hw-hindi">
+            कोशिका भित्ति
+          </span>
         </div>
 
         <div className="hw-cell-label hw-label-nucleus">
           Nucleus
+          <br />
+          <span className="hw-hindi">
+            केन्द्रक
+          </span>
         </div>
 
         <div className="hw-cell-label hw-label-chloro">
           Chloroplasts
+          <br />
+          <span className="hw-hindi">
+            हरितलवक
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
+/* =========================================================
+   CHLOROPLAST DIAGRAM
+========================================================= */
+
 function ChloroplastDiagram() {
   return (
     <div className="hw-chloroplast-diagram">
       <div className="hw-chloro-title">
-        Chloroplasts
+        Chloroplast / हरितलवक
       </div>
 
       <div className="hw-chloro-body">
@@ -100,15 +124,23 @@ function ChloroplastDiagram() {
 
         <div className="hw-stroma-label">
           Stroma
+          <br />
+          <span className="hw-hindi">
+            स्ट्रोमा
+          </span>
         </div>
       </div>
 
       <div className="hw-chloro-label">
-        Thylakoids
+        Thylakoids / थायलाकोइड
       </div>
     </div>
   );
 }
+
+/* =========================================================
+   GENERIC DIAGRAM
+========================================================= */
 
 function GenericDiagram({
   title,
@@ -132,12 +164,18 @@ function GenericDiagram({
           <span>→</span>
           <span>→</span>
         </div>
+
+        <div className="hw-generic-circle">
+          ✓
+        </div>
       </div>
 
       {labels.length > 0 && (
         <div className="hw-generic-labels">
           {labels.map((label, index) => (
-            <span key={`${label}-${index}`}>
+            <span
+              key={`${label}-${index}`}
+            >
               {label}
             </span>
           ))}
@@ -146,6 +184,10 @@ function GenericDiagram({
     </div>
   );
 }
+
+/* =========================================================
+   DIAGRAM ROUTER
+========================================================= */
 
 function Diagram({
   section,
@@ -156,11 +198,17 @@ function Diagram({
     return null;
   }
 
-  if (section.diagram.type === "plant-cell") {
+  if (
+    section.diagram.type ===
+    "plant-cell"
+  ) {
     return <PlantCellDiagram />;
   }
 
-  if (section.diagram.type === "chloroplast") {
+  if (
+    section.diagram.type ===
+    "chloroplast"
+  ) {
     return <ChloroplastDiagram />;
   }
 
@@ -172,13 +220,278 @@ function Diagram({
   );
 }
 
+/* =========================================================
+   DEFINITIONS
+========================================================= */
+
+function DefinitionSection({
+  section,
+}: {
+  section: HandwrittenNoteSection;
+}) {
+  if (!section.points?.length) {
+    return null;
+  }
+
+  return (
+    <div className="hw-definition-list">
+      {section.points.map(
+        (point, index) => (
+          <div
+            className="hw-definition"
+            key={`${section.id}-definition-${index}`}
+          >
+            <span className="hw-dot">
+              ●
+            </span>
+
+            <div>
+              <div className="hw-point-text">
+                {point.title && (
+                  <strong>
+                    {point.title}:{" "}
+                  </strong>
+                )}
+
+                {point.text}
+              </div>
+
+              {point.hindi && (
+                <div className="hw-hindi-line">
+                  {point.hindi}
+                </div>
+              )}
+            </div>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   BULLETS
+========================================================= */
+
+function BulletSection({
+  section,
+}: {
+  section: HandwrittenNoteSection;
+}) {
+  if (!section.points?.length) {
+    return null;
+  }
+
+  return (
+    <div className="hw-bullet-list">
+      {section.points.map(
+        (point, index) => (
+          <div
+            className="hw-bullet"
+            key={`${section.id}-bullet-${index}`}
+          >
+            <span>•</span>
+
+            <div>
+              <div>
+                {point.title && (
+                  <strong>
+                    {point.title}:{" "}
+                  </strong>
+                )}
+
+                {point.text}
+              </div>
+
+              {point.hindi && (
+                <div className="hw-hindi-line">
+                  {point.hindi}
+                </div>
+              )}
+            </div>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   FLOWCHART
+========================================================= */
+
+function FlowchartSection({
+  section,
+}: {
+  section: HandwrittenNoteSection;
+}) {
+  if (!section.flow?.length) {
+    return null;
+  }
+
+  return (
+    <div className="hw-flow">
+      {section.flow.map(
+        (step, index) => (
+          <div
+            className="hw-flow-item"
+            key={`${section.id}-flow-${index}`}
+          >
+            <FlowBox step={step} />
+
+            {index <
+              section.flow!.length -
+                1 && (
+              <div className="hw-flow-arrow">
+                →
+              </div>
+            )}
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   EQUATION
+========================================================= */
+
+function EquationSection({
+  section,
+}: {
+  section: HandwrittenNoteSection;
+}) {
+  if (!section.equation) {
+    return null;
+  }
+
+  return (
+    <div className="hw-equation-box">
+      <div className="hw-equation-heading">
+        {section.equation.label ??
+          "Chemical Equation / रासायनिक समीकरण"}
+      </div>
+
+      <div className="hw-equation">
+        {section.equation.equation}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   EXAM POINTS
+========================================================= */
+
+function ExamPointsSection({
+  section,
+}: {
+  section: HandwrittenNoteSection;
+}) {
+  if (!section.items?.length) {
+    return null;
+  }
+
+  return (
+    <div className="hw-exam-box">
+      <div className="hw-exam-heading">
+        ⭐ Important Points for Exams
+      </div>
+
+      {section.items.map(
+        (item, index) => (
+          <div
+            className="hw-exam-item"
+            key={`${section.id}-exam-${index}`}
+          >
+            <span>✓</span>
+
+            <span>{item}</span>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   QUICK REVISION
+========================================================= */
+
+function QuickRevisionSection({
+  section,
+}: {
+  section: HandwrittenNoteSection;
+}) {
+  if (!section.items?.length) {
+    return null;
+  }
+
+  return (
+    <div className="hw-revision-box">
+      <div className="hw-revision-heading">
+        💡 Quick Revision / झटपट याद रखें
+      </div>
+
+      {section.items.map(
+        (item, index) => (
+          <div
+            className="hw-revision-item"
+            key={`${section.id}-revision-${index}`}
+          >
+            <span>✓</span>
+
+            <span>{item}</span>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   MEMORY TRICK
+========================================================= */
+
+function MnemonicSection({
+  section,
+}: {
+  section: HandwrittenNoteSection;
+}) {
+  if (!section.mnemonic) {
+    return null;
+  }
+
+  return (
+    <div className="hw-mnemonic">
+      <div className="hw-mnemonic-label">
+        🧠 Memory Trick
+      </div>
+
+      <div>
+        {section.mnemonic}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   SECTION
+========================================================= */
+
 function Section({
   section,
 }: {
   section: HandwrittenNoteSection;
 }) {
   return (
-    <section className="hw-section">
+    <section
+      className="hw-section"
+      data-section-id={section.id}
+    >
+      {/* Section heading */}
+
       <div className="hw-section-heading">
         <span className="hw-section-number">
           {section.id}
@@ -186,6 +499,7 @@ function Section({
 
         <span>
           {section.heading}
+
           {section.headingHindi && (
             <>
               {" "}
@@ -198,184 +512,102 @@ function Section({
         </span>
       </div>
 
-      {section.type === "definitions" &&
-        section.points && (
-          <div className="hw-definition-list">
-            {section.points.map(
-              (point, index) => (
-                <div
-                  className="hw-definition"
-                  key={index}
-                >
-                  <span className="hw-dot">
-                    ●
-                  </span>
+      {/* Definitions */}
 
-                  <div>
-                    <div className="hw-point-text">
-                      {point.title && (
-                        <strong>
-                          {point.title}:{" "}
-                        </strong>
-                      )}
+      {section.type ===
+        "definitions" && (
+        <DefinitionSection
+          section={section}
+        />
+      )}
 
-                      {point.text}
-                    </div>
+      {/* Bullets */}
 
-                    {point.hindi && (
-                      <div className="hw-hindi-line">
-                        {point.hindi}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-        )}
+      {section.type ===
+        "bullets" && (
+        <BulletSection
+          section={section}
+        />
+      )}
 
-      {section.type === "bullets" &&
-        section.points && (
-          <div className="hw-bullet-list">
-            {section.points.map(
-              (point, index) => (
-                <div
-                  className="hw-bullet"
-                  key={index}
-                >
-                  <span>•</span>
+      {/* Diagram */}
 
-                  <div>
-                    <div>
-                      {point.title && (
-                        <strong>
-                          {point.title}:{" "}
-                        </strong>
-                      )}
-                      {point.text}
-                    </div>
-
-                    {point.hindi && (
-                      <div className="hw-hindi-line">
-                        {point.hindi}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-        )}
-
-      {section.type === "diagram" && (
+      {section.type ===
+        "diagram" && (
         <Diagram section={section} />
       )}
 
-      {section.type === "flowchart" &&
-        section.flow && (
-          <div className="hw-flow">
-            {section.flow.map(
-              (step, index) => (
-                <div
-                  className="hw-flow-item"
-                  key={index}
-                >
-                  <FlowBox step={step} />
-
-                  {index <
-                    section.flow!.length -
-                      1 && (
-                    <div className="hw-flow-arrow">
-                      →
-                    </div>
-                  )}
-                </div>
-              ),
-            )}
-          </div>
-        )}
-
-      {section.type === "equation" &&
-        section.equation && (
-          <div className="hw-equation-box">
-            <div className="hw-equation-heading">
-              {section.equation.label ??
-                "Chemical Equation"}
-            </div>
-
-            <div className="hw-equation">
-              {section.equation.equation}
-            </div>
-          </div>
-        )}
-
-      {section.type === "exam_points" &&
-        section.items && (
-          <div className="hw-exam-box">
-            <div className="hw-exam-heading">
-              ⭐ Important Points for Exams
-            </div>
-
-            {section.items.map(
-              (item, index) => (
-                <div
-                  className="hw-exam-item"
-                  key={index}
-                >
-                  <span>✓</span>
-                  <span>{item}</span>
-                </div>
-              ),
-            )}
-          </div>
-        )}
+      {/* Flowchart */}
 
       {section.type ===
-        "quick_revision" &&
-        section.items && (
-          <div className="hw-revision-box">
-            <div className="hw-revision-heading">
-              💡 Quick Revision / झटपट याद रखें
-            </div>
+        "flowchart" && (
+        <FlowchartSection
+          section={section}
+        />
+      )}
 
-            {section.items.map(
-              (item, index) => (
-                <div
-                  className="hw-revision-item"
-                  key={index}
-                >
-                  <span>✓</span>
-                  <span>{item}</span>
-                </div>
-              ),
-            )}
-          </div>
-        )}
+      {/* Equation */}
 
-      {section.type === "mnemonic" &&
-        section.mnemonic && (
-          <div className="hw-mnemonic">
-            <div className="hw-mnemonic-label">
-              Memory Trick
-            </div>
+      {section.type ===
+        "equation" && (
+        <EquationSection
+          section={section}
+        />
+      )}
 
-            <div>
-              {section.mnemonic}
-            </div>
-          </div>
-        )}
+      {/* Exam Points */}
+
+      {section.type ===
+        "exam_points" && (
+        <ExamPointsSection
+          section={section}
+        />
+      )}
+
+      {/* Quick Revision */}
+
+      {section.type ===
+        "quick_revision" && (
+        <QuickRevisionSection
+          section={section}
+        />
+      )}
+
+      {/* Memory Trick */}
+
+      {section.type ===
+        "mnemonic" && (
+        <MnemonicSection
+          section={section}
+        />
+      )}
     </section>
   );
 }
 
+/* =========================================================
+   MAIN RENDERER
+========================================================= */
+
 export default function HandwrittenNotesRenderer({
   notes,
 }: Props) {
+  const sections =
+    Array.isArray(notes.sections)
+      ? notes.sections
+      : [];
+
   return (
     <div className="hw-renderer-wrapper">
       <div className="hw-page">
-        {/* TOP BRANDING */}
+
+        {/* =================================================
+            BRAND HEADER
+        ================================================= */}
+
         <header className="hw-brand-header">
+          {/* Ranker Bhaiya */}
+
           <div className="hw-ranker-brand">
             <div className="hw-brand-icon">
               🎓
@@ -392,14 +624,16 @@ export default function HandwrittenNotesRenderer({
             </div>
           </div>
 
+          {/* Ask Vidhya */}
+
           <div className="hw-vidhya-brand">
             <div className="hw-vidhya-icon">
-              🤖
+              ✍️
             </div>
 
             <div>
               <div className="hw-vidhya-name">
-                Ask Vidhya ✨
+                Ask Vidhya
               </div>
 
               <div className="hw-vidhya-tagline">
@@ -409,15 +643,21 @@ export default function HandwrittenNotesRenderer({
           </div>
         </header>
 
-        {/* TITLE */}
+        {/* =================================================
+            TITLE
+        ================================================= */}
+
         <div className="hw-title-area">
           <h1>
             {notes.title}
+
             {notes.titleHindi && (
               <>
                 {" "}
                 /{" "}
-                {notes.titleHindi}
+                <span className="hw-hindi">
+                  {notes.titleHindi}
+                </span>
               </>
             )}
           </h1>
@@ -435,35 +675,44 @@ export default function HandwrittenNotesRenderer({
           )}
         </div>
 
-        {/* CONTENT */}
+        {/* =================================================
+            CONTENT
+        ================================================= */}
+
         <main className="hw-content">
-          {notes.sections.map(
+          {sections.map(
             (section) => (
               <Section
-                section={section}
                 key={section.id}
+                section={section}
               />
             ),
           )}
         </main>
 
-        {/* FOOTER TIP */}
+        {/* =================================================
+            FOOTER TIP
+        ================================================= */}
+
         {notes.footerTip && (
           <div className="hw-footer-tip">
             💡 {notes.footerTip}
           </div>
         )}
 
-        {/* FOOTER BRAND */}
+        {/* =================================================
+            FOOTER
+        ================================================= */}
+
         <footer className="hw-footer">
           <span>
-            🤖 Generated by Ask Vidhya
+            ✍️ Ask Vidhya
           </span>
 
           <span>•</span>
 
           <strong>
-            Ranker Bhaiya
+            RANKER BHAIYA
           </strong>
 
           <span>♥</span>
