@@ -5,6 +5,7 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
+import { recordStudentActivity } from "../../lib/studentActivity";
 
 type Question = {
   id: string;
@@ -24,9 +25,7 @@ const CATEGORY_ORDER = [
   "Reasoning",
 ];
 
-const normalizeCategory = (
-  category: string,
-) => {
+const normalizeCategory = (category: string) => {
   return category.trim();
 };
 
@@ -37,29 +36,21 @@ export default function PracticeQuestions() {
      STATE
   ===================================================== */
 
-  const [questions, setQuestions] =
-    useState<Question[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [selectedCategory, setSelectedCategory] =
     useState("All");
 
-  const [searchQuery, setSearchQuery] =
-    useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const [currentIndex, setCurrentIndex] =
-    useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const [selectedAnswer, setSelectedAnswer] =
     useState<string | null>(null);
 
-  const [score, setScore] =
-    useState(0);
+  const [score, setScore] = useState(0);
 
   const [answeredCount, setAnsweredCount] =
     useState(0);
@@ -67,8 +58,7 @@ export default function PracticeQuestions() {
   const [savingAttempt, setSavingAttempt] =
     useState(false);
 
-  const [finished, setFinished] =
-    useState(false);
+  const [finished, setFinished] = useState(false);
 
   /* =====================================================
      LOAD QUESTIONS
@@ -150,8 +140,7 @@ export default function PracticeQuestions() {
             question: item.question,
             options,
             answer: item.answer,
-            explanation:
-              item.explanation ?? "",
+            explanation: item.explanation ?? "",
             difficulty:
               item.difficulty ?? "Easy",
           };
@@ -177,33 +166,27 @@ export default function PracticeQuestions() {
   ===================================================== */
 
   const categories = useMemo(() => {
-    const databaseCategories =
-      Array.from(
-        new Set(
-          questions
-            .map(
-              (question) =>
-                question.category,
-            )
-            .filter(Boolean),
-        ),
-      );
+    const databaseCategories = Array.from(
+      new Set(
+        questions
+          .map(
+            (question) => question.category,
+          )
+          .filter(Boolean),
+      ),
+    );
 
     const orderedCategories =
       CATEGORY_ORDER.filter(
         (category) =>
           category === "All" ||
-          databaseCategories.includes(
-            category,
-          ),
+          databaseCategories.includes(category),
       );
 
     const additionalCategories =
       databaseCategories.filter(
         (category) =>
-          !CATEGORY_ORDER.includes(
-            category,
-          ),
+          !CATEGORY_ORDER.includes(category),
       );
 
     return [
@@ -220,33 +203,25 @@ export default function PracticeQuestions() {
     const query =
       searchQuery.trim().toLowerCase();
 
-    return questions.filter(
-      (question) => {
-        const categoryMatch =
-          selectedCategory === "All" ||
-          question.category ===
-            selectedCategory;
+    return questions.filter((question) => {
+      const categoryMatch =
+        selectedCategory === "All" ||
+        question.category === selectedCategory;
 
-        const searchMatch =
-          !query ||
-          question.question
-            .toLowerCase()
-            .includes(query) ||
-          question.category
-            .toLowerCase()
-            .includes(query) ||
-          question.options.some(
-            (option) =>
-              option
-                .toLowerCase()
-                .includes(query),
-          );
-
-        return (
-          categoryMatch && searchMatch
+      const searchMatch =
+        !query ||
+        question.question
+          .toLowerCase()
+          .includes(query) ||
+        question.category
+          .toLowerCase()
+          .includes(query) ||
+        question.options.some((option) =>
+          option.toLowerCase().includes(query),
         );
-      },
-    );
+
+      return categoryMatch && searchMatch;
+    });
   }, [
     questions,
     selectedCategory,
@@ -289,6 +264,7 @@ export default function PracticeQuestions() {
     }
 
     setSelectedAnswer(option);
+
     setAnsweredCount(
       (value) => value + 1,
     );
@@ -314,8 +290,7 @@ export default function PracticeQuestions() {
           .from("practice_attempts")
           .insert({
             user_id: user.id,
-            question_id:
-              currentQuestion.id,
+            question_id: currentQuestion.id,
             selected_answer: option,
             is_correct: isCorrect,
           });
@@ -335,7 +310,7 @@ export default function PracticeQuestions() {
      NEXT QUESTION
   ===================================================== */
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!selectedAnswer) {
       return;
     }
@@ -347,11 +322,34 @@ export default function PracticeQuestions() {
       setCurrentIndex(
         (value) => value + 1,
       );
+
       setSelectedAnswer(null);
+
       return;
     }
 
+    /*
+     * Last question completed.
+     *
+     * Record meaningful practice activity
+     * for streak + Today's Mission.
+     */
     setFinished(true);
+
+    if (answeredCount > 0) {
+      const result =
+        await recordStudentActivity({
+          activityType:
+            "practice_questions",
+        });
+
+      if (!result.success) {
+        console.error(
+          "Failed to record practice activity:",
+          result.error,
+        );
+      }
+    }
   };
 
   /* =====================================================
@@ -418,8 +416,7 @@ export default function PracticeQuestions() {
     answeredCount === 0
       ? 0
       : Math.round(
-          (score / answeredCount) *
-            100,
+          (score / answeredCount) * 100,
         );
 
   /* =====================================================
@@ -441,8 +438,7 @@ export default function PracticeQuestions() {
 
     if (
       option === selectedAnswer &&
-      option !==
-        currentQuestion?.answer
+      option !== currentQuestion?.answer
     ) {
       return "border-red-500 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950/30 dark:text-red-300";
     }
@@ -614,9 +610,7 @@ export default function PracticeQuestions() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-      {/* =================================================
-          HEADER
-      ================================================= */}
+      {/* HEADER */}
 
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
@@ -660,9 +654,7 @@ export default function PracticeQuestions() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-        {/* =================================================
-            HERO
-        ================================================= */}
+        {/* HERO */}
 
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-xl shadow-purple-600/20 sm:p-8 lg:p-10">
           <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-white/10 blur-3xl" />
@@ -688,9 +680,7 @@ export default function PracticeQuestions() {
           </div>
         </section>
 
-        {/* =================================================
-            ERROR
-        ================================================= */}
+        {/* ERROR */}
 
         {error && (
           <div className="mt-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
@@ -710,9 +700,7 @@ export default function PracticeQuestions() {
 
             <button
               type="button"
-              onClick={() =>
-                setError("")
-              }
+              onClick={() => setError("")}
               className="text-lg opacity-70 hover:opacity-100"
             >
               ×
@@ -720,9 +708,7 @@ export default function PracticeQuestions() {
           </div>
         )}
 
-        {/* =================================================
-            SEARCH
-        ================================================= */}
+        {/* SEARCH */}
 
         <section className="mt-6">
           <div className="relative">
@@ -744,9 +730,7 @@ export default function PracticeQuestions() {
           </div>
         </section>
 
-        {/* =================================================
-            CATEGORY FILTER
-        ================================================= */}
+        {/* CATEGORY FILTER */}
 
         {categories.length > 0 && (
           <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
@@ -774,9 +758,7 @@ export default function PracticeQuestions() {
           </div>
         )}
 
-        {/* =================================================
-            EMPTY STATE
-        ================================================= */}
+        {/* EMPTY STATE */}
 
         {filteredQuestions.length ===
           0 && (
@@ -797,9 +779,7 @@ export default function PracticeQuestions() {
             <button
               type="button"
               onClick={() => {
-                setSelectedCategory(
-                  "All",
-                );
+                setSelectedCategory("All");
                 setSearchQuery("");
               }}
               className="mt-6 rounded-xl bg-purple-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-purple-700"
@@ -809,225 +789,193 @@ export default function PracticeQuestions() {
           </section>
         )}
 
-        {/* =================================================
-            QUESTION AREA
-        ================================================= */}
+        {/* QUESTION AREA */}
 
         {currentQuestion &&
           filteredQuestions.length > 0 && (
-            <section className="mt-6">
-              {/* Progress header */}
+          <section className="mt-6">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Question {questionNumber} of{" "}
+                  {filteredQuestions.length}
+                </p>
 
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Question{" "}
-                    {questionNumber} of{" "}
-                    {
-                      filteredQuestions.length
-                    }
-                  </p>
-
-                  <div className="mt-2 h-2 w-48 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800 sm:w-64">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-500 transition-all duration-500"
-                      style={{
-                        width: `${questionProgress}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-black text-purple-600 dark:bg-purple-950/30 dark:text-purple-400">
-                    {currentQuestion.category}
-                  </span>
-
-                  <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    {currentQuestion.difficulty ??
-                      "Easy"}
-                  </span>
+                <div className="mt-2 h-2 w-48 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800 sm:w-64">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-500 transition-all duration-500"
+                    style={{
+                      width: `${questionProgress}%`,
+                    }}
+                  />
                 </div>
               </div>
 
-              {/* Question card */}
+              <div className="flex items-center gap-2">
+                <span className="rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-black text-purple-600 dark:bg-purple-950/30 dark:text-purple-400">
+                  {currentQuestion.category}
+                </span>
 
-              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7 lg:p-8">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-sm font-black text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
-                    {questionNumber}
-                  </div>
+                <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {currentQuestion.difficulty ??
+                    "Easy"}
+                </span>
+              </div>
+            </div>
 
-                  <h2 className="pt-1 text-lg font-black leading-7 sm:text-xl sm:leading-8 lg:text-2xl lg:leading-9">
-                    {
-                      currentQuestion.question
-                    }
-                  </h2>
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7 lg:p-8">
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-sm font-black text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
+                  {questionNumber}
                 </div>
 
-                {/* Options */}
+                <h2 className="pt-1 text-lg font-black leading-7 sm:text-xl sm:leading-8 lg:text-2xl lg:leading-9">
+                  {currentQuestion.question}
+                </h2>
+              </div>
 
-                <div className="mt-7 grid gap-3">
-                  {currentQuestion.options.map(
-                    (
-                      option,
-                      optionIndex,
-                    ) => (
-                      <button
-                        key={`${currentQuestion.id}-${option}`}
-                        type="button"
-                        disabled={
-                          selectedAnswer !==
-                            null ||
-                          savingAttempt
-                        }
-                        onClick={() =>
-                          handleAnswer(
-                            option,
-                          )
-                        }
-                        className={`group flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition active:scale-[0.99] disabled:cursor-default sm:p-5 ${getOptionClass(
-                          option,
-                        )}`}
+              {/* OPTIONS */}
+
+              <div className="mt-7 grid gap-3">
+                {currentQuestion.options.map(
+                  (option, optionIndex) => (
+                    <button
+                      key={`${currentQuestion.id}-${option}`}
+                      type="button"
+                      disabled={
+                        selectedAnswer !== null ||
+                        savingAttempt
+                      }
+                      onClick={() =>
+                        handleAnswer(option)
+                      }
+                      className={`group flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition active:scale-[0.99] disabled:cursor-default sm:p-5 ${getOptionClass(
+                        option,
+                      )}`}
+                    >
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-black ${
+                          selectedAnswer &&
+                          option ===
+                            currentQuestion.answer
+                            ? "border-emerald-500 bg-emerald-500 text-white"
+                            : selectedAnswer &&
+                                option ===
+                                  selectedAnswer
+                              ? "border-red-500 bg-red-500 text-white"
+                              : "border-slate-200 bg-slate-50 text-slate-600 group-hover:border-purple-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                        }`}
                       >
-                        <span
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-black ${
-                            selectedAnswer &&
-                            option ===
-                              currentQuestion.answer
-                              ? "border-emerald-500 bg-emerald-500 text-white"
-                              : selectedAnswer &&
-                                  option ===
-                                    selectedAnswer
-                                ? "border-red-500 bg-red-500 text-white"
-                                : "border-slate-200 bg-slate-50 text-slate-600 group-hover:border-purple-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
-                          }`}
-                        >
-                          {getOptionIcon(
-                            option,
-                          ) ||
-                            String.fromCharCode(
-                              65 +
-                                optionIndex,
-                            )}
-                        </span>
+                        {getOptionIcon(option) ||
+                          String.fromCharCode(
+                            65 + optionIndex,
+                          )}
+                      </span>
 
-                        <span className="flex-1 text-sm font-bold leading-6 sm:text-base">
-                          {option}
-                        </span>
-                      </button>
-                    ),
-                  )}
-                </div>
+                      <span className="flex-1 text-sm font-bold leading-6 sm:text-base">
+                        {option}
+                      </span>
+                    </button>
+                  ),
+                )}
+              </div>
 
-                {/* Feedback */}
+              {/* FEEDBACK */}
 
-                {selectedAnswer && (
-                  <div
-                    className={`mt-6 rounded-2xl border p-4 ${
-                      selectedAnswer ===
+              {selectedAnswer && (
+                <div
+                  className={`mt-6 rounded-2xl border p-4 ${
+                    selectedAnswer ===
+                    currentQuestion.answer
+                      ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+                      : "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="text-2xl">
+                      {selectedAnswer ===
                       currentQuestion.answer
-                        ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/20"
-                        : "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="text-2xl">
+                        ? "🎉"
+                        : "💡"}
+                    </div>
+
+                    <div>
+                      <h3
+                        className={`font-black ${
+                          selectedAnswer ===
+                          currentQuestion.answer
+                            ? "text-emerald-700 dark:text-emerald-300"
+                            : "text-red-700 dark:text-red-300"
+                        }`}
+                      >
                         {selectedAnswer ===
                         currentQuestion.answer
-                          ? "🎉"
-                          : "💡"}
-                      </div>
+                          ? "Correct answer!"
+                          : "Not quite right"}
+                      </h3>
 
-                      <div>
-                        <h3
-                          className={`font-black ${
-                            selectedAnswer ===
-                            currentQuestion.answer
-                              ? "text-emerald-700 dark:text-emerald-300"
-                              : "text-red-700 dark:text-red-300"
-                          }`}
-                        >
-                          {selectedAnswer ===
-                          currentQuestion.answer
-                            ? "Correct answer!"
-                            : "Not quite right"}
-                        </h3>
+                      {selectedAnswer !==
+                        currentQuestion.answer && (
+                        <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                          Correct answer:{" "}
+                          <span className="font-black">
+                            {currentQuestion.answer}
+                          </span>
+                        </p>
+                      )}
 
-                        {selectedAnswer !==
-                          currentQuestion.answer && (
-                          <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                            Correct answer:{" "}
-                            <span className="font-black">
-                              {
-                                currentQuestion.answer
-                              }
-                            </span>
-                          </p>
-                        )}
-
-                        {currentQuestion.explanation && (
-                          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                            {
-                              currentQuestion.explanation
-                            }
-                          </p>
-                        )}
-                      </div>
+                      {currentQuestion.explanation && (
+                        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                          {currentQuestion.explanation}
+                        </p>
+                      )}
                     </div>
                   </div>
-                )}
-
-                {/* Navigation */}
-
-                <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <button
-                    type="button"
-                    onClick={
-                      handlePrevious
-                    }
-                    disabled={
-                      currentIndex === 0
-                    }
-                    className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    ← Previous
-                  </button>
-
-                  <p className="order-first text-center text-xs font-semibold text-slate-400 sm:order-none">
-                    {savingAttempt
-                      ? "Saving your answer..."
-                      : selectedAnswer
-                        ? "Review the explanation"
-                        : "Choose an answer"}
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    disabled={
-                      !selectedAnswer ||
-                      savingAttempt
-                    }
-                    className="rounded-xl bg-purple-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {currentIndex ===
-                    filteredQuestions.length -
-                      1
-                      ? "Finish Practice ✓"
-                      : "Next Question →"}
-                  </button>
                 </div>
+              )}
+
+              {/* NAVIGATION */}
+
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <button
+                  type="button"
+                  onClick={handlePrevious}
+                  disabled={currentIndex === 0}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  ← Previous
+                </button>
+
+                <p className="order-first text-center text-xs font-semibold text-slate-400 sm:order-none">
+                  {savingAttempt
+                    ? "Saving your answer..."
+                    : selectedAnswer
+                      ? "Review the explanation"
+                      : "Choose an answer"}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={
+                    !selectedAnswer ||
+                    savingAttempt
+                  }
+                  className="rounded-xl bg-purple-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {currentIndex ===
+                  filteredQuestions.length - 1
+                    ? "Finish Practice ✓"
+                    : "Next Question →"}
+                </button>
               </div>
-            </section>
-          )}
+            </div>
+          </section>
+        )}
 
-        {/* =================================================
-            SCORE MINI CARD
-        ================================================= */}
+        {/* SCORE */}
 
-        {filteredQuestions.length >
-          0 && (
+        {filteredQuestions.length > 0 && (
           <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -1068,9 +1016,7 @@ export default function PracticeQuestions() {
           </section>
         )}
 
-        {/* =================================================
-            TIP
-        ================================================= */}
+        {/* TIP */}
 
         <section className="mt-6 overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-5 dark:border-amber-900/40 dark:from-amber-950/20 dark:to-orange-950/20 sm:p-6">
           <div className="flex items-start gap-4">
@@ -1094,9 +1040,7 @@ export default function PracticeQuestions() {
           </div>
         </section>
 
-        {/* =================================================
-            FOOTER BUTTON
-        ================================================= */}
+        {/* FOOTER */}
 
         <div className="mt-8 flex justify-center pb-6">
           <button
