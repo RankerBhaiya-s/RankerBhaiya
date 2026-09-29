@@ -20,13 +20,13 @@ interface RecordStudentActivityOptions {
 }
 
 /**
- * Records a student's meaningful daily activity.
+ * Records a meaningful student activity for a specific day.
  *
- * The database has a unique constraint on:
+ * The database unique constraint:
  * user_id + activity_date + activity_type
  *
- * So calling this function multiple times for the same
- * activity on the same day will not create duplicates.
+ * prevents duplicate activity records for the same
+ * activity on the same day.
  */
 export async function recordStudentActivity({
   userId,
@@ -39,7 +39,7 @@ export async function recordStudentActivity({
   try {
     let currentUserId = userId;
 
-    // If userId wasn't supplied, get the currently logged-in user.
+    // Get logged-in user when userId is not provided.
     if (!currentUserId) {
       const {
         data: { user },
@@ -47,11 +47,31 @@ export async function recordStudentActivity({
       } = await supabase.auth.getUser();
 
       if (userError) {
-        throw userError;
+        console.error(
+          "Failed to get current user:",
+          userError,
+        );
+
+        return {
+          success: false,
+          error: userError,
+        };
       }
 
       if (!user) {
-        throw new Error("User is not logged in.");
+        const error = new Error(
+          "User is not logged in.",
+        );
+
+        console.error(
+          "recordStudentActivity:",
+          error.message,
+        );
+
+        return {
+          success: false,
+          error,
+        };
       }
 
       currentUserId = user.id;
@@ -64,8 +84,12 @@ export async function recordStudentActivity({
         const now = new Date();
 
         const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const day = String(now.getDate()).padStart(2, "0");
+        const month = String(
+          now.getMonth() + 1,
+        ).padStart(2, "0");
+        const day = String(
+          now.getDate(),
+        ).padStart(2, "0");
 
         return `${year}-${month}-${day}`;
       })();
@@ -79,13 +103,17 @@ export async function recordStudentActivity({
           activity_type: activityType,
         },
         {
-          onConflict: "user_id,activity_date,activity_type",
+          onConflict:
+            "user_id,activity_date,activity_type",
           ignoreDuplicates: true,
         },
       );
 
     if (error) {
-      console.error("recordStudentActivity error:", error);
+      console.error(
+        "Failed to record student activity:",
+        error,
+      );
 
       return {
         success: false,
@@ -98,14 +126,21 @@ export async function recordStudentActivity({
       error: null,
     };
   } catch (error) {
-    console.error("recordStudentActivity exception:", error);
+    const normalizedError =
+      error instanceof Error
+        ? error
+        : new Error(
+            "Failed to record student activity.",
+          );
+
+    console.error(
+      "recordStudentActivity exception:",
+      normalizedError,
+    );
 
     return {
       success: false,
-      error:
-        error instanceof Error
-          ? error
-          : new Error("Failed to record student activity."),
+      error: normalizedError,
     };
   }
 }
