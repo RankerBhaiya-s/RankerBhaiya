@@ -8,7 +8,9 @@ import { getDailyMindset } from "../../data/dailyMindsets";
 export function StudentDashboard() {
   const navigate = useNavigate();
   const { user, profile, loading, signOut } = useAuth();
-  const { isDark } = useTheme();
+
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -23,12 +25,15 @@ export function StudentDashboard() {
   if (loading) {
     return (
       <div
-        className={`min-h-screen flex items-center justify-center ${
-          isDark ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"
+        className={`flex min-h-screen items-center justify-center ${
+          isDark
+            ? "bg-slate-950 text-white"
+            : "bg-slate-50 text-slate-900"
         }`}
       >
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+
           <p className="text-sm font-medium opacity-70">
             Loading Ranker Bhaiya...
           </p>
@@ -57,7 +62,9 @@ export function StudentDashboard() {
           : "bg-slate-50 text-slate-900"
       }`}
     >
-      {/* ================= HEADER ================= */}
+      {/* =========================================================
+          HEADER
+      ========================================================= */}
       <header
         className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
           isDark
@@ -68,6 +75,7 @@ export function StudentDashboard() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Logo */}
           <button
+            type="button"
             onClick={() => navigate("/student/dashboard")}
             className="flex items-center gap-3"
           >
@@ -79,6 +87,7 @@ export function StudentDashboard() {
               <div className="text-base font-black tracking-tight">
                 Ranker Bhaiya
               </div>
+
               <div
                 className={`text-[10px] font-semibold uppercase tracking-widest ${
                   isDark ? "text-slate-400" : "text-slate-500"
@@ -89,10 +98,11 @@ export function StudentDashboard() {
             </div>
           </button>
 
-          {/* Right */}
+          {/* Right Side */}
           <div className="flex items-center gap-2">
             {/* Progress Tracker */}
             <button
+              type="button"
               onClick={() => navigate("/student/progress")}
               className={`hidden items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold transition sm:flex ${
                 isDark
@@ -107,6 +117,7 @@ export function StudentDashboard() {
             {/* Profile */}
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setShowProfileMenu((prev) => !prev)}
                 className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 transition ${
                   isDark
@@ -137,12 +148,14 @@ export function StudentDashboard() {
                     <p className="truncate text-sm font-bold">
                       {studentName}
                     </p>
+
                     <p className="truncate text-xs opacity-60">
                       {user.email}
                     </p>
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => {
                       setShowProfileMenu(false);
                       navigate("/student/profile");
@@ -153,6 +166,7 @@ export function StudentDashboard() {
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => {
                       setShowProfileMenu(false);
                       navigate("/student/settings");
@@ -163,6 +177,7 @@ export function StudentDashboard() {
                   </button>
 
                   <button
+                    type="button"
                     onClick={handleLogout}
                     className="block w-full border-t border-inherit px-4 py-3 text-left text-sm font-bold text-red-500 transition hover:bg-red-500/5"
                   >
@@ -175,14 +190,18 @@ export function StudentDashboard() {
         </div>
       </header>
 
-      {/* ================= MAIN ================= */}
+      {/* =========================================================
+          MAIN
+      ========================================================= */}
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* ================= HERO ================= */}
-        <section
-          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-blue-700 to-purple-700 p-5 text-white shadow-xl sm:p-7"
-        >
-          {/* Decorative circles */}
+
+        {/* =======================================================
+            COMPACT HERO
+        ======================================================= */}
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-blue-700 to-purple-700 p-5 text-white shadow-xl sm:p-7">
+          {/* Decorative Elements */}
           <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+
           <div className="pointer-events-none absolute -bottom-20 -left-16 h-48 w-48 rounded-full bg-purple-300/10 blur-2xl" />
 
           <div className="relative">
@@ -211,8 +230,11 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* Mobile Progress */}
+        {/* =======================================================
+            MOBILE PROGRESS
+        ======================================================= */}
         <button
+          type="button"
           onClick={() => navigate("/student/progress")}
           className={`mt-4 flex w-full items-center justify-between rounded-2xl border p-4 text-left sm:hidden ${
             isDark
@@ -221,7 +243,10 @@ export function StudentDashboard() {
           }`}
         >
           <div>
-            <p className="text-sm font-black">📊 Progress Tracker</p>
+            <p className="text-sm font-black">
+              📊 Progress Tracker
+            </p>
+
             <p className="mt-0.5 text-xs opacity-60">
               Check your preparation progress
             </p>
@@ -230,20 +255,25 @@ export function StudentDashboard() {
           <span className="text-lg">→</span>
         </button>
 
-        {/* ================= PREPARATION TOOLS ================= */}
+        {/* =======================================================
+            PREPARATION TOOLS
+        ======================================================= */}
         <section className="mt-8">
           <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-blue-600">
               Prepare Smart
             </p>
+
             <h2 className="mt-1 text-xl font-black sm:text-2xl">
               Preparation Tools
             </h2>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
+
             {/* Study Planner */}
             <button
+              type="button"
               onClick={() => navigate("/student/study-planner")}
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
@@ -261,7 +291,9 @@ export function StudentDashboard() {
                 </span>
               </div>
 
-              <h3 className="mt-4 text-lg font-black">Study Planner</h3>
+              <h3 className="mt-4 text-lg font-black">
+                Study Planner
+              </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
                 Plan your study sessions and stay consistent with your
@@ -271,6 +303,7 @@ export function StudentDashboard() {
 
             {/* Practice Questions */}
             <button
+              type="button"
               onClick={() => navigate("/student/practice-questions")}
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
@@ -297,8 +330,9 @@ export function StudentDashboard() {
               </p>
             </button>
 
-            {/* Short Video */}
+            {/* Short Videos */}
             <button
+              type="button"
               onClick={() => navigate("/student/short-videos")}
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
@@ -316,7 +350,9 @@ export function StudentDashboard() {
                 </span>
               </div>
 
-              <h3 className="mt-4 text-lg font-black">Short Videos</h3>
+              <h3 className="mt-4 text-lg font-black">
+                Short Videos
+              </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
                 Learn important topics through short, focused video series.
@@ -325,6 +361,7 @@ export function StudentDashboard() {
 
             {/* Daily Challenge */}
             <button
+              type="button"
               onClick={() => navigate("/student/daily-challenge")}
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
@@ -342,7 +379,9 @@ export function StudentDashboard() {
                 </span>
               </div>
 
-              <h3 className="mt-4 text-lg font-black">Daily Challenge</h3>
+              <h3 className="mt-4 text-lg font-black">
+                Daily Challenge
+              </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
                 Test yourself every day with quick exam-focused questions.
@@ -351,20 +390,27 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* ================= LEARNING HUB ================= */}
+        {/* =======================================================
+            LEARNING HUB
+        ======================================================= */}
         <section className="mt-10">
           <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-purple-600">
               Learn Every Day
             </p>
+
             <h2 className="mt-1 text-xl font-black sm:text-2xl">
               Learning Hub
             </h2>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Ask Vidhya - FEATURED */}
+
+            {/* =================================================
+                ASK VIDHYA FEATURED
+            ================================================= */}
             <button
+              type="button"
               onClick={() => navigate("/student/ask")}
               className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-5 text-left text-white shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:col-span-2 lg:col-span-2"
             >
@@ -392,6 +438,7 @@ export function StudentDashboard() {
 
                 <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-purple-700 transition group-hover:bg-purple-50">
                   Ask Vidhya
+
                   <span className="transition group-hover:translate-x-1">
                     →
                   </span>
@@ -401,6 +448,7 @@ export function StudentDashboard() {
 
             {/* Fast Revision */}
             <button
+              type="button"
               onClick={() => navigate("/student/quick-revision")}
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
@@ -412,7 +460,9 @@ export function StudentDashboard() {
                 ⚡
               </div>
 
-              <h3 className="mt-4 font-black">Fast Revision</h3>
+              <h3 className="mt-4 font-black">
+                Fast Revision
+              </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
                 Revise important concepts quickly with smart revision cards
@@ -422,6 +472,7 @@ export function StudentDashboard() {
 
             {/* Current Affairs */}
             <button
+              type="button"
               onClick={() => navigate("/student/current-affairs")}
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
@@ -433,7 +484,9 @@ export function StudentDashboard() {
                 📰
               </div>
 
-              <h3 className="mt-4 font-black">Current Affairs</h3>
+              <h3 className="mt-4 font-black">
+                Current Affairs
+              </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
                 Stay updated with important national and international
@@ -441,8 +494,9 @@ export function StudentDashboard() {
               </p>
             </button>
 
-            {/* Newspaper */}
+            {/* Daily Newspaper */}
             <button
+              type="button"
               onClick={() => navigate("/student/daily-newspaper")}
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
@@ -454,7 +508,9 @@ export function StudentDashboard() {
                 🗞️
               </div>
 
-              <h3 className="mt-4 font-black">Daily Newspaper</h3>
+              <h3 className="mt-4 font-black">
+                Daily Newspaper
+              </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
                 Read important newspaper content prepared for exam
@@ -464,6 +520,7 @@ export function StudentDashboard() {
 
             {/* Vocabulary */}
             <button
+              type="button"
               onClick={() => navigate("/student/vocabulary")}
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
@@ -475,7 +532,9 @@ export function StudentDashboard() {
                 📚
               </div>
 
-              <h3 className="mt-4 font-black">English Vocabulary</h3>
+              <h3 className="mt-4 font-black">
+                English Vocabulary
+              </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
                 Improve vocabulary, idioms, synonyms, antonyms and more.
@@ -484,6 +543,7 @@ export function StudentDashboard() {
 
             {/* Exam Tips */}
             <button
+              type="button"
               onClick={() => navigate("/student/exam-tips")}
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
@@ -495,7 +555,9 @@ export function StudentDashboard() {
                 🎯
               </div>
 
-              <h3 className="mt-4 font-black">Exam Tips</h3>
+              <h3 className="mt-4 font-black">
+                Exam Tips
+              </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
                 Smart strategies for revision, time management and exams.
@@ -504,9 +566,12 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* ================= QUICK DAILY CTA ================= */}
+        {/* =======================================================
+            DAILY CHALLENGE CTA
+        ======================================================= */}
         <section className="mt-10">
           <button
+            type="button"
             onClick={() => navigate("/student/daily-challenge")}
             className="group w-full overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-red-500 to-pink-600 p-5 text-left text-white shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:p-6"
           >
@@ -532,7 +597,9 @@ export function StudentDashboard() {
           </button>
         </section>
 
-        {/* ================= ABOUT ================= */}
+        {/* =======================================================
+            ABOUT
+        ======================================================= */}
         <section
           className={`mt-10 rounded-3xl border p-6 ${
             isDark
@@ -559,7 +626,9 @@ export function StudentDashboard() {
         </section>
       </main>
 
-      {/* ================= FOOTER ================= */}
+      {/* =========================================================
+          FOOTER
+      ========================================================= */}
       <footer
         className={`mt-12 border-t ${
           isDark ? "border-slate-800" : "border-slate-200"
