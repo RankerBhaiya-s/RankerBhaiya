@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getDailyMindset } from "../../data/dailyMindsets";
@@ -14,12 +15,16 @@ export function StudentDashboard() {
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
+  // =========================================================
+  // DAILY MINDSET
+  // =========================================================
+
   const dailyMindset = getDailyMindset();
 
-  /*
-   * Demo/local dashboard progress.
-   * Later these values can be connected with Supabase activity data.
-   */
+  // =========================================================
+  // DAILY PRACTICE
+  // =========================================================
+
   const [dailyPractice, setDailyPractice] = useState(12);
 
   const dailyTarget = 20;
@@ -28,6 +33,122 @@ export function StudentDashboard() {
     100,
     Math.round((dailyPractice / dailyTarget) * 100),
   );
+
+  // =========================================================
+  // REAL STREAK
+  // =========================================================
+
+  const [streakLoading, setStreakLoading] = useState(true);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [activeDates, setActiveDates] = useState<string[]>([]);
+
+  // =========================================================
+  // DATE HELPERS
+  // =========================================================
+
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const getPreviousDate = (dateString: string) => {
+    const date = new Date(`${dateString}T00:00:00`);
+
+    date.setDate(date.getDate() - 1);
+
+    return getLocalDateString(date);
+  };
+
+  // =========================================================
+  // LOAD REAL STUDENT STREAK
+  // =========================================================
+
+  const loadStudentStreak = async () => {
+    if (!user?.id) {
+      setStreakLoading(false);
+      return;
+    }
+
+    setStreakLoading(true);
+
+    try {
+      const today = getLocalDateString(new Date());
+
+      const { data, error } = await supabase
+        .from("student_daily_activity")
+        .select("activity_date")
+        .eq("user_id", user.id)
+        .order("activity_date", {
+          ascending: false,
+        });
+
+      if (error) {
+        console.error("Failed to load student streak:", error);
+
+        setCurrentStreak(0);
+        setActiveDates([]);
+
+        return;
+      }
+
+      const uniqueDates = Array.from(
+        new Set(
+          (data ?? [])
+            .map((item) => item.activity_date)
+            .filter(Boolean),
+        ),
+      );
+
+      setActiveDates(uniqueDates);
+
+      /*
+       * No activity today means current streak is 0.
+       */
+      if (!uniqueDates.includes(today)) {
+        setCurrentStreak(0);
+        return;
+      }
+
+      /*
+       * Calculate consecutive-day streak.
+       */
+      let streak = 1;
+      let checkingDate = today;
+
+      while (true) {
+        const previousDate = getPreviousDate(checkingDate);
+
+        if (!uniqueDates.includes(previousDate)) {
+          break;
+        }
+
+        streak += 1;
+        checkingDate = previousDate;
+      }
+
+      setCurrentStreak(streak);
+    } catch (error) {
+      console.error("Unexpected streak error:", error);
+
+      setCurrentStreak(0);
+      setActiveDates([]);
+    } finally {
+      setStreakLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      loadStudentStreak();
+    }
+  }, [user?.id]);
+
+  // =========================================================
+  // STUDENT NAME
+  // =========================================================
 
   const studentName =
     profile?.full_name?.trim() ||
@@ -38,11 +159,21 @@ export function StudentDashboard() {
     return studentName.split(" ")[0] || "Student";
   }, [studentName]);
 
+  // =========================================================
+  // AUTH REDIRECT
+  // =========================================================
+
   useEffect(() => {
     if (!loading && !user) {
-      navigate("/student/login", { replace: true });
+      navigate("/student/login", {
+        replace: true,
+      });
     }
   }, [loading, user, navigate]);
+
+  // =========================================================
+  // LOADING
+  // =========================================================
 
   if (loading) {
     return (
@@ -66,15 +197,41 @@ export function StudentDashboard() {
 
   if (!user) return null;
 
+  // =========================================================
+  // LOGOUT
+  // =========================================================
+
   const handleLogout = async () => {
     await signOut();
-    navigate("/student/login", { replace: true });
+
+    navigate("/student/login", {
+      replace: true,
+    });
   };
 
+  // =========================================================
+  // DAILY PRACTICE
+  // =========================================================
+
   const handleDailyPractice = () => {
-    setDailyPractice((current) => Math.min(current + 1, dailyTarget));
+    setDailyPractice((current) =>
+      Math.min(current + 1, dailyTarget),
+    );
+
     navigate("/student/practice-questions");
   };
+
+  // =========================================================
+  // TODAY
+  // =========================================================
+
+  const todayDate = getLocalDateString(new Date());
+
+  const todayActivityCompleted = activeDates.includes(todayDate);
+
+  // =========================================================
+  // RENDER
+  // =========================================================
 
   return (
     <div
@@ -84,9 +241,10 @@ export function StudentDashboard() {
           : "bg-slate-50 text-slate-900"
       }`}
     >
-      {/* =========================================================
+      {/* =====================================================
           HEADER
-      ========================================================= */}
+      ===================================================== */}
+
       <header
         className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
           isDark
@@ -95,7 +253,8 @@ export function StudentDashboard() {
         }`}
       >
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Brand */}
+          {/* BRAND */}
+
           <button
             type="button"
             onClick={() => navigate("/student/dashboard")}
@@ -112,7 +271,9 @@ export function StudentDashboard() {
 
               <div
                 className={`text-[10px] font-semibold uppercase tracking-widest ${
-                  isDark ? "text-slate-400" : "text-slate-500"
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
                 }`}
               >
                 Aapki Mehnat, Hamari Strategy
@@ -120,9 +281,11 @@ export function StudentDashboard() {
             </div>
           </button>
 
-          {/* Header Actions */}
+          {/* HEADER ACTIONS */}
+
           <div className="flex items-center gap-2">
-            {/* Progress */}
+            {/* PROGRESS */}
+
             <button
               type="button"
               onClick={() => navigate("/student/progress")}
@@ -136,7 +299,8 @@ export function StudentDashboard() {
               <span>Progress</span>
             </button>
 
-            {/* Profile Menu */}
+            {/* PROFILE MENU */}
+
             <div className="relative">
               <button
                 type="button"
@@ -157,7 +321,9 @@ export function StudentDashboard() {
                   {studentName}
                 </span>
 
-                <span className="text-xs opacity-60">⌄</span>
+                <span className="text-xs opacity-60">
+                  ⌄
+                </span>
               </button>
 
               {showProfileMenu && (
@@ -214,14 +380,15 @@ export function StudentDashboard() {
         </div>
       </header>
 
-      {/* =========================================================
+      {/* =====================================================
           MAIN
-      ========================================================= */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      ===================================================== */}
 
-        {/* =======================================================
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {/* ===================================================
             HERO
-        ======================================================= */}
+        =================================================== */}
+
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-blue-700 to-purple-700 p-5 text-white shadow-xl sm:p-7">
           <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
 
@@ -236,7 +403,8 @@ export function StudentDashboard() {
               Hello, {firstName}! 👋
             </h1>
 
-            {/* Daily Mindset */}
+            {/* DAILY MINDSET */}
+
             <div className="mt-5 max-w-3xl rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
               <p className="text-[11px] font-black tracking-[0.18em] text-blue-100">
                 🧠 DAILY MINDSET
@@ -253,44 +421,99 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =======================================================
-            7 DAY STREAK
-        ======================================================= */}
+        {/* ===================================================
+            REAL 7 DAY STREAK
+        =================================================== */}
+
         <section className="mt-5">
           <div className="overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-red-500 to-pink-600 p-5 text-white shadow-lg sm:p-6">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-widest text-orange-100">
-                  Keep Going
+                  {currentStreak > 0
+                    ? "Keep Going"
+                    : "Start Today"}
                 </p>
 
                 <h2 className="mt-1 text-2xl font-black sm:text-3xl">
-                  🔥 7 Day Streak
+                  🔥{" "}
+                  {streakLoading
+                    ? "..."
+                    : `${currentStreak} Day Streak`}
                 </h2>
 
                 <p className="mt-1 text-sm text-orange-100">
-                  You&apos;ve been consistent for 7 days. Don&apos;t break
-                  the streak!
+                  {streakLoading
+                    ? "Checking your learning activity..."
+                    : currentStreak > 0
+                      ? currentStreak === 1
+                        ? "Great start! Complete an activity tomorrow to build your streak."
+                        : "You're being consistent. Don't break the streak!"
+                      : "Complete a learning activity today to start your streak."}
                 </p>
               </div>
 
+              {/* LAST 7 DAYS */}
+
               <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-                  <div
-                    key={day}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-xs font-black backdrop-blur"
-                  >
-                    ✓
-                  </div>
-                ))}
+                {Array.from({ length: 7 }).map(
+                  (_, index) => {
+                    const date = new Date();
+
+                    date.setDate(
+                      date.getDate() - (6 - index),
+                    );
+
+                    const dateString =
+                      getLocalDateString(date);
+
+                    const isActive =
+                      activeDates.includes(dateString);
+
+                    const isToday = index === 6;
+
+                    return (
+                      <div
+                        key={dateString}
+                        title={`${dateString}${
+                          isToday ? " • Today" : ""
+                        }`}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black backdrop-blur transition ${
+                          isActive
+                            ? "bg-white text-red-500 shadow-md"
+                            : "bg-white/15 text-white/50"
+                        }`}
+                      >
+                        {isActive ? "✓" : "•"}
+                      </div>
+                    );
+                  },
+                )}
               </div>
             </div>
+
+            {/* TODAY STATUS */}
+
+            {!streakLoading && (
+              <div className="mt-5 flex items-center justify-between rounded-2xl bg-black/10 px-4 py-3 backdrop-blur-sm">
+                <span className="text-xs font-bold text-orange-100">
+                  Today&apos;s activity
+                </span>
+
+                <span className="text-xs font-black">
+                  {todayActivityCompleted
+                    ? "✓ Completed"
+                    : "Not completed"}
+                </span>
+              </div>
+            )}
           </div>
         </section>
 
-        {/* =======================================================
+        {/* ===================================================
             TODAY'S MISSION
-        ======================================================= */}
+        =================================================== */}
+
         <section className="mt-6">
           <div
             className={`rounded-3xl border p-5 sm:p-6 ${
@@ -310,14 +533,16 @@ export function StudentDashboard() {
                 </h2>
 
                 <p className="mt-1 text-sm opacity-65">
-                  Finish today&apos;s learning activities and keep your
-                  preparation moving.
+                  Finish today&apos;s learning activities and
+                  keep your preparation moving.
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() => navigate("/student/daily-challenge")}
+                onClick={() =>
+                  navigate("/student/daily-challenge")
+                }
                 className="shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
               >
                 Start Mission →
@@ -326,9 +551,10 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =======================================================
+        {/* ===================================================
             PREPARATION TOOLS
-        ======================================================= */}
+        =================================================== */}
+
         <section className="mt-10">
           <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-blue-600">
@@ -341,11 +567,13 @@ export function StudentDashboard() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
+            {/* STUDY PLANNER */}
 
-            {/* Study Planner */}
             <button
               type="button"
-              onClick={() => navigate("/student/study-planner")}
+              onClick={() =>
+                navigate("/student/study-planner")
+              }
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-blue-700"
@@ -367,15 +595,18 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
-                Plan your study sessions and stay consistent with your
-                preparation.
+                Plan your study sessions and stay consistent
+                with your preparation.
               </p>
             </button>
 
-            {/* Practice Questions */}
+            {/* PRACTICE QUESTIONS */}
+
             <button
               type="button"
-              onClick={() => navigate("/student/practice-questions")}
+              onClick={() =>
+                navigate("/student/practice-questions")
+              }
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-purple-700"
@@ -397,14 +628,18 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
-                Practice topic-wise questions and strengthen your concepts.
+                Practice topic-wise questions and strengthen your
+                concepts.
               </p>
             </button>
 
-            {/* Short Videos */}
+            {/* SHORT VIDEOS */}
+
             <button
               type="button"
-              onClick={() => navigate("/student/short-videos")}
+              onClick={() =>
+                navigate("/student/short-videos")
+              }
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-pink-700"
@@ -426,14 +661,18 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
-                Learn important topics through short, focused video series.
+                Learn important topics through short, focused
+                video series.
               </p>
             </button>
 
-            {/* Daily Challenge */}
+            {/* DAILY CHALLENGE */}
+
             <button
               type="button"
-              onClick={() => navigate("/student/daily-challenge")}
+              onClick={() =>
+                navigate("/student/daily-challenge")
+              }
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-orange-700"
@@ -455,15 +694,17 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
-                Test yourself every day with quick exam-focused questions.
+                Test yourself every day with quick
+                exam-focused questions.
               </p>
             </button>
           </div>
         </section>
 
-        {/* =======================================================
+        {/* ===================================================
             LEARNING HUB
-        ======================================================= */}
+        =================================================== */}
+
         <section className="mt-10">
           <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-purple-600">
@@ -476,8 +717,8 @@ export function StudentDashboard() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {/* ASK VIDHYA */}
 
-            {/* ASK VIDHYA FEATURED */}
             <button
               type="button"
               onClick={() => navigate("/student/ask")}
@@ -503,8 +744,9 @@ export function StudentDashboard() {
                 </h3>
 
                 <p className="mt-2 max-w-xl text-sm leading-6 text-purple-100 sm:text-base">
-                  Doubt ho, concept samajhna ho, revision karna ho ya
-                  study guidance chahiye — Vidhya se poochho.
+                  Doubt ho, concept samajhna ho, revision karna
+                  ho ya study guidance chahiye — Vidhya se
+                  poochho.
                 </p>
 
                 <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-purple-700 transition group-hover:bg-purple-50">
@@ -517,10 +759,13 @@ export function StudentDashboard() {
               </div>
             </button>
 
-            {/* Fast Revision */}
+            {/* FAST REVISION */}
+
             <button
               type="button"
-              onClick={() => navigate("/student/quick-revision")}
+              onClick={() =>
+                navigate("/student/quick-revision")
+              }
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-green-700"
@@ -536,15 +781,18 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
-                Revise important concepts quickly with smart revision cards
-                and MCQs.
+                Revise important concepts quickly with smart
+                revision cards and MCQs.
               </p>
             </button>
 
-            {/* Current Affairs */}
+            {/* CURRENT AFFAIRS */}
+
             <button
               type="button"
-              onClick={() => navigate("/student/current-affairs")}
+              onClick={() =>
+                navigate("/student/current-affairs")
+              }
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-blue-700"
@@ -560,15 +808,18 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
-                Stay updated with important national and international
-                events.
+                Stay updated with important national and
+                international events.
               </p>
             </button>
 
-            {/* Daily Newspaper */}
+            {/* DAILY NEWSPAPER */}
+
             <button
               type="button"
-              onClick={() => navigate("/student/daily-newspaper")}
+              onClick={() =>
+                navigate("/student/daily-newspaper")
+              }
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-orange-700"
@@ -584,15 +835,18 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
-                Read important newspaper content prepared for exam
-                preparation.
+                Read important newspaper content prepared for
+                exam preparation.
               </p>
             </button>
 
-            {/* Vocabulary */}
+            {/* VOCABULARY */}
+
             <button
               type="button"
-              onClick={() => navigate("/student/vocabulary")}
+              onClick={() =>
+                navigate("/student/vocabulary")
+              }
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-pink-700"
@@ -608,14 +862,18 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
-                Improve vocabulary, idioms, synonyms, antonyms and more.
+                Improve vocabulary, idioms, synonyms, antonyms
+                and more.
               </p>
             </button>
 
-            {/* Exam Tips */}
+            {/* EXAM TIPS */}
+
             <button
               type="button"
-              onClick={() => navigate("/student/exam-tips")}
+              onClick={() =>
+                navigate("/student/exam-tips")
+              }
               className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-yellow-700"
@@ -631,15 +889,17 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-sm leading-6 opacity-65">
-                Smart strategies for revision, time management and exams.
+                Smart strategies for revision, time management
+                and exams.
               </p>
             </button>
           </div>
         </section>
 
-        {/* =======================================================
+        {/* ===================================================
             YOUR PREPARATION
-        ======================================================= */}
+        =================================================== */}
+
         <section className="mt-10">
           <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-indigo-600">
@@ -659,8 +919,8 @@ export function StudentDashboard() {
             }`}
           >
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {/* OVERALL */}
 
-              {/* Overall */}
               <div className="rounded-2xl bg-blue-500/10 p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold opacity-70">
@@ -685,7 +945,8 @@ export function StudentDashboard() {
                 </div>
               </div>
 
-              {/* Questions */}
+              {/* QUESTIONS */}
+
               <div className="rounded-2xl bg-purple-500/10 p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold opacity-70">
@@ -704,7 +965,8 @@ export function StudentDashboard() {
                 </p>
               </div>
 
-              {/* Accuracy */}
+              {/* ACCURACY */}
+
               <div className="rounded-2xl bg-green-500/10 p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold opacity-70">
@@ -723,7 +985,8 @@ export function StudentDashboard() {
                 </p>
               </div>
 
-              {/* Revision */}
+              {/* REVISION */}
+
               <div className="rounded-2xl bg-orange-500/10 p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold opacity-70">
@@ -753,9 +1016,10 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =======================================================
+        {/* ===================================================
             WEAK TOPICS
-        ======================================================= */}
+        =================================================== */}
+
         <section className="mt-10">
           <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-red-500">
@@ -775,8 +1039,8 @@ export function StudentDashboard() {
             }`}
           >
             <div className="space-y-4">
+              {/* POLITY */}
 
-              {/* Polity */}
               <div>
                 <div className="mb-2 flex items-center justify-between gap-4">
                   <div>
@@ -796,7 +1060,11 @@ export function StudentDashboard() {
 
                     <button
                       type="button"
-                      onClick={() => navigate("/student/practice-questions")}
+                      onClick={() =>
+                        navigate(
+                          "/student/practice-questions",
+                        )
+                      }
                       className="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-500 transition hover:bg-red-500/15"
                     >
                       Practice
@@ -809,7 +1077,8 @@ export function StudentDashboard() {
                 </div>
               </div>
 
-              {/* Economy */}
+              {/* ECONOMY */}
+
               <div>
                 <div className="mb-2 flex items-center justify-between gap-4">
                   <div>
@@ -829,7 +1098,11 @@ export function StudentDashboard() {
 
                     <button
                       type="button"
-                      onClick={() => navigate("/student/practice-questions")}
+                      onClick={() =>
+                        navigate(
+                          "/student/practice-questions",
+                        )
+                      }
                       className="rounded-lg bg-orange-500/10 px-3 py-1.5 text-xs font-black text-orange-500 transition hover:bg-orange-500/15"
                     >
                       Practice
@@ -842,7 +1115,8 @@ export function StudentDashboard() {
                 </div>
               </div>
 
-              {/* Geography */}
+              {/* GEOGRAPHY */}
+
               <div>
                 <div className="mb-2 flex items-center justify-between gap-4">
                   <div>
@@ -862,7 +1136,11 @@ export function StudentDashboard() {
 
                     <button
                       type="button"
-                      onClick={() => navigate("/student/practice-questions")}
+                      onClick={() =>
+                        navigate(
+                          "/student/practice-questions",
+                        )
+                      }
                       className="rounded-lg bg-yellow-500/10 px-3 py-1.5 text-xs font-black text-yellow-600 transition hover:bg-yellow-500/15"
                     >
                       Practice
@@ -878,13 +1156,16 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =======================================================
+        {/* ===================================================
             5 MINUTE CHALLENGE
-        ======================================================= */}
+        =================================================== */}
+
         <section className="mt-10">
           <button
             type="button"
-            onClick={() => navigate("/student/daily-challenge")}
+            onClick={() =>
+              navigate("/student/daily-challenge")
+            }
             className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-700 p-6 text-left text-white shadow-xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:p-7"
           >
             <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
@@ -900,8 +1181,8 @@ export function StudentDashboard() {
                 </h2>
 
                 <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100">
-                  Sirf 5 minutes nikalo aur apni preparation ko ek quick
-                  boost do.
+                  Sirf 5 minutes nikalo aur apni preparation ko
+                  ek quick boost do.
                 </p>
               </div>
 
@@ -918,9 +1199,10 @@ export function StudentDashboard() {
           </button>
         </section>
 
-        {/* =======================================================
+        {/* ===================================================
             DAILY PRACTICE
-        ======================================================= */}
+        =================================================== */}
+
         <section className="mt-10">
           <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-orange-500">
@@ -953,6 +1235,7 @@ export function StudentDashboard() {
               <div className="text-left sm:text-right">
                 <p className="text-2xl font-black">
                   {dailyPractice}
+
                   <span className="text-sm opacity-40">
                     /{dailyTarget}
                   </span>
@@ -967,7 +1250,9 @@ export function StudentDashboard() {
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
-                style={{ width: `${practiceProgress}%` }}
+                style={{
+                  width: `${practiceProgress}%`,
+                }}
               />
             </div>
 
@@ -981,9 +1266,10 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =======================================================
+        {/* ===================================================
             WEEKLY ACHIEVEMENTS
-        ======================================================= */}
+        =================================================== */}
+
         <section className="mt-10">
           <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-yellow-600">
@@ -996,8 +1282,8 @@ export function StudentDashboard() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* STREAK */}
 
-            {/* Streak */}
             <div
               className={`rounded-3xl border p-5 ${
                 isDark
@@ -1014,15 +1300,24 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-1 text-xs leading-5 opacity-60">
-                You studied consistently for 7 days.
+                Build a consistent daily learning habit.
               </p>
 
-              <span className="mt-4 inline-block rounded-full bg-green-500/10 px-3 py-1 text-[10px] font-black text-green-600">
-                UNLOCKED
+              <span
+                className={`mt-4 inline-block rounded-full px-3 py-1 text-[10px] font-black ${
+                  currentStreak >= 7
+                    ? "bg-green-500/10 text-green-600"
+                    : "bg-yellow-500/10 text-yellow-600"
+                }`}
+              >
+                {currentStreak >= 7
+                  ? "UNLOCKED"
+                  : `${Math.min(currentStreak, 7)}/7 DAYS`}
               </span>
             </div>
 
-            {/* Questions */}
+            {/* QUESTIONS */}
+
             <div
               className={`rounded-3xl border p-5 ${
                 isDark
@@ -1047,7 +1342,8 @@ export function StudentDashboard() {
               </span>
             </div>
 
-            {/* Revision */}
+            {/* REVISION */}
+
             <div
               className={`rounded-3xl border p-5 ${
                 isDark
@@ -1072,7 +1368,8 @@ export function StudentDashboard() {
               </span>
             </div>
 
-            {/* Accuracy */}
+            {/* ACCURACY */}
+
             <div
               className={`rounded-3xl border p-5 ${
                 isDark
@@ -1099,9 +1396,10 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =======================================================
+        {/* ===================================================
             ABOUT
-        ======================================================= */}
+        =================================================== */}
+
         <section
           className={`mt-10 rounded-3xl border p-6 ${
             isDark
@@ -1118,27 +1416,33 @@ export function StudentDashboard() {
           </h2>
 
           <p className="mt-3 max-w-4xl text-sm leading-7 opacity-70">
-            Ranker Bhaiya is a student-focused learning platform built to
-            make exam preparation simpler, smarter, and more effective.
-            From daily current affairs and newspaper reading to fast
-            revision, vocabulary building, short videos and AI-powered
-            learning support, everything is designed to help students stay
-            consistent, learn with clarity, and prepare with confidence.
+            Ranker Bhaiya is a student-focused learning platform
+            built to make exam preparation simpler, smarter, and
+            more effective. From daily current affairs and
+            newspaper reading to fast revision, vocabulary
+            building, short videos and AI-powered learning support,
+            everything is designed to help students stay
+            consistent, learn with clarity, and prepare with
+            confidence.
           </p>
         </section>
       </main>
 
-      {/* =========================================================
+      {/* =====================================================
           FOOTER
-      ========================================================= */}
+      ===================================================== */}
+
       <footer
         className={`mt-12 border-t ${
-          isDark ? "border-slate-800" : "border-slate-200"
+          isDark
+            ? "border-slate-800"
+            : "border-slate-200"
         }`}
       >
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 text-center text-xs opacity-55 sm:flex-row sm:px-6 lg:px-8 sm:text-left">
           <p>
-            © {new Date().getFullYear()} Ranker Bhaiya. All rights reserved.
+            © {new Date().getFullYear()} Ranker Bhaiya. All
+            rights reserved.
           </p>
 
           <p className="font-semibold">
