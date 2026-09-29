@@ -37,6 +37,12 @@ import ProgressTracker from "./pages/student/ProgressTracker";
 import DailyChallenge from "./pages/student/DailyChallenge";
 
 /* =====================================================
+   SHORT VIDEOS
+===================================================== */
+
+import ShortVideos from "./pages/student/ShortVideos";
+
+/* =====================================================
    HANDWRITTEN NOTES
 ===================================================== */
 
@@ -152,6 +158,15 @@ export default function App() {
                   <Route
                     path="student/handwritten-notes"
                     element={<HandwrittenNotes />}
+                  />
+
+                  {/* =================================================
+                      SHORT VIDEOS
+                  ================================================= */}
+
+                  <Route
+                    path="student/short-videos"
+                    element={<ShortVideos />}
                   />
 
                   {/* =================================================
