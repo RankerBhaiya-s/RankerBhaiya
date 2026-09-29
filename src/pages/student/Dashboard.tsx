@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
@@ -6,162 +10,142 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getDailyMindset } from "../../data/dailyMindsets";
 
-export function StudentDashboard() {
-  const navigate = useNavigate();
-  const { user, profile, loading, signOut } = useAuth();
+type ActivityRow = {
+  activity_date: string;
+  activity_type: string;
+};
 
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+type PreparationStats = {
+  attempted: number;
+  correct: number;
+  accuracy: number;
+};
 
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+type WeakTopic = {
+  category: string;
+  attempted: number;
+  correct: number;
+  accuracy: number;
+};
 
-  // =========================================================
-  // DAILY MINDSET
-  // =========================================================
+const DAILY_TARGET = 20;
 
-  const dailyMindset = getDailyMindset();
+const getLocalDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(
+    date.getMonth() + 1,
+  ).padStart(2, "0");
+  const day = String(
+    date.getDate(),
+  ).padStart(2, "0");
 
-  // =========================================================
-  // DAILY PRACTICE
-  // =========================================================
+  return `${year}-${month}-${day}`;
+};
 
-  const [dailyPractice, setDailyPractice] = useState(12);
-
-  const dailyTarget = 20;
-
-  const practiceProgress = Math.min(
-    100,
-    Math.round((dailyPractice / dailyTarget) * 100),
+const getPreviousDate = (
+  dateString: string,
+) => {
+  const date = new Date(
+    `${dateString}T00:00:00`,
   );
 
-  // =========================================================
-  // REAL STREAK
-  // =========================================================
+  date.setDate(date.getDate() - 1);
 
-  const [streakLoading, setStreakLoading] = useState(true);
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [activeDates, setActiveDates] = useState<string[]>([]);
+  return getLocalDateString(date);
+};
 
-  // =========================================================
-  // DATE HELPERS
-  // =========================================================
+export function StudentDashboard() {
+  const navigate = useNavigate();
 
-  const getLocalDateString = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
+  const { user, profile, loading } = useAuth();
+  const { theme } = useTheme();
 
-    return `${year}-${month}-${day}`;
-  };
+  const isDark = theme === "dark";
 
-  const getPreviousDate = (dateString: string) => {
-    const date = new Date(`${dateString}T00:00:00`);
+  const dailyMindset = useMemo(
+    () => getDailyMindset(),
+    [],
+  );
 
-    date.setDate(date.getDate() - 1);
+  /* =====================================================
+     USER
+  ===================================================== */
 
-    return getLocalDateString(date);
-  };
-
-  // =========================================================
-  // LOAD REAL STUDENT STREAK
-  // =========================================================
-
-  const loadStudentStreak = async () => {
-    if (!user?.id) {
-      setStreakLoading(false);
-      return;
-    }
-
-    setStreakLoading(true);
-
-    try {
-      const today = getLocalDateString(new Date());
-
-      const { data, error } = await supabase
-        .from("student_daily_activity")
-        .select("activity_date")
-        .eq("user_id", user.id)
-        .order("activity_date", {
-          ascending: false,
-        });
-
-      if (error) {
-        console.error("Failed to load student streak:", error);
-
-        setCurrentStreak(0);
-        setActiveDates([]);
-
-        return;
-      }
-
-      const uniqueDates = Array.from(
-        new Set(
-          (data ?? [])
-            .map((item) => item.activity_date)
-            .filter(Boolean),
-        ),
-      );
-
-      setActiveDates(uniqueDates);
-
-      /*
-       * No activity today means current streak is 0.
-       */
-      if (!uniqueDates.includes(today)) {
-        setCurrentStreak(0);
-        return;
-      }
-
-      /*
-       * Calculate consecutive-day streak.
-       */
-      let streak = 1;
-      let checkingDate = today;
-
-      while (true) {
-        const previousDate = getPreviousDate(checkingDate);
-
-        if (!uniqueDates.includes(previousDate)) {
-          break;
-        }
-
-        streak += 1;
-        checkingDate = previousDate;
-      }
-
-      setCurrentStreak(streak);
-    } catch (error) {
-      console.error("Unexpected streak error:", error);
-
-      setCurrentStreak(0);
-      setActiveDates([]);
-    } finally {
-      setStreakLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user?.id) {
-      loadStudentStreak();
-    }
-  }, [user?.id]);
-
-  // =========================================================
-  // STUDENT NAME
-  // =========================================================
-
-  const studentName =
-    profile?.full_name?.trim() ||
-    user?.email?.split("@")[0] ||
+  const firstName =
+    profile?.full_name?.trim()?.split(" ")[0] ||
     "Student";
 
-  const firstName = useMemo(() => {
-    return studentName.split(" ")[0] || "Student";
-  }, [studentName]);
+  /* =====================================================
+     STREAK
+  ===================================================== */
 
-  // =========================================================
-  // AUTH REDIRECT
-  // =========================================================
+  const [streakLoading, setStreakLoading] =
+    useState(true);
+
+  const [currentStreak, setCurrentStreak] =
+    useState(0);
+
+  const [activeDates, setActiveDates] =
+    useState<string[]>([]);
+
+  /* =====================================================
+     PREPARATION STATS
+  ===================================================== */
+
+  const [
+    preparationStats,
+    setPreparationStats,
+  ] = useState<PreparationStats>({
+    attempted: 0,
+    correct: 0,
+    accuracy: 0,
+  });
+
+  const [
+    preparationLoading,
+    setPreparationLoading,
+  ] = useState(true);
+
+  /* =====================================================
+     WEAK TOPICS
+  ===================================================== */
+
+  const [weakTopics, setWeakTopics] =
+    useState<WeakTopic[]>([]);
+
+  const [
+    weakTopicsLoading,
+    setWeakTopicsLoading,
+  ] = useState(true);
+
+  /* =====================================================
+     DAILY PRACTICE
+  ===================================================== */
+
+  const [dailyPractice, setDailyPractice] =
+    useState(0);
+
+  /* =====================================================
+     TODAY'S MISSION
+  ===================================================== */
+
+  const [
+    missionCompleted,
+    setMissionCompleted,
+  ] = useState({
+    practice: false,
+    challenge: false,
+    currentAffairs: false,
+  });
+
+  const [
+    missionLoading,
+    setMissionLoading,
+  ] = useState(true);
+
+  /* =====================================================
+     LOGIN REDIRECT
+  ===================================================== */
 
   useEffect(() => {
     if (!loading && !user) {
@@ -171,672 +155,1159 @@ export function StudentDashboard() {
     }
   }, [loading, user, navigate]);
 
-  // =========================================================
-  // LOADING
-  // =========================================================
+  /* =====================================================
+     LOAD STREAK
+  ===================================================== */
 
-  if (loading) {
+  const loadStudentStreak = async () => {
+    if (!user?.id) {
+      return;
+    }
+
+    setStreakLoading(true);
+
+    const { data, error } =
+      await supabase
+        .from("student_daily_activity")
+        .select("activity_date")
+        .eq("user_id", user.id)
+        .order("activity_date", {
+          ascending: false,
+        });
+
+    if (error) {
+      console.error(
+        "Failed to load student streak:",
+        error,
+      );
+
+      setCurrentStreak(0);
+      setActiveDates([]);
+      setStreakLoading(false);
+
+      return;
+    }
+
+    const uniqueDates = Array.from(
+      new Set(
+        (data ?? [])
+          .map(
+            (item) => item.activity_date,
+          )
+          .filter(Boolean),
+      ),
+    );
+
+    setActiveDates(uniqueDates);
+
+    const today =
+      getLocalDateString(new Date());
+
+    if (!uniqueDates.includes(today)) {
+      setCurrentStreak(0);
+      setStreakLoading(false);
+
+      return;
+    }
+
+    let streak = 1;
+    let checkDate = today;
+
+    while (true) {
+      const previousDate =
+        getPreviousDate(checkDate);
+
+      if (
+        uniqueDates.includes(
+          previousDate,
+        )
+      ) {
+        streak += 1;
+        checkDate = previousDate;
+      } else {
+        break;
+      }
+    }
+
+    setCurrentStreak(streak);
+    setStreakLoading(false);
+  };
+
+  /* =====================================================
+     LOAD PREPARATION STATS
+  ===================================================== */
+
+  const loadPreparationStats = async () => {
+    if (!user?.id) {
+      return;
+    }
+
+    setPreparationLoading(true);
+
+    const { data, error } =
+      await supabase
+        .from("practice_attempts")
+        .select(
+          "question_id, is_correct",
+        )
+        .eq("user_id", user.id);
+
+    if (error) {
+      console.error(
+        "Failed to load preparation stats:",
+        error,
+      );
+
+      setPreparationStats({
+        attempted: 0,
+        correct: 0,
+        accuracy: 0,
+      });
+
+      setPreparationLoading(false);
+
+      return;
+    }
+
+    const attempts = data ?? [];
+
+    const attempted =
+      attempts.length;
+
+    const correct =
+      attempts.filter(
+        (attempt) =>
+          attempt.is_correct === true,
+      ).length;
+
+    const accuracy =
+      attempted === 0
+        ? 0
+        : Math.round(
+            (correct / attempted) *
+              100,
+          );
+
+    setPreparationStats({
+      attempted,
+      correct,
+      accuracy,
+    });
+
+    setPreparationLoading(false);
+  };
+
+  /* =====================================================
+     LOAD WEAK TOPICS
+  ===================================================== */
+
+  const loadWeakTopics = async () => {
+    if (!user?.id) {
+      return;
+    }
+
+    setWeakTopicsLoading(true);
+
+    const { data, error } =
+      await supabase
+        .from("practice_attempts")
+        .select(
+          `
+            is_correct,
+            practice_questions (
+              category
+            )
+          `,
+        )
+        .eq("user_id", user.id);
+
+    if (error) {
+      console.error(
+        "Failed to load weak topics:",
+        error,
+      );
+
+      setWeakTopics([]);
+      setWeakTopicsLoading(false);
+
+      return;
+    }
+
+    const topicMap =
+      new Map<
+        string,
+        {
+          attempted: number;
+          correct: number;
+        }
+      >();
+
+    (data ?? []).forEach(
+      (attempt) => {
+        const question =
+          Array.isArray(
+            attempt.practice_questions,
+          )
+            ? attempt
+                .practice_questions[0]
+            : attempt.practice_questions;
+
+        const category =
+          question?.category?.trim();
+
+        if (!category) {
+          return;
+        }
+
+        const existing =
+          topicMap.get(category) ?? {
+            attempted: 0,
+            correct: 0,
+          };
+
+        existing.attempted += 1;
+
+        if (
+          attempt.is_correct === true
+        ) {
+          existing.correct += 1;
+        }
+
+        topicMap.set(
+          category,
+          existing,
+        );
+      },
+    );
+
+    const topics: WeakTopic[] =
+      Array.from(
+        topicMap.entries(),
+      )
+        .map(
+          ([
+            category,
+            stats,
+          ]) => ({
+            category,
+            attempted:
+              stats.attempted,
+            correct: stats.correct,
+            accuracy:
+              stats.attempted === 0
+                ? 0
+                : Math.round(
+                    (stats.correct /
+                      stats.attempted) *
+                      100,
+                  ),
+          }),
+        )
+        .filter(
+          (topic) =>
+            topic.attempted >= 2,
+        )
+        .sort(
+          (a, b) =>
+            a.accuracy -
+            b.accuracy,
+        )
+        .slice(0, 3);
+
+    setWeakTopics(topics);
+    setWeakTopicsLoading(false);
+  };
+
+  /* =====================================================
+     LOAD TODAY'S MISSION
+  ===================================================== */
+
+  const loadTodayMission = async () => {
+    if (!user?.id) {
+      return;
+    }
+
+    setMissionLoading(true);
+
+    const today =
+      getLocalDateString(new Date());
+
+    const { data, error } =
+      await supabase
+        .from("student_daily_activity")
+        .select(
+          "activity_type",
+        )
+        .eq("user_id", user.id)
+        .eq("activity_date", today);
+
+    if (error) {
+      console.error(
+        "Failed to load today's mission:",
+        error,
+      );
+
+      setMissionCompleted({
+        practice: false,
+        challenge: false,
+        currentAffairs: false,
+      });
+
+      setMissionLoading(false);
+
+      return;
+    }
+
+    const activityTypes = new Set(
+      (data ?? []).map(
+        (item) =>
+          item.activity_type,
+      ),
+    );
+
+    setMissionCompleted({
+      practice:
+        activityTypes.has(
+          "practice_questions",
+        ),
+      challenge:
+        activityTypes.has(
+          "daily_challenge",
+        ),
+      currentAffairs:
+        activityTypes.has(
+          "current_affairs",
+        ),
+    });
+
+    setMissionLoading(false);
+  };
+
+  /* =====================================================
+     LOAD ALL DASHBOARD DATA
+  ===================================================== */
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    loadStudentStreak();
+    loadPreparationStats();
+    loadWeakTopics();
+    loadTodayMission();
+  }, [user?.id]);
+
+  /* =====================================================
+     MISSION COUNT
+  ===================================================== */
+
+  const missionCount =
+    Number(missionCompleted.practice) +
+    Number(missionCompleted.challenge) +
+    Number(
+      missionCompleted.currentAffairs,
+    );
+
+  /* =====================================================
+     STREAK DAYS
+  ===================================================== */
+
+  const streakDays = Array.from(
+    { length: 7 },
+    (_, index) => {
+      const date = new Date();
+
+      date.setDate(
+        date.getDate() -
+          (6 - index),
+      );
+
+      const dateString =
+        getLocalDateString(date);
+
+      return {
+        date: dateString,
+        active:
+          activeDates.includes(
+            dateString,
+          ),
+      };
+    },
+  );
+
+  /* =====================================================
+     DAILY PRACTICE PROGRESS
+  ===================================================== */
+
+  const dailyPracticePercent =
+    Math.min(
+      100,
+      Math.round(
+        (dailyPractice /
+          DAILY_TARGET) *
+          100,
+      ),
+    );
+
+  /* =====================================================
+     HANDLERS
+  ===================================================== */
+
+  const handleDailyPractice = () => {
+    navigate(
+      "/student/practice-questions",
+    );
+  };
+
+  const handleStudyPlanner = () => {
+    navigate(
+      "/student/study-planner",
+    );
+  };
+
+  const handlePracticeQuestions = () => {
+    navigate(
+      "/student/practice-questions",
+    );
+  };
+
+  const handleShortVideos = () => {
+    navigate(
+      "/student/short-videos",
+    );
+  };
+
+  const handleDailyChallenge = () => {
+    navigate(
+      "/student/daily-challenge",
+    );
+  };
+
+  const handleAskVidhya = () => {
+    navigate("/student/ask");
+  };
+
+  const handleCurrentAffairs = () => {
+    navigate(
+      "/student/current-affairs",
+    );
+  };
+
+  const handleDailyNewspaper = () => {
+    navigate(
+      "/student/daily-newspaper",
+    );
+  };
+
+  const handleVocabulary = () => {
+    navigate(
+      "/student/vocabulary",
+    );
+  };
+
+  const handleExamTips = () => {
+    navigate(
+      "/student/exam-tips",
+    );
+  };
+
+  const handleProgress = () => {
+    navigate(
+      "/student/progress",
+    );
+  };
+
+  const handleFastRevision = () => {
+    navigate(
+      "/student/quick-revision",
+    );
+  };
+
+  const handleWeakTopic = (
+    topic: WeakTopic,
+  ) => {
+    navigate(
+      "/student/practice-questions",
+      {
+        state: {
+          category: topic.category,
+        },
+      },
+    );
+  };
+
+  /* =====================================================
+     LOADING
+  ===================================================== */
+
+  if (loading || !user) {
     return (
-      <div
-        className={`flex min-h-screen items-center justify-center ${
-          isDark
-            ? "bg-slate-950 text-white"
-            : "bg-slate-50 text-slate-900"
-        }`}
-      >
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+      <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-purple-600 dark:border-slate-800 dark:border-t-purple-400" />
 
-          <p className="text-sm font-medium opacity-70">
-            Loading Ranker Bhaiya...
-          </p>
+            <p className="mt-4 text-sm font-bold text-slate-500 dark:text-slate-400">
+              Loading your dashboard...
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!user) return null;
-
-  // =========================================================
-  // LOGOUT
-  // =========================================================
-
-  const handleLogout = async () => {
-    await signOut();
-
-    navigate("/student/login", {
-      replace: true,
-    });
-  };
-
-  // =========================================================
-  // DAILY PRACTICE
-  // =========================================================
-
-  const handleDailyPractice = () => {
-    setDailyPractice((current) =>
-      Math.min(current + 1, dailyTarget),
-    );
-
-    navigate("/student/practice-questions");
-  };
-
-  // =========================================================
-  // TODAY
-  // =========================================================
-
-  const todayDate = getLocalDateString(new Date());
-
-  const todayActivityCompleted = activeDates.includes(todayDate);
-
-  // =========================================================
-  // RENDER
-  // =========================================================
+  /* =====================================================
+     UI
+  ===================================================== */
 
   return (
     <div
-      className={`min-h-screen transition-colors duration-300 ${
+      className={`min-h-screen ${
         isDark
           ? "bg-slate-950 text-white"
           : "bg-slate-50 text-slate-900"
       }`}
     >
-      {/* =====================================================
+      {/* =================================================
           HEADER
-      ===================================================== */}
+      ================================================= */}
 
       <header
-        className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
+        className={`sticky top-0 z-40 border-b backdrop-blur-xl ${
           isDark
             ? "border-slate-800 bg-slate-950/90"
             : "border-slate-200 bg-white/90"
         }`}
       >
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* BRAND */}
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400">
+              Ranker Bhaiya
+            </p>
+
+            <h1 className="mt-1 text-lg font-black sm:text-xl">
+              Hello, {firstName}! 👋
+            </h1>
+          </div>
 
           <button
             type="button"
-            onClick={() => navigate("/student/dashboard")}
-            className="flex items-center gap-3"
+            onClick={() =>
+              navigate(
+                "/student/profile",
+              )
+            }
+            className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-black transition ${
+              isDark
+                ? "border-slate-700 bg-slate-900 hover:bg-slate-800"
+                : "border-slate-200 bg-white hover:bg-slate-100"
+            }`}
+            aria-label="Profile"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-lg font-black text-white shadow-lg">
-              RB
-            </div>
-
-            <div className="text-left">
-              <div className="text-base font-black tracking-tight">
-                Ranker Bhaiya
-              </div>
-
-              <div
-                className={`text-[10px] font-semibold uppercase tracking-widest ${
-                  isDark
-                    ? "text-slate-400"
-                    : "text-slate-500"
-                }`}
-              >
-                Aapki Mehnat, Hamari Strategy
-              </div>
-            </div>
+            {firstName
+              .charAt(0)
+              .toUpperCase()}
           </button>
-
-          {/* HEADER ACTIONS */}
-
-          <div className="flex items-center gap-2">
-            {/* PROGRESS */}
-
-            <button
-              type="button"
-              onClick={() => navigate("/student/progress")}
-              className={`hidden items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold transition sm:flex ${
-                isDark
-                  ? "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <span>📊</span>
-              <span>Progress</span>
-            </button>
-
-            {/* PROFILE MENU */}
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() =>
-                  setShowProfileMenu((current) => !current)
-                }
-                className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 transition ${
-                  isDark
-                    ? "border-slate-700 bg-slate-900 hover:bg-slate-800"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
-                }`}
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-black text-white">
-                  {studentName.charAt(0).toUpperCase()}
-                </div>
-
-                <span className="hidden max-w-[120px] truncate text-sm font-bold sm:block">
-                  {studentName}
-                </span>
-
-                <span className="text-xs opacity-60">
-                  ⌄
-                </span>
-              </button>
-
-              {showProfileMenu && (
-                <div
-                  className={`absolute right-0 mt-2 w-52 overflow-hidden rounded-2xl border shadow-xl ${
-                    isDark
-                      ? "border-slate-700 bg-slate-900"
-                      : "border-slate-200 bg-white"
-                  }`}
-                >
-                  <div className="border-b border-inherit px-4 py-3">
-                    <p className="truncate text-sm font-bold">
-                      {studentName}
-                    </p>
-
-                    <p className="truncate text-xs opacity-60">
-                      {user.email}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      navigate("/student/profile");
-                    }}
-                    className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
-                  >
-                    👤 My Profile
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      navigate("/student/settings");
-                    }}
-                    className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
-                  >
-                    ⚙️ Settings
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="block w-full border-t border-inherit px-4 py-3 text-left text-sm font-bold text-red-500 transition hover:bg-red-500/5"
-                  >
-                    🚪 Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </header>
 
-      {/* =====================================================
-          MAIN
-      ===================================================== */}
-
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* ===================================================
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        {/* =================================================
             HERO
-        =================================================== */}
+        ================================================= */}
 
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-blue-700 to-purple-700 p-5 text-white shadow-xl sm:p-7">
-          <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-2xl shadow-purple-600/20 sm:p-8 lg:p-10">
+          <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
 
-          <div className="pointer-events-none absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-purple-300/10 blur-3xl" />
+          <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-pink-400/20 blur-3xl" />
 
-          <div className="relative">
-            <p className="text-xs font-black tracking-[0.22em] text-blue-100">
-              👋 WELCOME BACK
+          <div className="relative z-10 max-w-3xl">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-100">
+              Welcome back
             </p>
 
-            <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
-              Hello, {firstName}! 👋
-            </h1>
+            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
+              Hello, {firstName}! 🚀
+            </h2>
 
-            {/* DAILY MINDSET */}
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-purple-50 sm:text-base">
+              Ranker Bhaiya brings learning
+              resources, current affairs, and
+              AI-powered guidance together in
+              one place — helping you learn
+              smarter, stay ahead, and prepare
+              with confidence.
+            </p>
 
-            <div className="mt-5 max-w-3xl rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-              <p className="text-[11px] font-black tracking-[0.18em] text-blue-100">
-                🧠 DAILY MINDSET
-              </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleAskVidhya}
+                className="rounded-xl bg-white px-5 py-3 text-sm font-black text-purple-700 shadow-xl transition hover:bg-purple-50 active:scale-95"
+              >
+                🤖 Ask Vidhya →
+              </button>
 
-              <p className="mt-2 text-sm font-semibold leading-6 text-white sm:text-base">
+              <button
+                type="button"
+                onClick={handlePracticeQuestions}
+                className="rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/20 active:scale-95"
+              >
+                📝 Practice Now
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* =================================================
+            DAILY MINDSET
+        ================================================= */}
+
+        <section
+          className={`mt-6 rounded-3xl border p-5 shadow-sm sm:p-6 ${
+            isDark
+              ? "border-slate-800 bg-slate-900"
+              : "border-slate-200 bg-white"
+          }`}
+        >
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-2xl dark:bg-purple-950/50">
+              🧠
+            </div>
+
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-purple-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                  Daily Mindset
+                </span>
+
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                  ☀️ Today's Thought
+                </span>
+              </div>
+
+              <p className="mt-3 text-lg font-black leading-7 sm:text-xl">
                 {dailyMindset.en}
               </p>
 
-              <p className="mt-1 text-sm font-medium leading-6 text-blue-100 sm:text-base">
+              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
                 {dailyMindset.hi}
               </p>
             </div>
           </div>
         </section>
 
-        {/* ===================================================
-            REAL 7 DAY STREAK
-        =================================================== */}
+        {/* =================================================
+            TOP STATS
+        ================================================= */}
 
-        <section className="mt-5">
-          <div className="overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-red-500 to-pink-600 p-5 text-white shadow-lg sm:p-6">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-orange-100">
-                  {currentStreak > 0
-                    ? "Keep Going"
-                    : "Start Today"}
-                </p>
+        <section className="mt-6 grid gap-4 lg:grid-cols-3">
+          {/* STREAK */}
 
-                <h2 className="mt-1 text-2xl font-black sm:text-3xl">
-                  🔥{" "}
-                  {streakLoading
-                    ? "..."
-                    : `${currentStreak} Day Streak`}
-                </h2>
-
-                <p className="mt-1 text-sm text-orange-100">
-                  {streakLoading
-                    ? "Checking your learning activity..."
-                    : currentStreak > 0
-                      ? currentStreak === 1
-                        ? "Great start! Complete an activity tomorrow to build your streak."
-                        : "You're being consistent. Don't break the streak!"
-                      : "Complete a learning activity today to start your streak."}
-                </p>
-              </div>
-
-              {/* LAST 7 DAYS */}
-
-              <div className="flex items-center gap-2">
-                {Array.from({ length: 7 }).map(
-                  (_, index) => {
-                    const date = new Date();
-
-                    date.setDate(
-                      date.getDate() - (6 - index),
-                    );
-
-                    const dateString =
-                      getLocalDateString(date);
-
-                    const isActive =
-                      activeDates.includes(dateString);
-
-                    const isToday = index === 6;
-
-                    return (
-                      <div
-                        key={dateString}
-                        title={`${dateString}${
-                          isToday ? " • Today" : ""
-                        }`}
-                        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black backdrop-blur transition ${
-                          isActive
-                            ? "bg-white text-red-500 shadow-md"
-                            : "bg-white/15 text-white/50"
-                        }`}
-                      >
-                        {isActive ? "✓" : "•"}
-                      </div>
-                    );
-                  },
-                )}
-              </div>
-            </div>
-
-            {/* TODAY STATUS */}
-
-            {!streakLoading && (
-              <div className="mt-5 flex items-center justify-between rounded-2xl bg-black/10 px-4 py-3 backdrop-blur-sm">
-                <span className="text-xs font-bold text-orange-100">
-                  Today&apos;s activity
-                </span>
-
-                <span className="text-xs font-black">
-                  {todayActivityCompleted
-                    ? "✓ Completed"
-                    : "Not completed"}
-                </span>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ===================================================
-            TODAY'S MISSION
-        =================================================== */}
-
-        <section className="mt-6">
           <div
-            className={`rounded-3xl border p-5 sm:p-6 ${
+            className={`rounded-3xl border p-5 shadow-sm ${
               isDark
                 ? "border-slate-800 bg-slate-900"
                 : "border-slate-200 bg-white"
             }`}
           >
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-widest text-blue-600">
-                  🎯 Today&apos;s Mission
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">
+                    🔥
+                  </span>
+
+                  <h3 className="font-black">
+                    7 Day Streak
+                  </h3>
+                </div>
+
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {currentStreak === 0
+                    ? "Start your streak today!"
+                    : currentStreak >= 7
+                      ? "Amazing! Keep the streak alive."
+                      : `${7 - currentStreak} more days to reach 7.`}
                 </p>
+              </div>
 
-                <h2 className="mt-1 text-xl font-black sm:text-2xl">
-                  Complete your daily preparation
-                </h2>
+              <span className="rounded-xl bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-600 dark:bg-orange-950/30 dark:text-orange-300">
+                {streakLoading
+                  ? "..."
+                  : `${currentStreak} DAYS`}
+              </span>
+            </div>
 
-                <p className="mt-1 text-sm opacity-65">
-                  Finish today&apos;s learning activities and
-                  keep your preparation moving.
+            <div className="mt-5 flex justify-between gap-1">
+              {streakDays.map(
+                (day, index) => (
+                  <div
+                    key={day.date}
+                    className="flex flex-1 flex-col items-center gap-2"
+                  >
+                    <div
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${
+                        day.active
+                          ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
+                          : isDark
+                            ? "bg-slate-800 text-slate-500"
+                            : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      {day.active
+                        ? "✓"
+                        : "•"}
+                    </div>
+
+                    <span className="text-[10px] font-bold text-slate-400">
+                      {index === 6
+                        ? "Today"
+                        : `D${index + 1}`}
+                    </span>
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
+
+          {/* MISSION */}
+
+          <div
+            className={`rounded-3xl border p-5 shadow-sm ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">
+                  🎯
+                </span>
+
+                <div>
+                  <h3 className="font-black">
+                    Today's Mission
+                  </h3>
+
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    Complete your daily targets
+                  </p>
+                </div>
+              </div>
+
+              <span className="rounded-xl bg-purple-50 px-3 py-1.5 text-xs font-black text-purple-600 dark:bg-purple-950/30 dark:text-purple-300">
+                {missionLoading
+                  ? "..."
+                  : `${missionCount}/3`}
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-2.5">
+              {[
+                {
+                  label:
+                    "Complete Practice Questions",
+                  done:
+                    missionCompleted.practice,
+                  onClick:
+                    handlePracticeQuestions,
+                },
+                {
+                  label:
+                    "Complete Daily Challenge",
+                  done:
+                    missionCompleted.challenge,
+                  onClick:
+                    handleDailyChallenge,
+                },
+                {
+                  label:
+                    "Read Today's Current Affairs",
+                  done:
+                    missionCompleted.currentAffairs,
+                  onClick:
+                    handleCurrentAffairs,
+                },
+              ].map(
+                (mission) => (
+                  <button
+                    key={mission.label}
+                    type="button"
+                    onClick={
+                      mission.onClick
+                    }
+                    className="flex w-full items-center gap-3 text-left"
+                  >
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                        mission.done
+                          ? "bg-emerald-500 text-white"
+                          : isDark
+                            ? "border border-slate-700 bg-slate-800 text-slate-500"
+                            : "border border-slate-200 bg-slate-50 text-slate-400"
+                      }`}
+                    >
+                      {mission.done
+                        ? "✓"
+                        : "○"}
+                    </span>
+
+                    <span
+                      className={`text-xs font-bold ${
+                        mission.done
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-slate-600 dark:text-slate-300"
+                      }`}
+                    >
+                      {mission.label}
+                    </span>
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+
+          {/* PREPARATION */}
+
+          <div
+            className={`rounded-3xl border p-5 shadow-sm ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">
+                    📊
+                  </span>
+
+                  <h3 className="font-black">
+                    Your Preparation
+                  </h3>
+                </div>
+
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Based on your practice
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() =>
-                  navigate("/student/daily-challenge")
-                }
-                className="shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
+                onClick={handleProgress}
+                className="text-xs font-black text-purple-600 hover:text-purple-700 dark:text-purple-400"
               >
-                Start Mission →
+                View →
               </button>
+            </div>
+
+            <div className="mt-5 flex items-center gap-5">
+              <div className="relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                <div
+                  className="absolute inset-1 rounded-full"
+                  style={{
+                    background: `conic-gradient(#8b5cf6 ${preparationStats.accuracy}%, ${
+                      isDark
+                        ? "#1e293b"
+                        : "#e2e8f0"
+                    } ${preparationStats.accuracy}% 100%)`,
+                  }}
+                />
+
+                <div
+                  className={`relative flex h-20 w-20 items-center justify-center rounded-full text-lg font-black ${
+                    isDark
+                      ? "bg-slate-900"
+                      : "bg-white"
+                  }`}
+                >
+                  {preparationLoading
+                    ? "—"
+                    : `${preparationStats.accuracy}%`}
+                </div>
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-3">
+                <div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold">
+                      Questions
+                    </span>
+
+                    <span className="font-black text-purple-600 dark:text-purple-400">
+                      {preparationLoading
+                        ? "—"
+                        : preparationStats.attempted}
+                    </span>
+                  </div>
+
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-purple-500 transition-all"
+                      style={{
+                        width: `${
+                          preparationStats.attempted > 0
+                            ? Math.min(
+                                100,
+                                preparationStats
+                                  .attempted * 2,
+                              )
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold">
+                      Accuracy
+                    </span>
+
+                    <span className="font-black text-emerald-600 dark:text-emerald-400">
+                      {preparationLoading
+                        ? "—"
+                        : `${preparationStats.accuracy}%`}
+                    </span>
+                  </div>
+
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all"
+                      style={{
+                        width: `${
+                          preparationStats.accuracy
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ===================================================
+        {/* =================================================
             PREPARATION TOOLS
-        =================================================== */}
+        ================================================= */}
 
         <section className="mt-10">
-          <div className="mb-4">
-            <p className="text-xs font-black uppercase tracking-widest text-blue-600">
-              Prepare Smart
-            </p>
-
-            <h2 className="mt-1 text-xl font-black sm:text-2xl">
-              Preparation Tools
+          <div>
+            <h2 className="text-2xl font-black tracking-tight">
+              Your Preparation Tools
             </h2>
+
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Tools designed to keep your
+              preparation organized and
+              consistent.
+            </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* STUDY PLANNER */}
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                icon: "📅",
+                title: "Study Planner",
+                description:
+                  "Plan your study sessions and stay consistent.",
+                action:
+                  handleStudyPlanner,
+              },
+              {
+                icon: "📝",
+                title: "Practice Questions",
+                description:
+                  "Practice exam-style questions and improve accuracy.",
+                action:
+                  handlePracticeQuestions,
+              },
+              {
+                icon: "🎬",
+                title: "Short Videos",
+                description:
+                  "Learn important topics through short focused videos.",
+                action:
+                  handleShortVideos,
+              },
+              {
+                icon: "⚡",
+                title: "Daily Challenge",
+                description:
+                  "Challenge yourself with quick daily practice.",
+                action:
+                  handleDailyChallenge,
+              },
+            ].map((tool) => (
+              <button
+                key={tool.title}
+                type="button"
+                onClick={tool.action}
+                className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                  isDark
+                    ? "border-slate-800 bg-slate-900 hover:border-purple-800"
+                    : "border-slate-200 bg-white hover:border-purple-200"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-2xl dark:bg-purple-950/40">
+                    {tool.icon}
+                  </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/student/study-planner")
-              }
-              className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                isDark
-                  ? "border-slate-800 bg-slate-900 hover:border-blue-700"
-                  : "border-slate-200 bg-white hover:border-blue-200"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-2xl dark:bg-blue-500/15">
-                  📅
+                  <span className="text-purple-600 transition group-hover:translate-x-1 dark:text-purple-400">
+                    →
+                  </span>
                 </div>
 
-                <span className="text-lg opacity-40 transition group-hover:translate-x-1">
-                  →
-                </span>
-              </div>
+                <h3 className="mt-5 font-black">
+                  {tool.title}
+                </h3>
 
-              <h3 className="mt-4 text-lg font-black">
-                Study Planner
-              </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {tool.description}
+                </p>
 
-              <p className="mt-1 text-sm leading-6 opacity-65">
-                Plan your study sessions and stay consistent
-                with your preparation.
-              </p>
-            </button>
-
-            {/* PRACTICE QUESTIONS */}
-
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/student/practice-questions")
-              }
-              className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                isDark
-                  ? "border-slate-800 bg-slate-900 hover:border-purple-700"
-                  : "border-slate-200 bg-white hover:border-purple-200"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-2xl dark:bg-purple-500/15">
-                  📝
-                </div>
-
-                <span className="text-lg opacity-40 transition group-hover:translate-x-1">
-                  →
-                </span>
-              </div>
-
-              <h3 className="mt-4 text-lg font-black">
-                Practice Questions
-              </h3>
-
-              <p className="mt-1 text-sm leading-6 opacity-65">
-                Practice topic-wise questions and strengthen your
-                concepts.
-              </p>
-            </button>
-
-            {/* SHORT VIDEOS */}
-
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/student/short-videos")
-              }
-              className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                isDark
-                  ? "border-slate-800 bg-slate-900 hover:border-pink-700"
-                  : "border-slate-200 bg-white hover:border-pink-200"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-100 text-2xl dark:bg-pink-500/15">
-                  🎬
-                </div>
-
-                <span className="text-lg opacity-40 transition group-hover:translate-x-1">
-                  →
-                </span>
-              </div>
-
-              <h3 className="mt-4 text-lg font-black">
-                Short Videos
-              </h3>
-
-              <p className="mt-1 text-sm leading-6 opacity-65">
-                Learn important topics through short, focused
-                video series.
-              </p>
-            </button>
-
-            {/* DAILY CHALLENGE */}
-
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/student/daily-challenge")
-              }
-              className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                isDark
-                  ? "border-slate-800 bg-slate-900 hover:border-orange-700"
-                  : "border-slate-200 bg-white hover:border-orange-200"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 text-2xl dark:bg-orange-500/15">
-                  ⚡
-                </div>
-
-                <span className="text-lg opacity-40 transition group-hover:translate-x-1">
-                  →
-                </span>
-              </div>
-
-              <h3 className="mt-4 text-lg font-black">
-                Daily Challenge
-              </h3>
-
-              <p className="mt-1 text-sm leading-6 opacity-65">
-                Test yourself every day with quick
-                exam-focused questions.
-              </p>
-            </button>
+                <p className="mt-4 text-xs font-black text-purple-600 dark:text-purple-400">
+                  Open →
+                </p>
+              </button>
+            ))}
           </div>
         </section>
 
-        {/* ===================================================
+        {/* =================================================
             LEARNING HUB
-        =================================================== */}
+        ================================================= */}
 
         <section className="mt-10">
-          <div className="mb-4">
-            <p className="text-xs font-black uppercase tracking-widest text-purple-600">
-              Learn Every Day
-            </p>
-
-            <h2 className="mt-1 text-xl font-black sm:text-2xl">
+          <div>
+            <h2 className="text-2xl font-black tracking-tight">
               Learning Hub
             </h2>
+
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Learn, revise and stay updated,
+              every day.
+            </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-5 grid gap-4 lg:grid-cols-3">
             {/* ASK VIDHYA */}
 
             <button
               type="button"
-              onClick={() => navigate("/student/ask")}
-              className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 text-left text-white shadow-xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:col-span-2 lg:col-span-2"
+              onClick={handleAskVidhya}
+              className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-left text-white shadow-xl shadow-purple-600/20 lg:row-span-2"
             >
-              <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+              <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
 
-              <div className="pointer-events-none absolute -bottom-12 -left-12 h-36 w-36 rounded-full bg-fuchsia-300/10 blur-3xl" />
-
-              <div className="relative">
-                <div className="flex items-start justify-between gap-4">
+              <div className="relative z-10 flex h-full flex-col">
+                <div className="flex items-start justify-between">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-3xl backdrop-blur">
                     🤖
                   </div>
 
-                  <span className="rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider backdrop-blur">
-                    AI Learning Assistant
+                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-black tracking-wider">
+                    AI ASSISTANT
                   </span>
                 </div>
 
-                <h3 className="mt-5 text-2xl font-black sm:text-3xl">
-                  Ask Vidhya
-                </h3>
+                <div className="mt-8">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-100">
+                    Ask Vidhya
+                  </p>
 
-                <p className="mt-2 max-w-xl text-sm leading-6 text-purple-100 sm:text-base">
-                  Doubt ho, concept samajhna ho, revision karna
-                  ho ya study guidance chahiye — Vidhya se
-                  poochho.
-                </p>
+                  <h3 className="mt-2 text-3xl font-black">
+                    Your personal AI learning assistant.
+                  </h3>
 
-                <div className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-purple-700 transition group-hover:bg-purple-50">
-                  Ask Vidhya
+                  <p className="mt-4 text-sm leading-6 text-purple-50">
+                    Ask questions, understand
+                    concepts, create learning
+                    support and learn smarter.
+                  </p>
+                </div>
 
-                  <span className="transition group-hover:translate-x-1">
-                    →
+                <div className="mt-auto pt-8">
+                  <span className="inline-flex rounded-xl bg-white px-5 py-3 text-sm font-black text-purple-700 transition group-hover:bg-purple-50">
+                    Ask Vidhya →
                   </span>
                 </div>
               </div>
-            </button>
-
-            {/* FAST REVISION */}
-
-            <button
-              type="button"
-              onClick={() =>
-                navigate("/student/quick-revision")
-              }
-              className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                isDark
-                  ? "border-slate-800 bg-slate-900 hover:border-green-700"
-                  : "border-slate-200 bg-white hover:border-green-200"
-              }`}
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-100 text-2xl dark:bg-green-500/15">
-                ⚡
-              </div>
-
-              <h3 className="mt-4 font-black">
-                Fast Revision
-              </h3>
-
-              <p className="mt-1 text-sm leading-6 opacity-65">
-                Revise important concepts quickly with smart
-                revision cards and MCQs.
-              </p>
             </button>
 
             {/* CURRENT AFFAIRS */}
 
             <button
               type="button"
-              onClick={() =>
-                navigate("/student/current-affairs")
-              }
-              className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
+              onClick={handleCurrentAffairs}
+              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
-                  ? "border-slate-800 bg-slate-900 hover:border-blue-700"
-                  : "border-slate-200 bg-white hover:border-blue-200"
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
               }`}
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-2xl dark:bg-blue-500/15">
-                📰
+              <div className="flex items-start justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-2xl dark:bg-blue-950/40">
+                  📰
+                </div>
+
+                <span className="text-blue-600 transition group-hover:translate-x-1 dark:text-blue-400">
+                  →
+                </span>
               </div>
 
-              <h3 className="mt-4 font-black">
-                Current Affairs
+              <h3 className="mt-5 font-black">
+                Daily Current Affairs
               </h3>
 
-              <p className="mt-1 text-sm leading-6 opacity-65">
-                Stay updated with important national and
-                international events.
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Stay updated with important
+                national and international news.
+              </p>
+
+              <p className="mt-4 text-xs font-black text-blue-600 dark:text-blue-400">
+                Explore →
               </p>
             </button>
 
-            {/* DAILY NEWSPAPER */}
+            {/* NEWSPAPER */}
 
             <button
               type="button"
-              onClick={() =>
-                navigate("/student/daily-newspaper")
-              }
-              className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
+              onClick={handleDailyNewspaper}
+              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
-                  ? "border-slate-800 bg-slate-900 hover:border-orange-700"
-                  : "border-slate-200 bg-white hover:border-orange-200"
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
               }`}
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 text-2xl dark:bg-orange-500/15">
-                🗞️
+              <div className="flex items-start justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-50 text-2xl dark:bg-pink-950/40">
+                  🗞️
+                </div>
+
+                <span className="text-pink-600 transition group-hover:translate-x-1 dark:text-pink-400">
+                  →
+                </span>
               </div>
 
-              <h3 className="mt-4 font-black">
+              <h3 className="mt-5 font-black">
                 Daily Newspaper
               </h3>
 
-              <p className="mt-1 text-sm leading-6 opacity-65">
-                Read important newspaper content prepared for
-                exam preparation.
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Read daily newspapers and stay
+                informed.
+              </p>
+
+              <p className="mt-4 text-xs font-black text-pink-600 dark:text-pink-400">
+                Explore →
               </p>
             </button>
 
@@ -844,26 +1315,34 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={() =>
-                navigate("/student/vocabulary")
-              }
-              className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
+              onClick={handleVocabulary}
+              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
-                  ? "border-slate-800 bg-slate-900 hover:border-pink-700"
-                  : "border-slate-200 bg-white hover:border-pink-200"
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
               }`}
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-100 text-2xl dark:bg-pink-500/15">
-                📚
+              <div className="flex items-start justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-2xl dark:bg-cyan-950/40">
+                  🔤
+                </div>
+
+                <span className="text-cyan-600 transition group-hover:translate-x-1 dark:text-cyan-400">
+                  →
+                </span>
               </div>
 
-              <h3 className="mt-4 font-black">
+              <h3 className="mt-5 font-black">
                 English Vocabulary
               </h3>
 
-              <p className="mt-1 text-sm leading-6 opacity-65">
-                Improve vocabulary, idioms, synonyms, antonyms
-                and more.
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Build vocabulary with words,
+                idioms and more.
+              </p>
+
+              <p className="mt-4 text-xs font-black text-cyan-600 dark:text-cyan-400">
+                Explore →
               </p>
             </button>
 
@@ -871,585 +1350,460 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={() =>
-                navigate("/student/exam-tips")
-              }
-              className={`group rounded-3xl border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
+              onClick={handleExamTips}
+              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
-                  ? "border-slate-800 bg-slate-900 hover:border-yellow-700"
-                  : "border-slate-200 bg-white hover:border-yellow-200"
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
               }`}
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-yellow-100 text-2xl dark:bg-yellow-500/15">
-                🎯
+              <div className="flex items-start justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-2xl dark:bg-emerald-950/40">
+                  🎯
+                </div>
+
+                <span className="text-emerald-600 transition group-hover:translate-x-1 dark:text-emerald-400">
+                  →
+                </span>
               </div>
 
-              <h3 className="mt-4 font-black">
+              <h3 className="mt-5 font-black">
                 Exam Tips
               </h3>
 
-              <p className="mt-1 text-sm leading-6 opacity-65">
-                Smart strategies for revision, time management
-                and exams.
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Practical strategies for smarter
+                exam preparation.
+              </p>
+
+              <p className="mt-4 text-xs font-black text-emerald-600 dark:text-emerald-400">
+                Explore →
               </p>
             </button>
           </div>
         </section>
 
-        {/* ===================================================
-            YOUR PREPARATION
-        =================================================== */}
+        {/* =================================================
+            RECOMMENDATION + WEAK TOPICS
+        ================================================= */}
 
-        <section className="mt-10">
-          <div className="mb-4">
-            <p className="text-xs font-black uppercase tracking-widest text-indigo-600">
-              Your Progress
-            </p>
+        <section className="mt-10 grid gap-5 lg:grid-cols-5">
+          {/* RECOMMENDATION */}
 
-            <h2 className="mt-1 text-xl font-black sm:text-2xl">
-              📊 Your Preparation
-            </h2>
+          <div className="relative overflow-hidden rounded-3xl border border-purple-200 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-pink-50 p-6 dark:border-purple-900/40 dark:from-purple-950/30 dark:via-fuchsia-950/20 dark:to-pink-950/20 lg:col-span-3">
+            <div className="relative z-10 max-w-xl">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-slate-900">
+                💡
+              </span>
+
+              <h3 className="mt-5 text-xl font-black">
+                Bhaiya's Recommendation
+              </h3>
+
+              {weakTopicsLoading ? (
+                <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  Analysing your practice
+                  performance...
+                </p>
+              ) : weakTopics.length > 0 ? (
+                <>
+                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    Today, focus on{" "}
+                    <span className="font-black text-purple-700 dark:text-purple-300">
+                      {weakTopics[0].category}
+                    </span>
+                    . Your current accuracy in
+                    this topic is{" "}
+                    <span className="font-black">
+                      {weakTopics[0].accuracy}%
+                    </span>
+                    . Practice more questions
+                    from this topic to improve.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleWeakTopic(
+                        weakTopics[0],
+                      )
+                    }
+                    className="mt-6 rounded-xl bg-purple-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700"
+                  >
+                    Start Recommended Session →
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    Start solving practice
+                    questions and Ranker Bhaiya
+                    will identify the topics that
+                    need more attention.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={
+                      handlePracticeQuestions
+                    }
+                    className="mt-6 rounded-xl bg-purple-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700"
+                  >
+                    Start Practicing →
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div className="pointer-events-none absolute -bottom-12 -right-8 text-8xl opacity-20">
+              🚀
+            </div>
           </div>
 
+          {/* WEAK TOPICS */}
+
           <div
-            className={`rounded-3xl border p-5 sm:p-6 ${
+            className={`rounded-3xl border p-6 shadow-sm lg:col-span-2 ${
               isDark
                 ? "border-slate-800 bg-slate-900"
                 : "border-slate-200 bg-white"
             }`}
           >
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {/* OVERALL */}
-
-              <div className="rounded-2xl bg-blue-500/10 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold opacity-70">
-                    Overall Progress
-                  </span>
-
-                  <span className="text-lg">📊</span>
-                </div>
-
-                <div className="mt-3 flex items-end justify-between">
-                  <span className="text-3xl font-black">
-                    68%
-                  </span>
-
-                  <span className="text-xs font-bold text-blue-500">
-                    Growing
-                  </span>
-                </div>
-
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                  <div className="h-full w-[68%] rounded-full bg-blue-500" />
-                </div>
-              </div>
-
-              {/* QUESTIONS */}
-
-              <div className="rounded-2xl bg-purple-500/10 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold opacity-70">
-                    Questions
-                  </span>
-
-                  <span className="text-lg">📝</span>
-                </div>
-
-                <p className="mt-3 text-3xl font-black">
-                  245
-                </p>
-
-                <p className="mt-1 text-xs opacity-60">
-                  Questions attempted
-                </p>
-              </div>
-
-              {/* ACCURACY */}
-
-              <div className="rounded-2xl bg-green-500/10 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold opacity-70">
-                    Accuracy
-                  </span>
-
-                  <span className="text-lg">🎯</span>
-                </div>
-
-                <p className="mt-3 text-3xl font-black">
-                  78%
-                </p>
-
-                <p className="mt-1 text-xs opacity-60">
-                  Overall accuracy
-                </p>
-              </div>
-
-              {/* REVISION */}
-
-              <div className="rounded-2xl bg-orange-500/10 p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold opacity-70">
-                    Revision
-                  </span>
-
-                  <span className="text-lg">🔄</span>
-                </div>
-
-                <p className="mt-3 text-3xl font-black">
-                  64%
-                </p>
-
-                <p className="mt-1 text-xs opacity-60">
-                  Topics revised
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate("/student/progress")}
-              className="mt-5 w-full rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-sm font-black text-indigo-600 transition hover:bg-indigo-500/15"
-            >
-              View Full Progress →
-            </button>
-          </div>
-        </section>
-
-        {/* ===================================================
-            WEAK TOPICS
-        =================================================== */}
-
-        <section className="mt-10">
-          <div className="mb-4">
-            <p className="text-xs font-black uppercase tracking-widest text-red-500">
-              Improve Faster
-            </p>
-
-            <h2 className="mt-1 text-xl font-black sm:text-2xl">
-              🧠 Weak Topics
-            </h2>
-          </div>
-
-          <div
-            className={`rounded-3xl border p-5 sm:p-6 ${
-              isDark
-                ? "border-slate-800 bg-slate-900"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <div className="space-y-4">
-              {/* POLITY */}
-
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-black">
-                      Polity
-                    </p>
-
-                    <p className="text-xs opacity-55">
-                      Needs more practice
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-black text-red-500">
-                      42%
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          "/student/practice-questions",
-                        )
-                      }
-                      className="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-500 transition hover:bg-red-500/15"
-                    >
-                      Practice
-                    </button>
-                  </div>
-                </div>
-
-                <div className="h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                  <div className="h-full w-[42%] rounded-full bg-red-500" />
-                </div>
-              </div>
-
-              {/* ECONOMY */}
-
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-black">
-                      Economy
-                    </p>
-
-                    <p className="text-xs opacity-55">
-                      Improve your accuracy
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-black text-orange-500">
-                      51%
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          "/student/practice-questions",
-                        )
-                      }
-                      className="rounded-lg bg-orange-500/10 px-3 py-1.5 text-xs font-black text-orange-500 transition hover:bg-orange-500/15"
-                    >
-                      Practice
-                    </button>
-                  </div>
-                </div>
-
-                <div className="h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                  <div className="h-full w-[51%] rounded-full bg-orange-500" />
-                </div>
-              </div>
-
-              {/* GEOGRAPHY */}
-
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-black">
-                      Geography
-                    </p>
-
-                    <p className="text-xs opacity-55">
-                      Almost there
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-black text-yellow-500">
-                      58%
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          "/student/practice-questions",
-                        )
-                      }
-                      className="rounded-lg bg-yellow-500/10 px-3 py-1.5 text-xs font-black text-yellow-600 transition hover:bg-yellow-500/15"
-                    >
-                      Practice
-                    </button>
-                  </div>
-                </div>
-
-                <div className="h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                  <div className="h-full w-[58%] rounded-full bg-yellow-500" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ===================================================
-            5 MINUTE CHALLENGE
-        =================================================== */}
-
-        <section className="mt-10">
-          <button
-            type="button"
-            onClick={() =>
-              navigate("/student/daily-challenge")
-            }
-            className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-700 p-6 text-left text-white shadow-xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:p-7"
-          >
-            <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
-
-            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-blue-100">
-                  Quick Learning
-                </p>
-
-                <h2 className="mt-1 text-2xl font-black">
-                  ⚡ 5-Minute Challenge
-                </h2>
-
-                <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100">
-                  Sirf 5 minutes nikalo aur apni preparation ko
-                  ek quick boost do.
-                </p>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="rounded-xl bg-white/15 px-4 py-2.5 text-sm font-black backdrop-blur">
-                  5 Minutes
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">
+                  🧠
                 </span>
 
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-lg font-black text-blue-700 transition group-hover:translate-x-1">
-                  →
-                </span>
+                <h3 className="font-black">
+                  Your Weak Topics
+                </h3>
               </div>
+
+              <button
+                type="button"
+                onClick={handleProgress}
+                className="text-xs font-black text-purple-600 dark:text-purple-400"
+              >
+                View All →
+              </button>
             </div>
-          </button>
+
+            {weakTopicsLoading ? (
+              <div className="mt-6 space-y-4">
+                {[1, 2, 3].map(
+                  (item) => (
+                    <div
+                      key={item}
+                      className="animate-pulse"
+                    >
+                      <div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" />
+
+                      <div className="mt-2 h-2 rounded bg-slate-200 dark:bg-slate-800" />
+                    </div>
+                  ),
+                )}
+              </div>
+            ) : weakTopics.length === 0 ? (
+              <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-center dark:bg-slate-950">
+                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+                  Not enough practice data yet.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={
+                    handlePracticeQuestions
+                  }
+                  className="mt-3 text-xs font-black text-purple-600 dark:text-purple-400"
+                >
+                  Practice Questions →
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-5">
+                {weakTopics.map(
+                  (topic) => (
+                    <button
+                      key={topic.category}
+                      type="button"
+                      onClick={() =>
+                        handleWeakTopic(
+                          topic,
+                        )
+                      }
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="truncate text-sm font-bold">
+                          {topic.category}
+                        </span>
+
+                        <span className="shrink-0 text-xs font-black text-red-500">
+                          {topic.accuracy}%
+                        </span>
+                      </div>
+
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            topic.accuracy < 50
+                              ? "bg-red-500"
+                              : topic.accuracy < 70
+                                ? "bg-amber-500"
+                                : "bg-emerald-500"
+                          }`}
+                          style={{
+                            width: `${topic.accuracy}%`,
+                          }}
+                        />
+                      </div>
+
+                      <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                        {topic.attempted} questions
+                        attempted
+                      </p>
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
         </section>
 
-        {/* ===================================================
+        {/* =================================================
             DAILY PRACTICE
-        =================================================== */}
+        ================================================= */}
 
-        <section className="mt-10">
-          <div className="mb-4">
-            <p className="text-xs font-black uppercase tracking-widest text-orange-500">
-              Stay Consistent
-            </p>
+        <section className="mt-10 overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-pink-500 to-fuchsia-600 p-6 text-white shadow-xl shadow-pink-500/20 sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider">
+                ⚡ Daily Practice
+              </span>
 
-            <h2 className="mt-1 text-xl font-black sm:text-2xl">
-              🔥 Daily Practice
-            </h2>
-          </div>
+              <h2 className="mt-4 text-2xl font-black sm:text-3xl">
+                Challenge Yourself.
+                <br />
+                Improve Every Day.
+              </h2>
 
-          <div
-            className={`rounded-3xl border p-5 sm:p-6 ${
-              isDark
-                ? "border-slate-800 bg-slate-900"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-black">
-                  Today&apos;s Question Target
-                </p>
+              <p className="mt-3 text-sm leading-6 text-pink-50">
+                Practice questions, check your
+                accuracy and build a consistent
+                study habit.
+              </p>
 
-                <p className="mt-1 text-xs opacity-60">
-                  Complete 20 questions every day.
-                </p>
-              </div>
-
-              <div className="text-left sm:text-right">
-                <p className="text-2xl font-black">
-                  {dailyPractice}
-
-                  <span className="text-sm opacity-40">
-                    /{dailyTarget}
+              <div className="mt-5 max-w-md">
+                <div className="flex items-center justify-between text-xs font-black">
+                  <span>
+                    Today's progress
                   </span>
-                </p>
 
-                <p className="text-xs font-bold text-orange-500">
-                  {practiceProgress}% completed
-                </p>
+                  <span>
+                    {dailyPractice}/
+                    {DAILY_TARGET}
+                  </span>
+                </div>
+
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20">
+                  <div
+                    className="h-full rounded-full bg-white transition-all duration-500"
+                    style={{
+                      width: `${dailyPracticePercent}%`,
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
-                style={{
-                  width: `${practiceProgress}%`,
-                }}
-              />
             </div>
 
             <button
               type="button"
               onClick={handleDailyPractice}
-              className="mt-5 w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-black text-white transition hover:bg-orange-600"
+              className="shrink-0 rounded-2xl bg-white px-6 py-4 text-sm font-black text-pink-600 shadow-xl transition hover:bg-pink-50 active:scale-95"
             >
-              Continue Practice →
+              Start Practice →
             </button>
           </div>
         </section>
 
-        {/* ===================================================
+        {/* =================================================
             WEEKLY ACHIEVEMENTS
-        =================================================== */}
+        ================================================= */}
 
         <section className="mt-10">
-          <div className="mb-4">
-            <p className="text-xs font-black uppercase tracking-widest text-yellow-600">
-              Celebrate Your Progress
-            </p>
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 className="text-2xl font-black tracking-tight">
+                Weekly Achievements
+              </h2>
 
-            <h2 className="mt-1 text-xl font-black sm:text-2xl">
-              🏆 Weekly Achievements
-            </h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Small wins build big results.
+              </p>
+            </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* STREAK */}
-
-            <div
-              className={`rounded-3xl border p-5 ${
-                isDark
-                  ? "border-slate-800 bg-slate-900"
-                  : "border-slate-200 bg-white"
-              }`}
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10 text-2xl">
-                🔥
-              </div>
-
-              <h3 className="mt-4 font-black">
-                7 Day Streak
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 opacity-60">
-                Build a consistent daily learning habit.
-              </p>
-
-              <span
-                className={`mt-4 inline-block rounded-full px-3 py-1 text-[10px] font-black ${
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: "🔥",
+                title: "7 Day Streak",
+                unlocked:
+                  currentStreak >= 7,
+                value:
                   currentStreak >= 7
-                    ? "bg-green-500/10 text-green-600"
-                    : "bg-yellow-500/10 text-yellow-600"
-                }`}
-              >
-                {currentStreak >= 7
-                  ? "UNLOCKED"
-                  : `${Math.min(currentStreak, 7)}/7 DAYS`}
-              </span>
-            </div>
+                    ? "UNLOCKED"
+                    : `${Math.min(
+                        currentStreak,
+                        7,
+                      )}/7 DAYS`,
+              },
+              {
+                icon: "📝",
+                title: "100 Questions",
+                unlocked:
+                  preparationStats.attempted >=
+                  100,
+                value:
+                  preparationStats.attempted >=
+                  100
+                    ? "UNLOCKED"
+                    : `${Math.min(
+                        preparationStats.attempted,
+                        100,
+                      )}/100`,
+              },
+              {
+                icon: "🎯",
+                title: "80% Accuracy",
+                unlocked:
+                  preparationStats.accuracy >=
+                  80,
+                value:
+                  preparationStats.attempted ===
+                  0
+                    ? "START"
+                    : preparationStats.accuracy >=
+                        80
+                      ? "UNLOCKED"
+                      : `${preparationStats.accuracy}%`,
+              },
+              {
+                icon: "🚀",
+                title: "Keep Learning",
+                unlocked:
+                  preparationStats.attempted >=
+                  20,
+                value:
+                  preparationStats.attempted >=
+                  20
+                    ? "UNLOCKED"
+                    : `${Math.min(
+                        preparationStats.attempted,
+                        20,
+                      )}/20`,
+              },
+            ].map(
+              (achievement) => (
+                <div
+                  key={
+                    achievement.title
+                  }
+                  className={`rounded-3xl border p-5 ${
+                    achievement.unlocked
+                      ? isDark
+                        ? "border-emerald-900/50 bg-emerald-950/20"
+                        : "border-emerald-200 bg-emerald-50"
+                      : isDark
+                        ? "border-slate-800 bg-slate-900"
+                        : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <span className="text-3xl">
+                      {achievement.icon}
+                    </span>
 
-            {/* QUESTIONS */}
+                    <span
+                      className={`rounded-lg px-2 py-1 text-[9px] font-black ${
+                        achievement.unlocked
+                          ? "bg-emerald-500 text-white"
+                          : isDark
+                            ? "bg-slate-800 text-slate-500"
+                            : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      {achievement.value}
+                    </span>
+                  </div>
 
-            <div
-              className={`rounded-3xl border p-5 ${
-                isDark
-                  ? "border-slate-800 bg-slate-900"
-                  : "border-slate-200 bg-white"
-              }`}
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/10 text-2xl">
-                📝
-              </div>
+                  <h3 className="mt-5 font-black">
+                    {achievement.title}
+                  </h3>
 
-              <h3 className="mt-4 font-black">
-                100 Questions
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 opacity-60">
-                Complete 100 practice questions.
-              </p>
-
-              <span className="mt-4 inline-block rounded-full bg-green-500/10 px-3 py-1 text-[10px] font-black text-green-600">
-                UNLOCKED
-              </span>
-            </div>
-
-            {/* REVISION */}
-
-            <div
-              className={`rounded-3xl border p-5 ${
-                isDark
-                  ? "border-slate-800 bg-slate-900"
-                  : "border-slate-200 bg-white"
-              }`}
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-2xl">
-                📚
-              </div>
-
-              <h3 className="mt-4 font-black">
-                5 Topics Revised
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 opacity-60">
-                Revise five important topics this week.
-              </p>
-
-              <span className="mt-4 inline-block rounded-full bg-green-500/10 px-3 py-1 text-[10px] font-black text-green-600">
-                UNLOCKED
-              </span>
-            </div>
-
-            {/* ACCURACY */}
-
-            <div
-              className={`rounded-3xl border p-5 ${
-                isDark
-                  ? "border-slate-800 bg-slate-900"
-                  : "border-slate-200 bg-white"
-              }`}
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-500/10 text-2xl">
-                🎯
-              </div>
-
-              <h3 className="mt-4 font-black">
-                80% Accuracy
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 opacity-60">
-                Reach 80% accuracy in your practice.
-              </p>
-
-              <span className="mt-4 inline-block rounded-full bg-yellow-500/10 px-3 py-1 text-[10px] font-black text-yellow-600">
-                IN PROGRESS
-              </span>
-            </div>
+                  <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {achievement.unlocked
+                      ? "Achievement unlocked"
+                      : "Keep going"}
+                  </p>
+                </div>
+              ),
+            )}
           </div>
         </section>
 
-        {/* ===================================================
+        {/* =================================================
             ABOUT
-        =================================================== */}
+        ================================================= */}
 
         <section
-          className={`mt-10 rounded-3xl border p-6 ${
+          className={`mt-10 rounded-3xl border p-6 sm:p-8 ${
             isDark
               ? "border-slate-800 bg-slate-900"
               : "border-slate-200 bg-white"
           }`}
         >
-          <p className="text-xs font-black uppercase tracking-widest text-blue-600">
-            About Ranker Bhaiya
-          </p>
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-2xl dark:bg-purple-950/40">
+              🚀
+            </div>
 
-          <h2 className="mt-2 text-xl font-black">
-            Aapki Mehnat, Hamari Strategy.
-          </h2>
+            <div>
+              <h2 className="text-xl font-black">
+                About Ranker Bhaiya
+              </h2>
 
-          <p className="mt-3 max-w-4xl text-sm leading-7 opacity-70">
-            Ranker Bhaiya is a student-focused learning platform
-            built to make exam preparation simpler, smarter, and
-            more effective. From daily current affairs and
-            newspaper reading to fast revision, vocabulary
-            building, short videos and AI-powered learning support,
-            everything is designed to help students stay
-            consistent, learn with clarity, and prepare with
-            confidence.
-          </p>
+              <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600 dark:text-slate-300">
+                Ranker Bhaiya is a student-focused
+                learning platform built to make
+                exam preparation simpler, smarter,
+                and more effective. From daily
+                current affairs and newspaper
+                reading to fast revision,
+                vocabulary building, and
+                AI-powered learning support,
+                everything is designed to help
+                students stay consistent, learn
+                with clarity, and prepare with
+                confidence.
+              </p>
+            </div>
+          </div>
         </section>
+
+        {/* =================================================
+            FOOTER
+        ================================================= */}
+
+        <footer className="py-8 text-center">
+          <p className="text-xs font-semibold text-slate-400">
+            © {new Date().getFullYear()} Ranker
+            Bhaiya · Aapki Mehnat, Hamari
+            Strategy.
+          </p>
+        </footer>
       </main>
-
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
-
-      <footer
-        className={`mt-12 border-t ${
-          isDark
-            ? "border-slate-800"
-            : "border-slate-200"
-        }`}
-      >
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 text-center text-xs opacity-55 sm:flex-row sm:px-6 lg:px-8 sm:text-left">
-          <p>
-            © {new Date().getFullYear()} Ranker Bhaiya. All
-            rights reserved.
-          </p>
-
-          <p className="font-semibold">
-            Aapki Mehnat, Hamari Strategy.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }
