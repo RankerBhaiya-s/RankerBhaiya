@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
@@ -15,6 +15,28 @@ export function StudentDashboard() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const dailyMindset = getDailyMindset();
+
+  /*
+   * Demo/local dashboard progress.
+   * Later these values can be connected with Supabase activity data.
+   */
+  const [dailyPractice, setDailyPractice] = useState(12);
+
+  const dailyTarget = 20;
+
+  const practiceProgress = Math.min(
+    100,
+    Math.round((dailyPractice / dailyTarget) * 100),
+  );
+
+  const studentName =
+    profile?.full_name?.trim() ||
+    user?.email?.split("@")[0] ||
+    "Student";
+
+  const firstName = useMemo(() => {
+    return studentName.split(" ")[0] || "Student";
+  }, [studentName]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -44,14 +66,14 @@ export function StudentDashboard() {
 
   if (!user) return null;
 
-  const studentName =
-    profile?.full_name?.trim() ||
-    user.email?.split("@")[0] ||
-    "Student";
-
   const handleLogout = async () => {
     await signOut();
     navigate("/student/login", { replace: true });
+  };
+
+  const handleDailyPractice = () => {
+    setDailyPractice((current) => Math.min(current + 1, dailyTarget));
+    navigate("/student/practice-questions");
   };
 
   return (
@@ -68,12 +90,12 @@ export function StudentDashboard() {
       <header
         className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
           isDark
-            ? "border-slate-800 bg-slate-950/85"
-            : "border-slate-200 bg-white/85"
+            ? "border-slate-800 bg-slate-950/90"
+            : "border-slate-200 bg-white/90"
         }`}
       >
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Logo */}
+          {/* Brand */}
           <button
             type="button"
             onClick={() => navigate("/student/dashboard")}
@@ -98,9 +120,9 @@ export function StudentDashboard() {
             </div>
           </button>
 
-          {/* Right Side */}
+          {/* Header Actions */}
           <div className="flex items-center gap-2">
-            {/* Progress Tracker */}
+            {/* Progress */}
             <button
               type="button"
               onClick={() => navigate("/student/progress")}
@@ -114,11 +136,13 @@ export function StudentDashboard() {
               <span>Progress</span>
             </button>
 
-            {/* Profile */}
+            {/* Profile Menu */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setShowProfileMenu((prev) => !prev)}
+                onClick={() =>
+                  setShowProfileMenu((current) => !current)
+                }
                 className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 transition ${
                   isDark
                     ? "border-slate-700 bg-slate-900 hover:bg-slate-800"
@@ -196,13 +220,12 @@ export function StudentDashboard() {
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
 
         {/* =======================================================
-            COMPACT HERO
+            HERO
         ======================================================= */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-blue-700 to-purple-700 p-5 text-white shadow-xl sm:p-7">
-          {/* Decorative Elements */}
-          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+          <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
 
-          <div className="pointer-events-none absolute -bottom-20 -left-16 h-48 w-48 rounded-full bg-purple-300/10 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-20 h-56 w-56 rounded-full bg-purple-300/10 blur-3xl" />
 
           <div className="relative">
             <p className="text-xs font-black tracking-[0.22em] text-blue-100">
@@ -210,7 +233,7 @@ export function StudentDashboard() {
             </p>
 
             <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
-              Hello, {studentName}! 👋
+              Hello, {firstName}! 👋
             </h1>
 
             {/* Daily Mindset */}
@@ -231,34 +254,82 @@ export function StudentDashboard() {
         </section>
 
         {/* =======================================================
-            MOBILE PROGRESS
+            7 DAY STREAK
         ======================================================= */}
-        <button
-          type="button"
-          onClick={() => navigate("/student/progress")}
-          className={`mt-4 flex w-full items-center justify-between rounded-2xl border p-4 text-left sm:hidden ${
-            isDark
-              ? "border-slate-800 bg-slate-900"
-              : "border-slate-200 bg-white"
-          }`}
-        >
-          <div>
-            <p className="text-sm font-black">
-              📊 Progress Tracker
-            </p>
+        <section className="mt-5">
+          <div className="overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-red-500 to-pink-600 p-5 text-white shadow-lg sm:p-6">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-orange-100">
+                  Keep Going
+                </p>
 
-            <p className="mt-0.5 text-xs opacity-60">
-              Check your preparation progress
-            </p>
+                <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+                  🔥 7 Day Streak
+                </h2>
+
+                <p className="mt-1 text-sm text-orange-100">
+                  You&apos;ve been consistent for 7 days. Don&apos;t break
+                  the streak!
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+                  <div
+                    key={day}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-xs font-black backdrop-blur"
+                  >
+                    ✓
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+        </section>
 
-          <span className="text-lg">→</span>
-        </button>
+        {/* =======================================================
+            TODAY'S MISSION
+        ======================================================= */}
+        <section className="mt-6">
+          <div
+            className={`rounded-3xl border p-5 sm:p-6 ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-blue-600">
+                  🎯 Today&apos;s Mission
+                </p>
+
+                <h2 className="mt-1 text-xl font-black sm:text-2xl">
+                  Complete your daily preparation
+                </h2>
+
+                <p className="mt-1 text-sm opacity-65">
+                  Finish today&apos;s learning activities and keep your
+                  preparation moving.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => navigate("/student/daily-challenge")}
+                className="shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
+              >
+                Start Mission →
+              </button>
+            </div>
+          </div>
+        </section>
 
         {/* =======================================================
             PREPARATION TOOLS
         ======================================================= */}
-        <section className="mt-8">
+        <section className="mt-10">
           <div className="mb-4">
             <p className="text-xs font-black uppercase tracking-widest text-blue-600">
               Prepare Smart
@@ -406,32 +477,32 @@ export function StudentDashboard() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
-            {/* =================================================
-                ASK VIDHYA FEATURED
-            ================================================= */}
+            {/* ASK VIDHYA FEATURED */}
             <button
               type="button"
               onClick={() => navigate("/student/ask")}
-              className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-5 text-left text-white shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:col-span-2 lg:col-span-2"
+              className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 text-left text-white shadow-xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:col-span-2 lg:col-span-2"
             >
-              <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+              <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+
+              <div className="pointer-events-none absolute -bottom-12 -left-12 h-36 w-36 rounded-full bg-fuchsia-300/10 blur-3xl" />
 
               <div className="relative">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-3xl backdrop-blur">
                     🤖
                   </div>
 
-                  <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider">
+                  <span className="rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider backdrop-blur">
                     AI Learning Assistant
                   </span>
                 </div>
 
-                <h3 className="mt-5 text-2xl font-black">
+                <h3 className="mt-5 text-2xl font-black sm:text-3xl">
                   Ask Vidhya
                 </h3>
 
-                <p className="mt-2 max-w-xl text-sm leading-6 text-purple-100">
+                <p className="mt-2 max-w-xl text-sm leading-6 text-purple-100 sm:text-base">
                   Doubt ho, concept samajhna ho, revision karna ho ya
                   study guidance chahiye — Vidhya se poochho.
                 </p>
@@ -567,34 +638,465 @@ export function StudentDashboard() {
         </section>
 
         {/* =======================================================
-            DAILY CHALLENGE CTA
+            YOUR PREPARATION
+        ======================================================= */}
+        <section className="mt-10">
+          <div className="mb-4">
+            <p className="text-xs font-black uppercase tracking-widest text-indigo-600">
+              Your Progress
+            </p>
+
+            <h2 className="mt-1 text-xl font-black sm:text-2xl">
+              📊 Your Preparation
+            </h2>
+          </div>
+
+          <div
+            className={`rounded-3xl border p-5 sm:p-6 ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+
+              {/* Overall */}
+              <div className="rounded-2xl bg-blue-500/10 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold opacity-70">
+                    Overall Progress
+                  </span>
+
+                  <span className="text-lg">📊</span>
+                </div>
+
+                <div className="mt-3 flex items-end justify-between">
+                  <span className="text-3xl font-black">
+                    68%
+                  </span>
+
+                  <span className="text-xs font-bold text-blue-500">
+                    Growing
+                  </span>
+                </div>
+
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                  <div className="h-full w-[68%] rounded-full bg-blue-500" />
+                </div>
+              </div>
+
+              {/* Questions */}
+              <div className="rounded-2xl bg-purple-500/10 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold opacity-70">
+                    Questions
+                  </span>
+
+                  <span className="text-lg">📝</span>
+                </div>
+
+                <p className="mt-3 text-3xl font-black">
+                  245
+                </p>
+
+                <p className="mt-1 text-xs opacity-60">
+                  Questions attempted
+                </p>
+              </div>
+
+              {/* Accuracy */}
+              <div className="rounded-2xl bg-green-500/10 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold opacity-70">
+                    Accuracy
+                  </span>
+
+                  <span className="text-lg">🎯</span>
+                </div>
+
+                <p className="mt-3 text-3xl font-black">
+                  78%
+                </p>
+
+                <p className="mt-1 text-xs opacity-60">
+                  Overall accuracy
+                </p>
+              </div>
+
+              {/* Revision */}
+              <div className="rounded-2xl bg-orange-500/10 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold opacity-70">
+                    Revision
+                  </span>
+
+                  <span className="text-lg">🔄</span>
+                </div>
+
+                <p className="mt-3 text-3xl font-black">
+                  64%
+                </p>
+
+                <p className="mt-1 text-xs opacity-60">
+                  Topics revised
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate("/student/progress")}
+              className="mt-5 w-full rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-sm font-black text-indigo-600 transition hover:bg-indigo-500/15"
+            >
+              View Full Progress →
+            </button>
+          </div>
+        </section>
+
+        {/* =======================================================
+            WEAK TOPICS
+        ======================================================= */}
+        <section className="mt-10">
+          <div className="mb-4">
+            <p className="text-xs font-black uppercase tracking-widest text-red-500">
+              Improve Faster
+            </p>
+
+            <h2 className="mt-1 text-xl font-black sm:text-2xl">
+              🧠 Weak Topics
+            </h2>
+          </div>
+
+          <div
+            className={`rounded-3xl border p-5 sm:p-6 ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="space-y-4">
+
+              {/* Polity */}
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black">
+                      Polity
+                    </p>
+
+                    <p className="text-xs opacity-55">
+                      Needs more practice
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-black text-red-500">
+                      42%
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate("/student/practice-questions")}
+                      className="rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-500 transition hover:bg-red-500/15"
+                    >
+                      Practice
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                  <div className="h-full w-[42%] rounded-full bg-red-500" />
+                </div>
+              </div>
+
+              {/* Economy */}
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black">
+                      Economy
+                    </p>
+
+                    <p className="text-xs opacity-55">
+                      Improve your accuracy
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-black text-orange-500">
+                      51%
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate("/student/practice-questions")}
+                      className="rounded-lg bg-orange-500/10 px-3 py-1.5 text-xs font-black text-orange-500 transition hover:bg-orange-500/15"
+                    >
+                      Practice
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                  <div className="h-full w-[51%] rounded-full bg-orange-500" />
+                </div>
+              </div>
+
+              {/* Geography */}
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black">
+                      Geography
+                    </p>
+
+                    <p className="text-xs opacity-55">
+                      Almost there
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-black text-yellow-500">
+                      58%
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate("/student/practice-questions")}
+                      className="rounded-lg bg-yellow-500/10 px-3 py-1.5 text-xs font-black text-yellow-600 transition hover:bg-yellow-500/15"
+                    >
+                      Practice
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                  <div className="h-full w-[58%] rounded-full bg-yellow-500" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =======================================================
+            5 MINUTE CHALLENGE
         ======================================================= */}
         <section className="mt-10">
           <button
             type="button"
             onClick={() => navigate("/student/daily-challenge")}
-            className="group w-full overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-red-500 to-pink-600 p-5 text-left text-white shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:p-6"
+            className="group relative w-full overflow-hidden rounded-3xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-700 p-6 text-left text-white shadow-xl transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:p-7"
           >
-            <div className="flex items-center justify-between gap-4">
+            <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
+
+            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-widest text-orange-100">
-                  Today&apos;s Mission
+                <p className="text-xs font-black uppercase tracking-widest text-blue-100">
+                  Quick Learning
                 </p>
 
-                <h3 className="mt-1 text-xl font-black sm:text-2xl">
-                  Ready for today&apos;s challenge? ⚡
-                </h3>
+                <h2 className="mt-1 text-2xl font-black">
+                  ⚡ 5-Minute Challenge
+                </h2>
 
-                <p className="mt-1 text-sm text-orange-100">
-                  Test your knowledge and keep your preparation streak alive.
+                <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100">
+                  Sirf 5 minutes nikalo aur apni preparation ko ek quick
+                  boost do.
                 </p>
               </div>
 
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-xl backdrop-blur transition group-hover:translate-x-1">
-                →
+              <div className="flex shrink-0 items-center gap-3">
+                <span className="rounded-xl bg-white/15 px-4 py-2.5 text-sm font-black backdrop-blur">
+                  5 Minutes
+                </span>
+
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-lg font-black text-blue-700 transition group-hover:translate-x-1">
+                  →
+                </span>
               </div>
             </div>
           </button>
+        </section>
+
+        {/* =======================================================
+            DAILY PRACTICE
+        ======================================================= */}
+        <section className="mt-10">
+          <div className="mb-4">
+            <p className="text-xs font-black uppercase tracking-widest text-orange-500">
+              Stay Consistent
+            </p>
+
+            <h2 className="mt-1 text-xl font-black sm:text-2xl">
+              🔥 Daily Practice
+            </h2>
+          </div>
+
+          <div
+            className={`rounded-3xl border p-5 sm:p-6 ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-black">
+                  Today&apos;s Question Target
+                </p>
+
+                <p className="mt-1 text-xs opacity-60">
+                  Complete 20 questions every day.
+                </p>
+              </div>
+
+              <div className="text-left sm:text-right">
+                <p className="text-2xl font-black">
+                  {dailyPractice}
+                  <span className="text-sm opacity-40">
+                    /{dailyTarget}
+                  </span>
+                </p>
+
+                <p className="text-xs font-bold text-orange-500">
+                  {practiceProgress}% completed
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
+                style={{ width: `${practiceProgress}%` }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDailyPractice}
+              className="mt-5 w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-black text-white transition hover:bg-orange-600"
+            >
+              Continue Practice →
+            </button>
+          </div>
+        </section>
+
+        {/* =======================================================
+            WEEKLY ACHIEVEMENTS
+        ======================================================= */}
+        <section className="mt-10">
+          <div className="mb-4">
+            <p className="text-xs font-black uppercase tracking-widest text-yellow-600">
+              Celebrate Your Progress
+            </p>
+
+            <h2 className="mt-1 text-xl font-black sm:text-2xl">
+              🏆 Weekly Achievements
+            </h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+            {/* Streak */}
+            <div
+              className={`rounded-3xl border p-5 ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10 text-2xl">
+                🔥
+              </div>
+
+              <h3 className="mt-4 font-black">
+                7 Day Streak
+              </h3>
+
+              <p className="mt-1 text-xs leading-5 opacity-60">
+                You studied consistently for 7 days.
+              </p>
+
+              <span className="mt-4 inline-block rounded-full bg-green-500/10 px-3 py-1 text-[10px] font-black text-green-600">
+                UNLOCKED
+              </span>
+            </div>
+
+            {/* Questions */}
+            <div
+              className={`rounded-3xl border p-5 ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/10 text-2xl">
+                📝
+              </div>
+
+              <h3 className="mt-4 font-black">
+                100 Questions
+              </h3>
+
+              <p className="mt-1 text-xs leading-5 opacity-60">
+                Complete 100 practice questions.
+              </p>
+
+              <span className="mt-4 inline-block rounded-full bg-green-500/10 px-3 py-1 text-[10px] font-black text-green-600">
+                UNLOCKED
+              </span>
+            </div>
+
+            {/* Revision */}
+            <div
+              className={`rounded-3xl border p-5 ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-2xl">
+                📚
+              </div>
+
+              <h3 className="mt-4 font-black">
+                5 Topics Revised
+              </h3>
+
+              <p className="mt-1 text-xs leading-5 opacity-60">
+                Revise five important topics this week.
+              </p>
+
+              <span className="mt-4 inline-block rounded-full bg-green-500/10 px-3 py-1 text-[10px] font-black text-green-600">
+                UNLOCKED
+              </span>
+            </div>
+
+            {/* Accuracy */}
+            <div
+              className={`rounded-3xl border p-5 ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-500/10 text-2xl">
+                🎯
+              </div>
+
+              <h3 className="mt-4 font-black">
+                80% Accuracy
+              </h3>
+
+              <p className="mt-1 text-xs leading-5 opacity-60">
+                Reach 80% accuracy in your practice.
+              </p>
+
+              <span className="mt-4 inline-block rounded-full bg-yellow-500/10 px-3 py-1 text-[10px] font-black text-yellow-600">
+                IN PROGRESS
+              </span>
+            </div>
+          </div>
         </section>
 
         {/* =======================================================
