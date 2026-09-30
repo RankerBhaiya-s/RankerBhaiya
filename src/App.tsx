@@ -33,7 +33,7 @@ import { StudentDashboard } from "./pages/student/Dashboard";
 import { StudentProfile } from "./pages/student/Profile";
 import { StudentSyllabus } from "./pages/student/Syllabus";
 import { AskVidhya } from "./pages/student/AskVidhya";
-import { DailyNewspaper } from "./pages/student/DailyNewspaper";
+import DailyNewspaper from "./pages/student/DailyNewspaper";
 import WeeklyCurrentAffairs from "./pages/student/WeeklyCurrentAffairs";
 import { CurrentAffairDetail } from "./pages/student/CurrentAffairDetail";
 import { FastRevision } from "./pages/student/FastRevision";
