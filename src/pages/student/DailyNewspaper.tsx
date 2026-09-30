@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { supabase } from "../../lib/supabase";
+import { recordStudentActivity } from "../../lib/studentActivity";
 
 type Paper = {
   id: string;
@@ -19,7 +21,7 @@ export function DailyNewspaper() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    loadNewspapers();
+    void loadNewspapers();
   }, []);
 
   const loadNewspapers = async () => {
@@ -191,12 +193,28 @@ export function DailyNewspaper() {
     );
   };
 
-  const openPaper = (url: string) => {
+  const openPaper = async (url: string) => {
     if (!url) {
       setError(
         "Is newspaper ki file available nahi hai.",
       );
       return;
+    }
+
+    /*
+     * Record Daily Newspaper activity
+     * before opening the newspaper.
+     */
+    const activityResult =
+      await recordStudentActivity({
+        activityType: "daily_newspaper",
+      });
+
+    if (!activityResult.success) {
+      console.error(
+        "Failed to record Daily Newspaper activity:",
+        activityResult.error,
+      );
     }
 
     window.open(
@@ -215,7 +233,7 @@ export function DailyNewspaper() {
 
           <div>
             <h1 className="text-2xl font-bold text-blue-600">
-              PadhAI
+              Ranker Bhaiya
             </h1>
 
             <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -239,7 +257,7 @@ export function DailyNewspaper() {
       {/* CONTENT */}
       <main className="mx-auto max-w-5xl px-4 py-8">
 
-        <div className="rounded-3xl border border-amber-200 bg-white p-6 shadow-sm dark:border-amber-900/50 dark:bg-slate-900 sm:p-8">
+        <div className="rounded-3xl border border-amber-200 bg-white p-6 shadow-sm dark:border-amber-900/50 dark:bg-slate-900">
 
           {/* TITLE */}
           <div className="flex items-start justify-between gap-4">
@@ -294,7 +312,9 @@ export function DailyNewspaper() {
 
               <button
                 type="button"
-                onClick={loadNewspapers}
+                onClick={() => {
+                  void loadNewspapers();
+                }}
                 className="mt-4 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
               >
                 Retry
@@ -393,11 +413,11 @@ export function DailyNewspaper() {
                                 <button
                                   key={paper.id}
                                   type="button"
-                                  onClick={() =>
-                                    openPaper(
+                                  onClick={() => {
+                                    void openPaper(
                                       paper.url,
-                                    )
-                                  }
+                                    );
+                                  }}
                                   className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-blue-400 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
                                 >
 
@@ -471,11 +491,11 @@ export function DailyNewspaper() {
                                 <button
                                   key={paper.id}
                                   type="button"
-                                  onClick={() =>
-                                    openPaper(
+                                  onClick={() => {
+                                    void openPaper(
                                       paper.url,
-                                    )
-                                  }
+                                    );
+                                  }}
                                   className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-blue-400 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
                                 >
 
@@ -550,3 +570,5 @@ export function DailyNewspaper() {
     </div>
   );
 }
+
+export default DailyNewspaper;
