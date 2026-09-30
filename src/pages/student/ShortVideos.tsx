@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { supabase } from "../../lib/supabase";
 import { useTheme } from "../../context/ThemeContext";
+import { recordStudentActivity } from "../../lib/studentActivity";
 
 interface VideoSeries {
   id: string;
@@ -93,7 +94,7 @@ export default function ShortVideos() {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to load short videos."
+          : "Unable to load short videos.",
       );
     } finally {
       setLoadingSeries(false);
@@ -147,7 +148,7 @@ export default function ShortVideos() {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to load video parts."
+          : "Unable to load video parts.",
       );
     } finally {
       setLoadingParts(false);
@@ -161,7 +162,10 @@ export default function ShortVideos() {
   const getStorageUrl = (path: string | null) => {
     if (!path) return "";
 
-    if (path.startsWith("http://") || path.startsWith("https://")) {
+    if (
+      path.startsWith("http://") ||
+      path.startsWith("https://")
+    ) {
       return path;
     }
 
@@ -173,6 +177,24 @@ export default function ShortVideos() {
   };
 
   /* =====================================================
+     RECORD SHORT VIDEO ACTIVITY
+  ===================================================== */
+
+  const recordShortVideoActivity = async () => {
+    const activityResult =
+      await recordStudentActivity({
+        activityType: "short_videos",
+      });
+
+    if (!activityResult.success) {
+      console.error(
+        "Failed to record Short Videos activity:",
+        activityResult.error,
+      );
+    }
+  };
+
+  /* =====================================================
      FILTER
   ===================================================== */
 
@@ -181,7 +203,7 @@ export default function ShortVideos() {
       .map((item) => item.category)
       .filter(
         (value): value is string =>
-          Boolean(value && value.trim())
+          Boolean(value && value.trim()),
       );
 
     return Array.from(new Set(values));
@@ -199,7 +221,8 @@ export default function ShortVideos() {
 
       const matchesCategory =
         category === "all" ||
-        item.category?.toLowerCase() === category.toLowerCase();
+        item.category?.toLowerCase() ===
+          category.toLowerCase();
 
       return matchesSearch && matchesCategory;
     });
@@ -210,7 +233,9 @@ export default function ShortVideos() {
   ===================================================== */
 
   const selectedPartIndex = selectedPart
-    ? parts.findIndex((part) => part.id === selectedPart.id)
+    ? parts.findIndex(
+        (part) => part.id === selectedPart.id,
+      )
     : -1;
 
   const hasPrevious =
@@ -222,18 +247,28 @@ export default function ShortVideos() {
 
   const handlePrevious = () => {
     if (hasPrevious) {
-      setSelectedPart(parts[selectedPartIndex - 1]);
+      setSelectedPart(
+        parts[selectedPartIndex - 1],
+      );
     }
   };
 
   const handleNext = () => {
     if (hasNext) {
-      setSelectedPart(parts[selectedPartIndex + 1]);
+      setSelectedPart(
+        parts[selectedPartIndex + 1],
+      );
     }
   };
 
   const handleSelectSeries = (item: VideoSeries) => {
     loadParts(item);
+  };
+
+  const handleSelectPart = async (part: VideoPart) => {
+    setSelectedPart(part);
+
+    await recordShortVideoActivity();
   };
 
   const handleBackToSeries = () => {
@@ -312,7 +347,9 @@ export default function ShortVideos() {
         >
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
             <button
-              onClick={() => navigate("/student/dashboard")}
+              onClick={() =>
+                navigate("/student/dashboard")
+              }
               className="flex items-center gap-3"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 font-black text-white shadow-lg">
@@ -331,7 +368,9 @@ export default function ShortVideos() {
             </button>
 
             <button
-              onClick={() => navigate("/student/dashboard")}
+              onClick={() =>
+                navigate("/student/dashboard")
+              }
               className={`rounded-xl border px-3 py-2 text-sm font-bold ${
                 isDark
                   ? "border-slate-700 bg-slate-900 hover:bg-slate-800"
@@ -454,7 +493,8 @@ export default function ShortVideos() {
             ) : (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredSeries.map((item) => {
-                  const thumbnail = getSeriesThumbnail(item);
+                  const thumbnail =
+                    getSeriesThumbnail(item);
 
                   return (
                     <button
@@ -658,14 +698,19 @@ export default function ShortVideos() {
                     preload="metadata"
                     poster={
                       getPartThumbnail(selectedPart) ||
-                      getSeriesThumbnail(selectedSeries) ||
+                      getSeriesThumbnail(
+                        selectedSeries,
+                      ) ||
                       undefined
                     }
                     className="aspect-video w-full bg-black"
+                    onPlay={() => {
+                      void recordShortVideoActivity();
+                    }}
                   >
                     <source
                       src={getStorageUrl(
-                        selectedPart.video_path
+                        selectedPart.video_path,
                       )}
                       type="video/mp4"
                     />
@@ -697,7 +742,8 @@ export default function ShortVideos() {
                     </span>
 
                     <span className="text-xs font-bold opacity-40">
-                      {selectedPartIndex + 1} of {parts.length}
+                      {selectedPartIndex + 1} of{" "}
+                      {parts.length}
                     </span>
                   </div>
 
@@ -783,7 +829,7 @@ export default function ShortVideos() {
                         <button
                           key={part.id}
                           onClick={() =>
-                            setSelectedPart(part)
+                            void handleSelectPart(part)
                           }
                           className={`flex w-full gap-3 rounded-2xl p-2.5 text-left transition ${
                             active
