@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
@@ -9,11 +10,6 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getDailyMindset } from "../../data/dailyMindsets";
-
-type ActivityRow = {
-  activity_date: string;
-  activity_type: string;
-};
 
 type PreparationStats = {
   attempted: number;
@@ -32,23 +28,17 @@ const DAILY_TARGET = 20;
 
 const getLocalDateString = (date: Date) => {
   const year = date.getFullYear();
-  const month = String(
-    date.getMonth() + 1,
-  ).padStart(2, "0");
-  const day = String(
-    date.getDate(),
-  ).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(
+    2,
+    "0",
+  );
+  const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 };
 
-const getPreviousDate = (
-  dateString: string,
-) => {
-  const date = new Date(
-    `${dateString}T00:00:00`,
-  );
-
+const getPreviousDate = (dateString: string) => {
+  const date = new Date(`${dateString}T00:00:00`);
   date.setDate(date.getDate() - 1);
 
   return getLocalDateString(date);
@@ -57,10 +47,21 @@ const getPreviousDate = (
 export function StudentDashboard() {
   const navigate = useNavigate();
 
-  const { user, profile, loading } = useAuth();
+  const {
+    user,
+    profile,
+    loading: authLoading,
+    signOut,
+  } = useAuth();
+
   const { theme } = useTheme();
 
   const isDark = theme === "dark";
+
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const [showProfileMenu, setShowProfileMenu] =
+    useState(false);
 
   const dailyMindset = useMemo(
     () => getDailyMindset(),
@@ -73,6 +74,7 @@ export function StudentDashboard() {
 
   const firstName =
     profile?.full_name?.trim()?.split(" ")[0] ||
+    user?.email?.split("@")[0] ||
     "Student";
 
   /* =====================================================
@@ -92,19 +94,15 @@ export function StudentDashboard() {
      PREPARATION STATS
   ===================================================== */
 
-  const [
-    preparationStats,
-    setPreparationStats,
-  ] = useState<PreparationStats>({
-    attempted: 0,
-    correct: 0,
-    accuracy: 0,
-  });
+  const [preparationStats, setPreparationStats] =
+    useState<PreparationStats>({
+      attempted: 0,
+      correct: 0,
+      accuracy: 0,
+    });
 
-  const [
-    preparationLoading,
-    setPreparationLoading,
-  ] = useState(true);
+  const [preparationLoading, setPreparationLoading] =
+    useState(true);
 
   /* =====================================================
      WEAK TOPICS
@@ -113,47 +111,98 @@ export function StudentDashboard() {
   const [weakTopics, setWeakTopics] =
     useState<WeakTopic[]>([]);
 
-  const [
-    weakTopicsLoading,
-    setWeakTopicsLoading,
-  ] = useState(true);
+  const [weakTopicsLoading, setWeakTopicsLoading] =
+    useState(true);
 
   /* =====================================================
      DAILY PRACTICE
   ===================================================== */
 
-  const [dailyPractice, setDailyPractice] =
-    useState(0);
+  const [dailyPractice] = useState(0);
 
   /* =====================================================
      TODAY'S MISSION
   ===================================================== */
 
-  const [
-    missionCompleted,
-    setMissionCompleted,
-  ] = useState({
-    practice: false,
-    challenge: false,
-    currentAffairs: false,
-  });
+  const [missionCompleted, setMissionCompleted] =
+    useState({
+      practice: false,
+      challenge: false,
+      currentAffairs: false,
+    });
 
-  const [
-    missionLoading,
-    setMissionLoading,
-  ] = useState(true);
+  const [missionLoading, setMissionLoading] =
+    useState(true);
+
+  /* =====================================================
+     DOCUMENT TITLE
+  ===================================================== */
+
+  useEffect(() => {
+    document.title =
+      "Student Dashboard | Ranker Bhaiya";
+  }, []);
 
   /* =====================================================
      LOGIN REDIRECT
   ===================================================== */
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       navigate("/student/login", {
         replace: true,
       });
     }
-  }, [loading, user, navigate]);
+  }, [
+    authLoading,
+    user,
+    navigate,
+  ]);
+
+  /* =====================================================
+     CLOSE PROFILE MENU
+  ===================================================== */
+
+  useEffect(() => {
+    function handleOutsideClick(
+      event: MouseEvent,
+    ) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(
+          event.target as Node,
+        )
+      ) {
+        setShowProfileMenu(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick,
+      );
+    };
+  }, []);
+
+  /* =====================================================
+     LOGOUT
+  ===================================================== */
+
+  async function handleLogout() {
+    setShowProfileMenu(false);
+
+    await signOut();
+
+    navigate("/student/login", {
+      replace: true,
+    });
+  }
 
   /* =====================================================
      LOAD STREAK
@@ -166,14 +215,13 @@ export function StudentDashboard() {
 
     setStreakLoading(true);
 
-    const { data, error } =
-      await supabase
-        .from("student_daily_activity")
-        .select("activity_date")
-        .eq("user_id", user.id)
-        .order("activity_date", {
-          ascending: false,
-        });
+    const { data, error } = await supabase
+      .from("student_daily_activity")
+      .select("activity_date")
+      .eq("user_id", user.id)
+      .order("activity_date", {
+        ascending: false,
+      });
 
     if (error) {
       console.error(
@@ -192,7 +240,8 @@ export function StudentDashboard() {
       new Set(
         (data ?? [])
           .map(
-            (item) => item.activity_date,
+            (item) =>
+              item.activity_date,
           )
           .filter(Boolean),
       ),
@@ -200,8 +249,9 @@ export function StudentDashboard() {
 
     setActiveDates(uniqueDates);
 
-    const today =
-      getLocalDateString(new Date());
+    const today = getLocalDateString(
+      new Date(),
+    );
 
     if (!uniqueDates.includes(today)) {
       setCurrentStreak(0);
@@ -244,13 +294,12 @@ export function StudentDashboard() {
 
     setPreparationLoading(true);
 
-    const { data, error } =
-      await supabase
-        .from("practice_attempts")
-        .select(
-          "question_id, is_correct",
-        )
-        .eq("user_id", user.id);
+    const { data, error } = await supabase
+      .from("practice_attempts")
+      .select(
+        "question_id, is_correct",
+      )
+      .eq("user_id", user.id);
 
     if (error) {
       console.error(
@@ -271,21 +320,18 @@ export function StudentDashboard() {
 
     const attempts = data ?? [];
 
-    const attempted =
-      attempts.length;
+    const attempted = attempts.length;
 
-    const correct =
-      attempts.filter(
-        (attempt) =>
-          attempt.is_correct === true,
-      ).length;
+    const correct = attempts.filter(
+      (attempt) =>
+        attempt.is_correct === true,
+    ).length;
 
     const accuracy =
       attempted === 0
         ? 0
         : Math.round(
-            (correct / attempted) *
-              100,
+            (correct / attempted) * 100,
           );
 
     setPreparationStats({
@@ -308,18 +354,17 @@ export function StudentDashboard() {
 
     setWeakTopicsLoading(true);
 
-    const { data, error } =
-      await supabase
-        .from("practice_attempts")
-        .select(
-          `
-            is_correct,
-            practice_questions (
-              category
-            )
-          `,
-        )
-        .eq("user_id", user.id);
+    const { data, error } = await supabase
+      .from("practice_attempts")
+      .select(
+        `
+          is_correct,
+          practice_questions (
+            category
+          )
+        `,
+      )
+      .eq("user_id", user.id);
 
     if (error) {
       console.error(
@@ -333,14 +378,13 @@ export function StudentDashboard() {
       return;
     }
 
-    const topicMap =
-      new Map<
-        string,
-        {
-          attempted: number;
-          correct: number;
-        }
-      >();
+    const topicMap = new Map<
+      string,
+      {
+        attempted: number;
+        correct: number;
+      }
+    >();
 
     (data ?? []).forEach(
       (attempt) => {
@@ -348,8 +392,7 @@ export function StudentDashboard() {
           Array.isArray(
             attempt.practice_questions,
           )
-            ? attempt
-                .practice_questions[0]
+            ? attempt.practice_questions[0]
             : attempt.practice_questions;
 
         const category =
@@ -385,14 +428,12 @@ export function StudentDashboard() {
         topicMap.entries(),
       )
         .map(
-          ([
-            category,
-            stats,
-          ]) => ({
+          ([category, stats]) => ({
             category,
             attempted:
               stats.attempted,
-            correct: stats.correct,
+            correct:
+              stats.correct,
             accuracy:
               stats.attempted === 0
                 ? 0
@@ -429,17 +470,15 @@ export function StudentDashboard() {
 
     setMissionLoading(true);
 
-    const today =
-      getLocalDateString(new Date());
+    const today = getLocalDateString(
+      new Date(),
+    );
 
-    const { data, error } =
-      await supabase
-        .from("student_daily_activity")
-        .select(
-          "activity_type",
-        )
-        .eq("user_id", user.id)
-        .eq("activity_date", today);
+    const { data, error } = await supabase
+      .from("student_daily_activity")
+      .select("activity_type")
+      .eq("user_id", user.id)
+      .eq("activity_date", today);
 
     if (error) {
       console.error(
@@ -484,7 +523,7 @@ export function StudentDashboard() {
   };
 
   /* =====================================================
-     LOAD ALL DASHBOARD DATA
+     LOAD DASHBOARD DATA
   ===================================================== */
 
   useEffect(() => {
@@ -492,10 +531,10 @@ export function StudentDashboard() {
       return;
     }
 
-    loadStudentStreak();
-    loadPreparationStats();
-    loadWeakTopics();
-    loadTodayMission();
+    void loadStudentStreak();
+    void loadPreparationStats();
+    void loadWeakTopics();
+    void loadTodayMission();
   }, [user?.id]);
 
   /* =====================================================
@@ -503,8 +542,12 @@ export function StudentDashboard() {
   ===================================================== */
 
   const missionCount =
-    Number(missionCompleted.practice) +
-    Number(missionCompleted.challenge) +
+    Number(
+      missionCompleted.practice,
+    ) +
+    Number(
+      missionCompleted.challenge,
+    ) +
     Number(
       missionCompleted.currentAffairs,
     );
@@ -537,7 +580,7 @@ export function StudentDashboard() {
   );
 
   /* =====================================================
-     DAILY PRACTICE PROGRESS
+     DAILY PRACTICE
   ===================================================== */
 
   const dailyPracticePercent =
@@ -551,78 +594,83 @@ export function StudentDashboard() {
     );
 
   /* =====================================================
-     HANDLERS
+     NAVIGATION HANDLERS
   ===================================================== */
 
-  const handleDailyPractice = () => {
-    navigate(
-      "/student/practice-questions",
-    );
-  };
+  const handleDailyPractice =
+    () => {
+      navigate(
+        "/student/practice-questions",
+      );
+    };
 
-  const handleStudyPlanner = () => {
-    navigate(
-      "/student/study-planner",
-    );
-  };
+  const handleStudyPlanner =
+    () => {
+      navigate(
+        "/student/study-planner",
+      );
+    };
 
-  const handlePracticeQuestions = () => {
-    navigate(
-      "/student/practice-questions",
-    );
-  };
+  const handlePracticeQuestions =
+    () => {
+      navigate(
+        "/student/practice-questions",
+      );
+    };
 
-  const handleShortVideos = () => {
-    navigate(
-      "/student/short-videos",
-    );
-  };
+  const handleShortVideos =
+    () => {
+      navigate(
+        "/student/short-videos",
+      );
+    };
 
-  const handleDailyChallenge = () => {
-    navigate(
-      "/student/daily-challenge",
-    );
-  };
+  const handleDailyChallenge =
+    () => {
+      navigate(
+        "/student/daily-challenge",
+      );
+    };
 
-  const handleAskVidhya = () => {
-    navigate("/student/ask");
-  };
+  const handleAskVidhya =
+    () => {
+      navigate("/student/ask");
+    };
 
-  const handleCurrentAffairs = () => {
-    navigate(
-      "/student/current-affairs",
-    );
-  };
+  const handleCurrentAffairs =
+    () => {
+      navigate(
+        "/student/current-affairs",
+      );
+    };
 
-  const handleDailyNewspaper = () => {
-    navigate(
-      "/student/daily-newspaper",
-    );
-  };
+  const handleDailyNewspaper =
+    () => {
+      navigate(
+        "/student/daily-newspaper",
+      );
+    };
 
-  const handleVocabulary = () => {
-    navigate(
-      "/student/vocabulary",
-    );
-  };
+  const handleVocabulary =
+    () => {
+      navigate(
+        "/student/vocabulary",
+      );
+    };
 
-  const handleExamTips = () => {
-    navigate(
-      "/student/exam-tips",
-    );
-  };
+  const handleExamTips =
+    () => {
+      navigate(
+        "/student/exam-tips",
+      );
+    };
 
-  const handleProgress = () => {
-    navigate(
-      "/student/progress",
-    );
-  };
-
-  const handleFastRevision = () => {
-    navigate(
-      "/student/quick-revision",
-    );
-  };
+  const handleProgress =
+    () => {
+      navigate(
+        "/student/progress",
+      );
+    };
 
   const handleWeakTopic = (
     topic: WeakTopic,
@@ -631,7 +679,8 @@ export function StudentDashboard() {
       "/student/practice-questions",
       {
         state: {
-          category: topic.category,
+          category:
+            topic.category,
         },
       },
     );
@@ -641,21 +690,37 @@ export function StudentDashboard() {
      LOADING
   ===================================================== */
 
-  if (loading || !user) {
+  if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-purple-600 dark:border-slate-800 dark:border-t-purple-400" />
-
-            <p className="mt-4 text-sm font-bold text-slate-500 dark:text-slate-400">
-              Loading your dashboard...
-            </p>
+      <div
+        className={`flex min-h-screen items-center justify-center ${
+          isDark
+            ? "bg-slate-950 text-white"
+            : "bg-slate-50 text-slate-900"
+        }`}
+      >
+        <div className="text-center">
+          <div className="mb-4 animate-pulse text-5xl">
+            📚
           </div>
+
+          <p className="font-semibold">
+            Loading Ranker Bhaiya...
+          </p>
         </div>
       </div>
     );
   }
+
+  if (!user) {
+    return null;
+  }
+
+  const profileIncomplete =
+    !profile?.full_name ||
+    !profile?.class_name ||
+    !profile?.board ||
+    !profile?.exam;
 
   /* =====================================================
      UI
@@ -691,28 +756,157 @@ export function StudentDashboard() {
             </h1>
           </div>
 
-          <button
-            type="button"
-            onClick={() =>
-              navigate(
-                "/student/profile",
-              )
-            }
-            className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-black transition ${
-              isDark
-                ? "border-slate-700 bg-slate-900 hover:bg-slate-800"
-                : "border-slate-200 bg-white hover:bg-slate-100"
-            }`}
-            aria-label="Profile"
+          {/* PROFILE MENU */}
+          <div
+            ref={menuRef}
+            className="relative"
           >
-            {firstName
-              .charAt(0)
-              .toUpperCase()}
-          </button>
+            <button
+              type="button"
+              onClick={() =>
+                setShowProfileMenu(
+                  (value) => !value,
+                )
+              }
+              className={`flex items-center gap-2 rounded-full border px-2 py-2 transition ${
+                isDark
+                  ? "border-slate-700 bg-slate-900 hover:bg-slate-800"
+                  : "border-slate-200 bg-white hover:bg-slate-100"
+              }`}
+              aria-label="Open profile menu"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-pink-500 text-sm font-black text-white">
+                {firstName
+                  .charAt(0)
+                  .toUpperCase()}
+              </span>
+
+              <span className="hidden max-w-[120px] truncate text-sm font-bold sm:block">
+                {firstName}
+              </span>
+
+              <span className="px-1 text-xs opacity-60">
+                ⌄
+              </span>
+            </button>
+
+            {showProfileMenu && (
+              <div
+                className={`absolute right-0 mt-2 w-60 overflow-hidden rounded-2xl border shadow-2xl ${
+                  isDark
+                    ? "border-slate-700 bg-slate-900"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="border-b border-inherit px-4 py-3">
+                  <p className="truncate text-sm font-bold">
+                    {profile?.full_name ||
+                      firstName}
+                  </p>
+
+                  <p className="truncate text-xs opacity-60">
+                    {user.email}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(
+                      false,
+                    );
+                    navigate(
+                      "/student/profile",
+                    );
+                  }}
+                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  👤 My Profile
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(
+                      false,
+                    );
+                    navigate(
+                      "/student/settings",
+                    );
+                  }}
+                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  ⚙️ Settings
+                </button>
+
+                <div className="my-1 border-t border-inherit" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(
+                      false,
+                    );
+                    navigate("/about");
+                  }}
+                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  ℹ️ About Us
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(
+                      false,
+                    );
+                    navigate(
+                      "/contact",
+                    );
+                  }}
+                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  📩 Contact Us
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileMenu(
+                      false,
+                    );
+                    navigate(
+                      "/privacy-policy",
+                    );
+                  }}
+                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  🔒 Privacy Policy
+                </button>
+
+                <div className="my-1 border-t border-inherit" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleLogout();
+                  }}
+                  className="block w-full px-4 py-3 text-left text-sm font-bold text-red-500 transition hover:bg-red-500/5"
+                >
+                  🚪 Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
+      {/* =================================================
+          MAIN
+      ================================================= */}
+
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+
         {/* =================================================
             HERO
         ================================================= */}
@@ -733,17 +927,20 @@ export function StudentDashboard() {
 
             <p className="mt-4 max-w-2xl text-sm leading-7 text-purple-50 sm:text-base">
               Ranker Bhaiya brings learning
-              resources, current affairs, and
-              AI-powered guidance together in
-              one place — helping you learn
-              smarter, stay ahead, and prepare
-              with confidence.
+              resources, current affairs,
+              and AI-powered guidance
+              together in one place —
+              helping you learn smarter,
+              stay ahead, and prepare with
+              confidence.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={handleAskVidhya}
+                onClick={
+                  handleAskVidhya
+                }
                 className="rounded-xl bg-white px-5 py-3 text-sm font-black text-purple-700 shadow-xl transition hover:bg-purple-50 active:scale-95"
               >
                 🤖 Ask Vidhya →
@@ -751,7 +948,9 @@ export function StudentDashboard() {
 
               <button
                 type="button"
-                onClick={handlePracticeQuestions}
+                onClick={
+                  handlePracticeQuestions
+                }
                 className="rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/20 active:scale-95"
               >
                 📝 Practice Now
@@ -759,6 +958,52 @@ export function StudentDashboard() {
             </div>
           </div>
         </section>
+
+        {/* =================================================
+            PROFILE COMPLETION
+        ================================================= */}
+
+        {profileIncomplete && (
+          <section
+            className={`mt-6 rounded-2xl border p-5 ${
+              isDark
+                ? "border-amber-500/20 bg-amber-500/5"
+                : "border-amber-200 bg-amber-50"
+            }`}
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-black">
+                  Complete your profile
+                </h2>
+
+                <p
+                  className={`mt-1 text-sm ${
+                    isDark
+                      ? "text-slate-400"
+                      : "text-slate-600"
+                  }`}
+                >
+                  Add your class, board and
+                  exam details for a better
+                  Ranker Bhaiya experience.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    "/student/profile",
+                  )
+                }
+                className="rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-black text-white transition hover:bg-amber-600"
+              >
+                Complete Profile
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* =================================================
             DAILY MINDSET
@@ -803,6 +1048,7 @@ export function StudentDashboard() {
         ================================================= */}
 
         <section className="mt-6 grid gap-4 lg:grid-cols-3">
+
           {/* STREAK */}
 
           <div
@@ -825,11 +1071,16 @@ export function StudentDashboard() {
                 </div>
 
                 <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {currentStreak === 0
+                  {currentStreak ===
+                  0
                     ? "Start your streak today!"
-                    : currentStreak >= 7
+                    : currentStreak >=
+                        7
                       ? "Amazing! Keep the streak alive."
-                      : `${7 - currentStreak} more days to reach 7.`}
+                      : `${
+                          7 -
+                          currentStreak
+                        } more days to reach 7.`}
                 </p>
               </div>
 
@@ -864,7 +1115,9 @@ export function StudentDashboard() {
                     <span className="text-[10px] font-bold text-slate-400">
                       {index === 6
                         ? "Today"
-                        : `D${index + 1}`}
+                        : `D${
+                            index + 1
+                          }`}
                     </span>
                   </div>
                 ),
@@ -893,7 +1146,8 @@ export function StudentDashboard() {
                   </h3>
 
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    Complete your daily targets
+                    Complete your daily
+                    targets
                   </p>
                 </div>
               </div>
@@ -934,7 +1188,9 @@ export function StudentDashboard() {
               ].map(
                 (mission) => (
                   <button
-                    key={mission.label}
+                    key={
+                      mission.label
+                    }
                     type="button"
                     onClick={
                       mission.onClick
@@ -962,7 +1218,9 @@ export function StudentDashboard() {
                           : "text-slate-600 dark:text-slate-300"
                       }`}
                     >
-                      {mission.label}
+                      {
+                        mission.label
+                      }
                     </span>
                   </button>
                 ),
@@ -998,7 +1256,9 @@ export function StudentDashboard() {
 
               <button
                 type="button"
-                onClick={handleProgress}
+                onClick={
+                  handleProgress
+                }
                 className="text-xs font-black text-purple-600 hover:text-purple-700 dark:text-purple-400"
               >
                 View →
@@ -1010,11 +1270,12 @@ export function StudentDashboard() {
                 <div
                   className="absolute inset-1 rounded-full"
                   style={{
-                    background: `conic-gradient(#8b5cf6 ${preparationStats.accuracy}%, ${
-                      isDark
-                        ? "#1e293b"
-                        : "#e2e8f0"
-                    } ${preparationStats.accuracy}% 100%)`,
+                    background:
+                      `conic-gradient(#8b5cf6 ${preparationStats.accuracy}%, ${
+                        isDark
+                          ? "#1e293b"
+                          : "#e2e8f0"
+                      } ${preparationStats.accuracy}% 100%)`,
                   }}
                 />
 
@@ -1050,11 +1311,12 @@ export function StudentDashboard() {
                       className="h-full rounded-full bg-purple-500 transition-all"
                       style={{
                         width: `${
-                          preparationStats.attempted > 0
+                          preparationStats.attempted >
+                          0
                             ? Math.min(
                                 100,
-                                preparationStats
-                                  .attempted * 2,
+                                preparationStats.attempted *
+                                  2,
                               )
                             : 0
                         }%`,
@@ -1080,9 +1342,7 @@ export function StudentDashboard() {
                     <div
                       className="h-full rounded-full bg-emerald-500 transition-all"
                       style={{
-                        width: `${
-                          preparationStats.accuracy
-                        }%`,
+                        width: `${preparationStats.accuracy}%`,
                       }}
                     />
                   </div>
@@ -1113,7 +1373,8 @@ export function StudentDashboard() {
             {[
               {
                 icon: "📅",
-                title: "Study Planner",
+                title:
+                  "Study Planner",
                 description:
                   "Plan your study sessions and stay consistent.",
                 action:
@@ -1121,7 +1382,8 @@ export function StudentDashboard() {
               },
               {
                 icon: "📝",
-                title: "Practice Questions",
+                title:
+                  "Practice Questions",
                 description:
                   "Practice exam-style questions and improve accuracy.",
                 action:
@@ -1129,7 +1391,8 @@ export function StudentDashboard() {
               },
               {
                 icon: "🎬",
-                title: "Short Videos",
+                title:
+                  "Short Videos",
                 description:
                   "Learn important topics through short focused videos.",
                 action:
@@ -1137,46 +1400,53 @@ export function StudentDashboard() {
               },
               {
                 icon: "⚡",
-                title: "Daily Challenge",
+                title:
+                  "Daily Challenge",
                 description:
                   "Challenge yourself with quick daily practice.",
                 action:
                   handleDailyChallenge,
               },
-            ].map((tool) => (
-              <button
-                key={tool.title}
-                type="button"
-                onClick={tool.action}
-                className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
-                  isDark
-                    ? "border-slate-800 bg-slate-900 hover:border-purple-800"
-                    : "border-slate-200 bg-white hover:border-purple-200"
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-2xl dark:bg-purple-950/40">
-                    {tool.icon}
+            ].map(
+              (tool) => (
+                <button
+                  key={tool.title}
+                  type="button"
+                  onClick={
+                    tool.action
+                  }
+                  className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                    isDark
+                      ? "border-slate-800 bg-slate-900 hover:border-purple-800"
+                      : "border-slate-200 bg-white hover:border-purple-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-2xl dark:bg-purple-950/40">
+                      {tool.icon}
+                    </div>
+
+                    <span className="text-purple-600 transition group-hover:translate-x-1 dark:text-purple-400">
+                      →
+                    </span>
                   </div>
 
-                  <span className="text-purple-600 transition group-hover:translate-x-1 dark:text-purple-400">
-                    →
-                  </span>
-                </div>
+                  <h3 className="mt-5 font-black">
+                    {tool.title}
+                  </h3>
 
-                <h3 className="mt-5 font-black">
-                  {tool.title}
-                </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    {
+                      tool.description
+                    }
+                  </p>
 
-                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  {tool.description}
-                </p>
-
-                <p className="mt-4 text-xs font-black text-purple-600 dark:text-purple-400">
-                  Open →
-                </p>
-              </button>
-            ))}
+                  <p className="mt-4 text-xs font-black text-purple-600 dark:text-purple-400">
+                    Open →
+                  </p>
+                </button>
+              ),
+            )}
           </div>
         </section>
 
@@ -1197,11 +1467,14 @@ export function StudentDashboard() {
           </div>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
+
             {/* ASK VIDHYA */}
 
             <button
               type="button"
-              onClick={handleAskVidhya}
+              onClick={
+                handleAskVidhya
+              }
               className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-left text-white shadow-xl shadow-purple-600/20 lg:row-span-2"
             >
               <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
@@ -1245,7 +1518,9 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={handleCurrentAffairs}
+              onClick={
+                handleCurrentAffairs
+              }
               className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1280,7 +1555,9 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={handleDailyNewspaper}
+              onClick={
+                handleDailyNewspaper
+              }
               className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1315,7 +1592,9 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={handleVocabulary}
+              onClick={
+                handleVocabulary
+              }
               className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1350,7 +1629,9 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={handleExamTips}
+              onClick={
+                handleExamTips
+              }
               className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1388,6 +1669,7 @@ export function StudentDashboard() {
         ================================================= */}
 
         <section className="mt-10 grid gap-5 lg:grid-cols-5">
+
           {/* RECOMMENDATION */}
 
           <div className="relative overflow-hidden rounded-3xl border border-purple-200 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-pink-50 p-6 dark:border-purple-900/40 dark:from-purple-950/30 dark:via-fuchsia-950/20 dark:to-pink-950/20 lg:col-span-3">
@@ -1405,17 +1687,24 @@ export function StudentDashboard() {
                   Analysing your practice
                   performance...
                 </p>
-              ) : weakTopics.length > 0 ? (
+              ) : weakTopics.length >
+                0 ? (
                 <>
                   <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
                     Today, focus on{" "}
                     <span className="font-black text-purple-700 dark:text-purple-300">
-                      {weakTopics[0].category}
+                      {
+                        weakTopics[0]
+                          .category
+                      }
                     </span>
-                    . Your current accuracy in
-                    this topic is{" "}
+                    . Your current accuracy
+                    in this topic is{" "}
                     <span className="font-black">
-                      {weakTopics[0].accuracy}%
+                      {
+                        weakTopics[0]
+                          .accuracy
+                      }%
                     </span>
                     . Practice more questions
                     from this topic to improve.
@@ -1482,7 +1771,9 @@ export function StudentDashboard() {
 
               <button
                 type="button"
-                onClick={handleProgress}
+                onClick={
+                  handleProgress
+                }
                 className="text-xs font-black text-purple-600 dark:text-purple-400"
               >
                 View All →
@@ -1504,7 +1795,8 @@ export function StudentDashboard() {
                   ),
                 )}
               </div>
-            ) : weakTopics.length === 0 ? (
+            ) : weakTopics.length ===
+              0 ? (
               <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-center dark:bg-slate-950">
                 <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
                   Not enough practice data yet.
@@ -1525,7 +1817,9 @@ export function StudentDashboard() {
                 {weakTopics.map(
                   (topic) => (
                     <button
-                      key={topic.category}
+                      key={
+                        topic.category
+                      }
                       type="button"
                       onClick={() =>
                         handleWeakTopic(
@@ -1536,20 +1830,26 @@ export function StudentDashboard() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="truncate text-sm font-bold">
-                          {topic.category}
+                          {
+                            topic.category
+                          }
                         </span>
 
                         <span className="shrink-0 text-xs font-black text-red-500">
-                          {topic.accuracy}%
+                          {
+                            topic.accuracy
+                          }%
                         </span>
                       </div>
 
                       <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                         <div
                           className={`h-full rounded-full transition-all ${
-                            topic.accuracy < 50
+                            topic.accuracy <
+                            50
                               ? "bg-red-500"
-                              : topic.accuracy < 70
+                              : topic.accuracy <
+                                  70
                                 ? "bg-amber-500"
                                 : "bg-emerald-500"
                           }`}
@@ -1560,8 +1860,10 @@ export function StudentDashboard() {
                       </div>
 
                       <p className="mt-1 text-[10px] font-semibold text-slate-400">
-                        {topic.attempted} questions
-                        attempted
+                        {
+                          topic.attempted
+                        }{" "}
+                        questions attempted
                       </p>
                     </button>
                   ),
@@ -1619,7 +1921,9 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={handleDailyPractice}
+              onClick={
+                handleDailyPractice
+              }
               className="shrink-0 rounded-2xl bg-white px-6 py-4 text-sm font-black text-pink-600 shadow-xl transition hover:bg-pink-50 active:scale-95"
             >
               Start Practice →
@@ -1632,27 +1936,28 @@ export function StudentDashboard() {
         ================================================= */}
 
         <section className="mt-10">
-          <div className="flex items-end justify-between">
-            <div>
-              <h2 className="text-2xl font-black tracking-tight">
-                Weekly Achievements
-              </h2>
+          <div>
+            <h2 className="text-2xl font-black tracking-tight">
+              Weekly Achievements
+            </h2>
 
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Small wins build big results.
-              </p>
-            </div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Small wins build big results.
+            </p>
           </div>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 icon: "🔥",
-                title: "7 Day Streak",
+                title:
+                  "7 Day Streak",
                 unlocked:
-                  currentStreak >= 7,
+                  currentStreak >=
+                  7,
                 value:
-                  currentStreak >= 7
+                  currentStreak >=
+                  7
                     ? "UNLOCKED"
                     : `${Math.min(
                         currentStreak,
@@ -1661,7 +1966,8 @@ export function StudentDashboard() {
               },
               {
                 icon: "📝",
-                title: "100 Questions",
+                title:
+                  "100 Questions",
                 unlocked:
                   preparationStats.attempted >=
                   100,
@@ -1676,7 +1982,8 @@ export function StudentDashboard() {
               },
               {
                 icon: "🎯",
-                title: "80% Accuracy",
+                title:
+                  "80% Accuracy",
                 unlocked:
                   preparationStats.accuracy >=
                   80,
@@ -1691,7 +1998,8 @@ export function StudentDashboard() {
               },
               {
                 icon: "🚀",
-                title: "Keep Learning",
+                title:
+                  "Keep Learning",
                 unlocked:
                   preparationStats.attempted >=
                   20,
@@ -1722,7 +2030,9 @@ export function StudentDashboard() {
                 >
                   <div className="flex items-start justify-between">
                     <span className="text-3xl">
-                      {achievement.icon}
+                      {
+                        achievement.icon
+                      }
                     </span>
 
                     <span
@@ -1734,12 +2044,16 @@ export function StudentDashboard() {
                             : "bg-slate-100 text-slate-400"
                       }`}
                     >
-                      {achievement.value}
+                      {
+                        achievement.value
+                      }
                     </span>
                   </div>
 
                   <h3 className="mt-5 font-black">
-                    {achievement.title}
+                    {
+                      achievement.title
+                    }
                   </h3>
 
                   <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -1775,9 +2089,10 @@ export function StudentDashboard() {
               </h2>
 
               <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600 dark:text-slate-300">
-                Ranker Bhaiya is a student-focused
-                learning platform built to make
-                exam preparation simpler, smarter,
+                Ranker Bhaiya is a
+                student-focused learning
+                platform built to make exam
+                preparation simpler, smarter,
                 and more effective. From daily
                 current affairs and newspaper
                 reading to fast revision,
