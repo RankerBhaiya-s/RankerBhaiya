@@ -1,11 +1,21 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function AboutUs() {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
       {/* Header */}
       <header className="border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <Link
             to="/"
             className="text-xl font-black tracking-tight text-indigo-600 dark:text-indigo-400"
@@ -13,105 +23,125 @@ export default function AboutUs() {
             Ranker Bhaiya
           </Link>
 
-          <Link
-            to="/"
-            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-700"
-          >
-            Home
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              ← Back
+            </button>
+
+            <Link
+              to="/"
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-700"
+            >
+              Home
+            </Link>
+          </div>
         </div>
       </header>
 
       {/* Hero */}
       <section className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 px-4 py-16 text-white sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl text-center">
-          <p className="mb-3 text-sm font-black uppercase tracking-[0.25em] text-indigo-100">
+        <div className="mx-auto max-w-5xl text-center">
+          <p className="text-sm font-black uppercase tracking-[0.25em] text-indigo-100">
             About Ranker Bhaiya
           </p>
 
-          <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
-            A Smarter Way to Prepare
+          <h1 className="mt-4 text-4xl font-black sm:text-5xl lg:text-6xl">
+            Learn Smarter. Prepare Better.
           </h1>
 
-          <p className="mx-auto mt-6 max-w-3xl text-base leading-7 text-indigo-50 sm:text-lg">
+          <p className="mx-auto mt-6 max-w-3xl text-base leading-8 text-indigo-50 sm:text-lg">
             Ranker Bhaiya is a student-focused learning platform built to make
             exam preparation simpler, smarter, and more effective.
           </p>
         </div>
       </section>
 
-      {/* Main */}
-      <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      {/* Main Content */}
+      <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="space-y-8">
           {/* Who We Are */}
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-            <h2 className="text-2xl font-black">Who We Are</h2>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-10">
+            <p className="text-sm font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
+              Who We Are
+            </p>
 
-            <p className="mt-4 leading-8 text-slate-600 dark:text-slate-300">
-              Ranker Bhaiya is a student-focused learning platform designed to
-              make exam preparation simpler, smarter, and more effective.
+            <h2 className="mt-3 text-3xl font-black">
+              A learning platform built for students
+            </h2>
+
+            <p className="mt-5 leading-8 text-slate-600 dark:text-slate-300">
+              Ranker Bhaiya is designed to bring important learning resources,
+              exam preparation tools, current affairs, revision support,
+              vocabulary building, and AI-powered learning assistance together
+              in one place.
             </p>
 
             <p className="mt-4 leading-8 text-slate-600 dark:text-slate-300">
-              We bring learning resources, current affairs, newspaper reading,
-              fast revision, vocabulary building, practice tools, and
-              AI-powered learning support together in one place.
-            </p>
-
-            <p className="mt-4 leading-8 text-slate-600 dark:text-slate-300">
-              Our focus is to help students learn with clarity, stay
-              consistent, remain updated, and prepare for their exams with
-              confidence.
+              Our goal is to reduce the complexity of preparation and help
+              students build a consistent learning routine with the right
+              resources at the right time.
             </p>
           </section>
 
           {/* What We Provide */}
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
-            <h2 className="text-2xl font-black">What We Provide</h2>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-10">
+            <div className="text-center">
+              <p className="text-sm font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
+                What We Provide
+              </p>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <h2 className="mt-3 text-3xl font-black">
+                Everything you need to prepare smarter
+              </h2>
+            </div>
+
+            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {[
-                [
-                  "📰",
-                  "Daily Current Affairs",
-                  "Stay updated with important events and exam-relevant information.",
-                ],
-                [
-                  "📖",
-                  "Newspaper Reading",
-                  "Access useful newspaper content for regular reading and awareness.",
-                ],
-                [
-                  "⚡",
-                  "Fast Revision",
-                  "Revise important concepts quickly and efficiently.",
-                ],
-                [
-                  "🔤",
-                  "Vocabulary Building",
-                  "Improve English vocabulary, meanings, examples, and usage.",
-                ],
-                [
-                  "🤖",
-                  "Ask Vidhya",
-                  "Get AI-powered learning support for your preparation.",
-                ],
-                [
-                  "🎯",
-                  "Practice & Challenges",
-                  "Build consistency through questions, challenges, and preparation tools.",
-                ],
-              ].map(([icon, title, description]) => (
+                {
+                  title: "Daily Current Affairs",
+                  description:
+                    "Stay updated with important national, international and exam-relevant current affairs.",
+                },
+                {
+                  title: "Daily Newspaper",
+                  description:
+                    "Read important newspaper updates and stay connected with what is happening around you.",
+                },
+                {
+                  title: "Fast Revision",
+                  description:
+                    "Revise important concepts quickly and make your preparation more efficient.",
+                },
+                {
+                  title: "Vocabulary Building",
+                  description:
+                    "Improve English vocabulary through useful words, meanings, examples and practice.",
+                },
+                {
+                  title: "Ask Vidhya",
+                  description:
+                    "Use AI-powered learning assistance to understand concepts and clear study doubts.",
+                },
+                {
+                  title: "Practice & Challenges",
+                  description:
+                    "Practice questions, daily challenges and other activities to stay consistent.",
+                },
+              ].map((item) => (
                 <div
-                  key={title}
-                  className="rounded-2xl border border-slate-200 p-5 dark:border-slate-700"
+                  key={item.title}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-950"
                 >
-                  <div className="text-3xl">{icon}</div>
+                  <h3 className="text-lg font-black">
+                    {item.title}
+                  </h3>
 
-                  <h3 className="mt-3 font-black">{title}</h3>
-
-                  <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                    {description}
+                  <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">
+                    {item.description}
                   </p>
                 </div>
               ))}
@@ -119,107 +149,119 @@ export default function AboutUs() {
           </section>
 
           {/* Mission */}
-          <section className="rounded-3xl bg-indigo-50 p-6 dark:bg-indigo-950/40 sm:p-8">
-            <h2 className="text-2xl font-black">Our Mission</h2>
+          <section className="rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-700 p-6 text-white shadow-sm sm:p-10">
+            <div className="max-w-3xl">
+              <p className="text-sm font-black uppercase tracking-[0.2em] text-indigo-200">
+                Our Mission
+              </p>
 
-            <p className="mt-4 leading-8 text-slate-700 dark:text-slate-300">
-              Our mission is to help students learn smarter, stay updated,
-              maintain consistency, and prepare for examinations with
-              confidence.
-            </p>
+              <h2 className="mt-3 text-3xl font-black">
+                Making preparation simpler and more effective
+              </h2>
 
-            <p className="mt-4 text-lg font-black text-indigo-700 dark:text-indigo-300">
-              Aapki Mehnat, Hamari Strategy.
-            </p>
+              <p className="mt-5 leading-8 text-indigo-50">
+                Our mission is to help students learn with clarity, stay
+                consistent and prepare with confidence. We believe that
+                effective preparation is not only about studying more, but
+                about studying smarter.
+              </p>
+            </div>
           </section>
 
           {/* Founders */}
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-10">
             <div className="text-center">
               <p className="text-sm font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
                 The Team Behind Ranker Bhaiya
               </p>
 
-              <h2 className="mt-2 text-3xl font-black">
+              <h2 className="mt-3 text-3xl font-black">
                 Meet Our Founders
               </h2>
 
-              <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+              <p className="mx-auto mt-4 max-w-2xl leading-7 text-slate-600 dark:text-slate-400">
                 Ranker Bhaiya is built with a vision to make learning more
-                accessible, structured, and effective for students.
+                accessible, structured and effective for students.
               </p>
             </div>
 
             <div className="mt-8 grid gap-5 md:grid-cols-3">
               {/* Founder */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-800">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-2xl font-black text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-300">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-950">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 text-2xl font-black text-white">
                   HS
                 </div>
 
-                <h3 className="mt-4 text-lg font-black">
+                <h3 className="mt-5 text-xl font-black">
                   Mr. Harsh Singh
                 </h3>
 
-                <p className="mt-1 text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                <p className="mt-2 text-sm font-bold text-indigo-600 dark:text-indigo-400">
                   M.B.A
                 </p>
 
-                <p className="mt-2 text-xs font-black uppercase tracking-wider text-slate-500">
+                <p className="mt-1 text-sm font-bold text-slate-500 dark:text-slate-400">
                   Founder
                 </p>
               </div>
 
               {/* Co-Founder */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-800">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-purple-100 text-2xl font-black text-purple-600 dark:bg-purple-900/50 dark:text-purple-300">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-950">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-2xl font-black text-white">
                   BK
                 </div>
 
-                <h3 className="mt-4 text-lg font-black">
+                <h3 className="mt-5 text-xl font-black">
                   Mr. Bankatesh Kumar
                 </h3>
 
-                <p className="mt-1 text-sm font-bold text-purple-600 dark:text-purple-400">
+                <p className="mt-2 text-sm font-bold text-indigo-600 dark:text-indigo-400">
                   M.B.A
                 </p>
 
-                <p className="mt-2 text-xs font-black uppercase tracking-wider text-slate-500">
+                <p className="mt-1 text-sm font-bold text-slate-500 dark:text-slate-400">
                   Co-Founder
                 </p>
               </div>
 
               {/* Co-Founder */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-800">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-pink-100 text-2xl font-black text-pink-600 dark:bg-pink-900/50 dark:text-pink-300">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-950">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-pink-600 to-rose-600 text-2xl font-black text-white">
                   AK
                 </div>
 
-                <h3 className="mt-4 text-lg font-black">
+                <h3 className="mt-5 text-xl font-black">
                   Mr. Abhishek Kumar
                 </h3>
 
-                <p className="mt-1 text-sm font-bold text-pink-600 dark:text-pink-400">
+                <p className="mt-2 text-sm font-bold text-indigo-600 dark:text-indigo-400">
                   B.C.A
                 </p>
 
-                <p className="mt-2 text-xs font-black uppercase tracking-wider text-slate-500">
+                <p className="mt-1 text-sm font-bold text-slate-500 dark:text-slate-400">
                   Co-Founder
                 </p>
               </div>
             </div>
           </section>
 
-          {/* Closing */}
-          <section className="text-center">
+          {/* CTA */}
+          <section className="rounded-3xl border border-indigo-200 bg-indigo-50 p-8 text-center dark:border-indigo-900 dark:bg-indigo-950/40">
             <h2 className="text-2xl font-black">
-              Learn. Revise. Practice. Improve.
+              Ready to learn smarter?
             </h2>
 
-            <p className="mx-auto mt-3 max-w-2xl text-slate-600 dark:text-slate-400">
-              Ranker Bhaiya is built to support you throughout your preparation
-              journey.
+            <p className="mx-auto mt-3 max-w-2xl leading-7 text-slate-600 dark:text-slate-300">
+              Explore Ranker Bhaiya and make your preparation more structured,
+              focused and consistent.
             </p>
+
+            <Link
+              to="/student/dashboard"
+              className="mt-6 inline-flex rounded-xl bg-indigo-600 px-6 py-3 text-sm font-black text-white transition hover:bg-indigo-700"
+            >
+              Go to Dashboard
+            </Link>
           </section>
         </div>
       </main>
@@ -232,11 +274,17 @@ export default function AboutUs() {
           </p>
 
           <div className="flex gap-4">
-            <Link to="/contact" className="hover:text-indigo-600">
+            <Link
+              to="/contact"
+              className="hover:text-indigo-600"
+            >
               Contact Us
             </Link>
 
-            <Link to="/privacy-policy" className="hover:text-indigo-600">
+            <Link
+              to="/privacy-policy"
+              className="hover:text-indigo-600"
+            >
               Privacy Policy
             </Link>
           </div>
