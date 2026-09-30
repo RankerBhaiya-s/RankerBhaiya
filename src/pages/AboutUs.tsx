@@ -11,6 +11,8 @@ export default function AboutUs() {
     }
   };
 
+  const baseUrl = import.meta.env.BASE_URL;
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
       {/* Header */}
@@ -184,13 +186,16 @@ export default function AboutUs() {
             </div>
 
             <div className="mt-8 grid gap-5 md:grid-cols-3">
-              {/* Founder - Harsh Singh */}
+              {/* Harsh Singh */}
               <div className="group rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center transition duration-300 hover:-translate-y-1 hover:shadow-lg dark:border-slate-700 dark:bg-slate-950">
                 <div className="mx-auto h-28 w-28 overflow-hidden rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 p-1 shadow-lg ring-4 ring-indigo-100 dark:ring-indigo-950">
                   <img
-                    src="/founders/harsh-singh.jpg"
+                    src={`${baseUrl}founders/harsh-singh.jpg`}
                     alt="Mr. Harsh Singh"
                     className="h-full w-full rounded-full object-cover transition duration-300 group-hover:scale-105"
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                    }}
                   />
                 </div>
 
@@ -207,13 +212,16 @@ export default function AboutUs() {
                 </p>
               </div>
 
-              {/* Co-Founder - Bankatesh Kumar */}
+              {/* Bankatesh Kumar */}
               <div className="group rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center transition duration-300 hover:-translate-y-1 hover:shadow-lg dark:border-slate-700 dark:bg-slate-950">
                 <div className="mx-auto h-28 w-28 overflow-hidden rounded-full bg-gradient-to-br from-purple-600 to-pink-600 p-1 shadow-lg ring-4 ring-purple-100 dark:ring-purple-950">
                   <img
-                    src="/founders/bankatesh-kumar.jpg"
+                    src={`${baseUrl}founders/bankatesh-kumar.jpg`}
                     alt="Mr. Bankatesh Kumar"
                     className="h-full w-full rounded-full object-cover transition duration-300 group-hover:scale-105"
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                    }}
                   />
                 </div>
 
@@ -230,11 +238,11 @@ export default function AboutUs() {
                 </p>
               </div>
 
-              {/* Co-Founder - Abhishek Kumar */}
+              {/* Abhishek Kumar */}
               <div className="group rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center transition duration-300 hover:-translate-y-1 hover:shadow-lg dark:border-slate-700 dark:bg-slate-950">
                 <div className="mx-auto h-28 w-28 overflow-hidden rounded-full bg-gradient-to-br from-pink-600 to-rose-600 p-1 shadow-lg ring-4 ring-pink-100 dark:ring-pink-950">
                   <img
-                    src="/founders/abhishek-kumar.jpg"
+                    src={`${baseUrl}founders/abhishek-kumar.jpg`}
                     alt="Mr. Abhishek Kumar"
                     className="h-full w-full rounded-full object-cover transition duration-300 group-hover:scale-105"
                   />
