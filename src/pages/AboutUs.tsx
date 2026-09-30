@@ -136,9 +136,7 @@ export default function AboutUs() {
                   key={item.title}
                   className="rounded-2xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-950"
                 >
-                  <h3 className="text-lg font-black">
-                    {item.title}
-                  </h3>
+                  <h3 className="text-lg font-black">{item.title}</h3>
 
                   <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400">
                     {item.description}
@@ -186,10 +184,14 @@ export default function AboutUs() {
             </div>
 
             <div className="mt-8 grid gap-5 md:grid-cols-3">
-              {/* Founder */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-950">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 text-2xl font-black text-white">
-                  HS
+              {/* Founder - Harsh Singh */}
+              <div className="group rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center transition duration-300 hover:-translate-y-1 hover:shadow-lg dark:border-slate-700 dark:bg-slate-950">
+                <div className="mx-auto h-28 w-28 overflow-hidden rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 p-1 shadow-lg ring-4 ring-indigo-100 dark:ring-indigo-950">
+                  <img
+                    src="/founders/harsh-singh.jpg"
+                    alt="Mr. Harsh Singh"
+                    className="h-full w-full rounded-full object-cover transition duration-300 group-hover:scale-105"
+                  />
                 </div>
 
                 <h3 className="mt-5 text-xl font-black">
@@ -205,10 +207,14 @@ export default function AboutUs() {
                 </p>
               </div>
 
-              {/* Co-Founder */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-950">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-2xl font-black text-white">
-                  BK
+              {/* Co-Founder - Bankatesh Kumar */}
+              <div className="group rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center transition duration-300 hover:-translate-y-1 hover:shadow-lg dark:border-slate-700 dark:bg-slate-950">
+                <div className="mx-auto h-28 w-28 overflow-hidden rounded-full bg-gradient-to-br from-purple-600 to-pink-600 p-1 shadow-lg ring-4 ring-purple-100 dark:ring-purple-950">
+                  <img
+                    src="/founders/bankatesh-kumar.jpg"
+                    alt="Mr. Bankatesh Kumar"
+                    className="h-full w-full rounded-full object-cover transition duration-300 group-hover:scale-105"
+                  />
                 </div>
 
                 <h3 className="mt-5 text-xl font-black">
@@ -224,10 +230,14 @@ export default function AboutUs() {
                 </p>
               </div>
 
-              {/* Co-Founder */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-slate-700 dark:bg-slate-950">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-pink-600 to-rose-600 text-2xl font-black text-white">
-                  AK
+              {/* Co-Founder - Abhishek Kumar */}
+              <div className="group rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center transition duration-300 hover:-translate-y-1 hover:shadow-lg dark:border-slate-700 dark:bg-slate-950">
+                <div className="mx-auto h-28 w-28 overflow-hidden rounded-full bg-gradient-to-br from-pink-600 to-rose-600 p-1 shadow-lg ring-4 ring-pink-100 dark:ring-pink-950">
+                  <img
+                    src="/founders/abhishek-kumar.jpg"
+                    alt="Mr. Abhishek Kumar"
+                    className="h-full w-full rounded-full object-cover transition duration-300 group-hover:scale-105"
+                  />
                 </div>
 
                 <h3 className="mt-5 text-xl font-black">
@@ -276,14 +286,14 @@ export default function AboutUs() {
           <div className="flex gap-4">
             <Link
               to="/contact"
-              className="hover:text-indigo-600"
+              className="transition hover:text-indigo-600 dark:hover:text-indigo-400"
             >
               Contact Us
             </Link>
 
             <Link
               to="/privacy-policy"
-              className="hover:text-indigo-600"
+              className="transition hover:text-indigo-600 dark:hover:text-indigo-400"
             >
               Privacy Policy
             </Link>
