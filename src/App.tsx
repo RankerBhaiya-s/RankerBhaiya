@@ -17,6 +17,14 @@ import { RootLayout } from "./layouts/RootLayout";
 import { Home } from "./pages/Home";
 
 /* =====================================================
+   PUBLIC PAGES
+===================================================== */
+
+import AboutUs from "./pages/AboutUs";
+import ContactUs from "./pages/ContactUs";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+
+/* =====================================================
    STUDENT
 ===================================================== */
 
@@ -94,6 +102,25 @@ export default function App() {
                 <Route
                   index
                   element={<Home />}
+                />
+
+                {/* =================================================
+                    PUBLIC PAGES
+                ================================================= */}
+
+                <Route
+                  path="about"
+                  element={<AboutUs />}
+                />
+
+                <Route
+                  path="contact"
+                  element={<ContactUs />}
+                />
+
+                <Route
+                  path="privacy-policy"
+                  element={<PrivacyPolicy />}
                 />
 
                 {/* =================================================
