@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { recordStudentActivity } from "../../lib/studentActivity";
 
 type Question = {
   id: string;
@@ -711,6 +712,21 @@ export default function DailyChallenge() {
         user.id,
         finalAnswers.length,
       );
+
+      // Record Daily Challenge completion for the dashboard
+      // streak and Today's Mission activity system.
+      const activityResult =
+        await recordStudentActivity({
+          userId: user.id,
+          activityType: "daily_challenge",
+        });
+
+      if (!activityResult.success) {
+        console.error(
+          "Failed to record Daily Challenge activity:",
+          activityResult.error,
+        );
+      }
 
       setProgressRecorded(true);
     } catch (err) {
