@@ -12,6 +12,7 @@ export function StudentLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -55,9 +56,7 @@ export function StudentLogin() {
     }
 
     if (!data.user) {
-      throw new Error(
-        "Login failed. Please try again."
-      );
+      throw new Error("Login failed. Please try again.");
     }
 
     await redirectStudent(data.user.id);
@@ -84,13 +83,13 @@ export function StudentLogin() {
 
     if (!data.user) {
       throw new Error(
-        "Unable to create account. Please try again."
+        "Unable to create account. Please try again.",
       );
     }
 
     if (!data.session) {
       setMessage(
-        "Account created successfully. Please check your email and confirm your account before logging in. / अकाउंट बन गया है। कृपया अपना ईमेल चेक करके अकाउंट कन्फर्म करें।"
+        "Account created successfully. Please check your email and confirm your account before logging in. / अकाउंट बन गया है। कृपया अपना ईमेल चेक करके अकाउंट कन्फर्म करें।",
       );
       return;
     }
@@ -105,7 +104,7 @@ export function StudentLogin() {
     if (profileError) {
       console.error(
         "Profile name update error:",
-        profileError
+        profileError,
       );
     }
 
@@ -113,7 +112,7 @@ export function StudentLogin() {
   }
 
   async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
+    event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
@@ -128,21 +127,21 @@ export function StudentLogin() {
 
     if (!cleanEmail || !password) {
       setError(
-        "Please enter email and password. / कृपया ईमेल और पासवर्ड दर्ज करें।"
+        "Please enter email and password. / कृपया ईमेल और पासवर्ड दर्ज करें।",
       );
       return;
     }
 
     if (isSignup && !fullName.trim()) {
       setError(
-        "Please enter your full name. / कृपया अपना पूरा नाम दर्ज करें।"
+        "Please enter your full name. / कृपया अपना पूरा नाम दर्ज करें।",
       );
       return;
     }
 
     if (password.length < 6) {
       setError(
-        "Password must be at least 6 characters. / पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।"
+        "Password must be at least 6 characters. / पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।",
       );
       return;
     }
@@ -163,38 +162,37 @@ export function StudentLogin() {
           ? err.message
           : "Something went wrong. Please try again.";
 
-      // User-friendly Supabase errors
       if (
-        errorMessage.toLowerCase().includes(
-          "invalid login credentials"
-        )
+        errorMessage
+          .toLowerCase()
+          .includes("invalid login credentials")
       ) {
         setError(
-          "Invalid email or password. / ईमेल या पासवर्ड गलत है।"
+          "Invalid email or password. / ईमेल या पासवर्ड गलत है।",
         );
       } else if (
-        errorMessage.toLowerCase().includes(
-          "email not confirmed"
-        )
+        errorMessage
+          .toLowerCase()
+          .includes("email not confirmed")
       ) {
         setError(
-          "Please confirm your email before logging in. / लॉगिन करने से पहले अपना ईमेल कन्फर्म करें।"
+          "Please confirm your email before logging in. / लॉगिन करने से पहले अपना ईमेल कन्फर्म करें।",
         );
       } else if (
-        errorMessage.toLowerCase().includes(
-          "user already registered"
-        )
+        errorMessage
+          .toLowerCase()
+          .includes("user already registered")
       ) {
         setError(
-          "This email is already registered. Please login instead. / यह ईमेल पहले से रजिस्टर है। लॉगिन करें।"
+          "This email is already registered. Please login instead. / यह ईमेल पहले से रजिस्टर है। लॉगिन करें।",
         );
       } else if (
-        errorMessage.toLowerCase().includes(
-          "invalid path specified in request url"
-        )
+        errorMessage
+          .toLowerCase()
+          .includes("invalid path specified in request url")
       ) {
         setError(
-          "Supabase configuration error. Please check VITE_SUPABASE_URL in GitHub Secrets."
+          "Supabase configuration error. Please check VITE_SUPABASE_URL in GitHub Secrets.",
         );
       } else {
         setError(errorMessage);
@@ -215,155 +213,313 @@ export function StudentLogin() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 dark:bg-slate-950">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900 sm:p-8">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10 dark:bg-slate-950">
+      {/* =====================================================
+          BACKGROUND DECORATION
+      ===================================================== */}
 
-        {/* HEADER */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-bold text-white shadow-lg">
+      <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
+
+      <div className="pointer-events-none absolute -bottom-32 -right-32 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" />
+
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-turmeric/5 blur-3xl" />
+
+      {/* =====================================================
+          LOGIN WRAPPER
+      ===================================================== */}
+
+      <div className="relative w-full max-w-md">
+        {/* Top branding */}
+        <div className="mb-5 text-center">
+          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-xl font-black text-white shadow-lg shadow-blue-600/20">
             R
           </div>
 
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            {isSignup
-              ? t("studentLogin.createAccount")
-              : t("studentLogin.login")}
-          </h1>
-
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {isSignup
-              ? t("studentLogin.createSubtitle")
-              : t("studentLogin.loginSubtitle")}
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-600 dark:text-blue-400">
+            Ranker Bhaiya
           </p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4"
-        >
+        {/* =====================================================
+            CARD
+        ===================================================== */}
 
-          {/* FULL NAME */}
-          {isSignup && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-                {t("studentLogin.fullName")}
-              </label>
+        <div className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/95 shadow-2xl shadow-slate-900/10 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 dark:shadow-black/30">
+          {/* Top accent */}
+          <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500" />
 
-              <input
-                type="text"
-                value={fullName}
-                onChange={(event) =>
-                  setFullName(event.target.value)
-                }
-                placeholder={t(
-                  "studentLogin.fullNamePlaceholder"
-                )}
+          <div className="p-6 sm:p-8">
+            {/* =================================================
+                HEADER
+            ================================================= */}
+
+            <div className="mb-8 text-center">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-2xl font-black text-white shadow-xl shadow-blue-600/25">
+                R
+              </div>
+
+              <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+                {isSignup
+                  ? t("studentLogin.createAccount")
+                  : t("studentLogin.login")}
+              </h1>
+
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
+                {isSignup
+                  ? t("studentLogin.createSubtitle")
+                  : t("studentLogin.loginSubtitle")}
+              </p>
+            </div>
+
+            {/* =================================================
+                MODE INDICATOR
+            ================================================= */}
+
+            <div className="mb-6 flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!loading) {
+                    setIsSignup(false);
+                    setError("");
+                    setMessage("");
+                  }
+                }}
                 disabled={loading}
-                autoComplete="name"
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
+                className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition ${
+                  !isSignup
+                    ? "bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-400"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                Login
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!loading) {
+                    setIsSignup(true);
+                    setError("");
+                    setMessage("");
+                  }
+                }}
+                disabled={loading}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition ${
+                  isSignup
+                    ? "bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-400"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                }`}
+              >
+                Create Account
+              </button>
             </div>
-          )}
 
-          {/* EMAIL */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-              {t("studentLogin.email")}
-            </label>
+            {/* =================================================
+                FORM
+            ================================================= */}
 
-            <input
-              type="email"
-              value={email}
-              onChange={(event) =>
-                setEmail(event.target.value)
-              }
-              placeholder="student@example.com"
-              disabled={loading}
-              autoComplete="email"
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
-          </div>
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-5"
+            >
+              {/* FULL NAME */}
+              {isSignup && (
+                <div>
+                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                    {t("studentLogin.fullName")}
+                  </label>
 
-          {/* PASSWORD */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">
-              {t("studentLogin.password")}
-            </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
+                      👤
+                    </span>
 
-            <input
-              type="password"
-              value={password}
-              onChange={(event) =>
-                setPassword(event.target.value)
-              }
-              placeholder={t(
-                "studentLogin.passwordPlaceholder"
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(event) =>
+                        setFullName(event.target.value)
+                      }
+                      placeholder={t(
+                        "studentLogin.fullNamePlaceholder",
+                      )}
+                      disabled={loading}
+                      autoComplete="name"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
+                    />
+                  </div>
+                </div>
               )}
-              disabled={loading}
-              autoComplete={
-                isSignup
-                  ? "new-password"
-                  : "current-password"
-              }
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
+
+              {/* EMAIL */}
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                  {t("studentLogin.email")}
+                </label>
+
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
+                    ✉️
+                  </span>
+
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) =>
+                      setEmail(event.target.value)
+                    }
+                    placeholder="student@example.com"
+                    disabled={loading}
+                    autoComplete="email"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* PASSWORD */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                    {t("studentLogin.password")}
+                  </label>
+
+                  <span className="text-xs font-medium text-slate-400">
+                    Min. 6 characters
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
+                    🔒
+                  </span>
+
+                  <input
+                    type={
+                      showPassword
+                        ? "text"
+                        : "password"
+                    }
+                    value={password}
+                    onChange={(event) =>
+                      setPassword(event.target.value)
+                    }
+                    placeholder={t(
+                      "studentLogin.passwordPlaceholder",
+                    )}
+                    disabled={loading}
+                    autoComplete={
+                      isSignup
+                        ? "new-password"
+                        : "current-password"
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-14 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPassword(
+                        (previous) => !previous,
+                      )
+                    }
+                    disabled={loading}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-sm text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 disabled:opacity-50 dark:hover:bg-slate-700 dark:hover:text-white"
+                    aria-label={
+                      showPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+
+              {/* ERROR */}
+              {error && (
+                <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                  <span className="shrink-0">⚠️</span>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* MESSAGE */}
+              {message && (
+                <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-5 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  <span className="shrink-0">✓</span>
+                  <span>{message}</span>
+                </div>
+              )}
+
+              {/* SUBMIT */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl hover:shadow-blue-600/25 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+              >
+                {loading ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <span>
+                      Please wait... / कृपया प्रतीक्षा करें...
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      {isSignup
+                        ? t(
+                            "studentLogin.createAccountButton",
+                          )
+                        : t(
+                            "studentLogin.loginButton",
+                          )}
+                    </span>
+
+                    <span className="transition-transform group-hover:translate-x-1">
+                      →
+                    </span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* =================================================
+                BOTTOM INFO
+            ================================================= */}
+
+            <div className="mt-7 border-t border-slate-100 pt-6 dark:border-slate-800">
+              <div className="text-center text-sm text-slate-500 dark:text-slate-400">
+                {isSignup
+                  ? t("studentLogin.alreadyAccount")
+                  : t("studentLogin.noAccount")}
+
+                <button
+                  type="button"
+                  onClick={toggleMode}
+                  disabled={loading}
+                  className="ml-1 font-bold text-blue-600 transition hover:text-indigo-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-400 dark:hover:text-indigo-400"
+                >
+                  {isSignup
+                    ? t("studentLogin.login")
+                    : t("studentLogin.createAccount")}
+                </button>
+              </div>
+            </div>
+
+            {/* Security note */}
+            <div className="mt-5 flex items-center justify-center gap-2 text-[11px] font-medium text-slate-400 dark:text-slate-500">
+              <span>🔐</span>
+              <span>Secure student authentication</span>
+            </div>
           </div>
-
-          {/* ERROR */}
-          {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
-              ⚠️ {error}
-            </div>
-          )}
-
-          {/* MESSAGE */}
-          {message && (
-            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/30 dark:text-green-300">
-              ✅ {message}
-            </div>
-          )}
-
-          {/* SUBMIT */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading && (
-              <span className="text-base">
-                ⏳
-              </span>
-            )}
-
-            {loading
-              ? "Please wait... / कृपया प्रतीक्षा करें..."
-              : isSignup
-                ? t(
-                    "studentLogin.createAccountButton"
-                  )
-                : t(
-                    "studentLogin.loginButton"
-                  )}
-          </button>
-        </form>
-
-        {/* TOGGLE */}
-        <div className="mt-6 text-center text-sm text-slate-600 dark:text-slate-300">
-          {isSignup
-            ? t("studentLogin.alreadyAccount")
-            : t("studentLogin.noAccount")}
-
-          <button
-            type="button"
-            onClick={toggleMode}
-            disabled={loading}
-            className="ml-1 font-semibold text-blue-600 transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isSignup
-              ? t("studentLogin.login")
-              : t("studentLogin.createAccount")}
-          </button>
         </div>
+
+        {/* Footer */}
+        <p className="mt-5 text-center text-xs font-medium text-slate-400 dark:text-slate-500">
+          © {new Date().getFullYear()} Ranker Bhaiya
+        </p>
       </div>
     </div>
   );
