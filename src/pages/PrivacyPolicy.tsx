@@ -1,11 +1,21 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function PrivacyPolicy() {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
       {/* Header */}
       <header className="border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <Link
             to="/"
             className="text-xl font-black tracking-tight text-indigo-600 dark:text-indigo-400"
@@ -13,12 +23,22 @@ export default function PrivacyPolicy() {
             Ranker Bhaiya
           </Link>
 
-          <Link
-            to="/"
-            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-700"
-          >
-            Home
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              ← Back
+            </button>
+
+            <Link
+              to="/"
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-indigo-700"
+            >
+              Home
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -43,6 +63,7 @@ export default function PrivacyPolicy() {
       <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-10">
           <div className="space-y-10">
+            {/* 1 */}
             <section>
               <h2 className="text-2xl font-black">
                 1. Introduction
@@ -60,6 +81,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            {/* 2 */}
             <section>
               <h2 className="text-2xl font-black">
                 2. Information We Collect
@@ -72,14 +94,20 @@ export default function PrivacyPolicy() {
 
               <ul className="mt-4 list-disc space-y-2 pl-6 leading-7 text-slate-600 dark:text-slate-300">
                 <li>Name and email address.</li>
-                <li>Student profile information provided by you.</li>
+
+                <li>
+                  Student profile information provided by you.
+                </li>
+
                 <li>
                   Learning and activity information generated while using the
                   platform.
                 </li>
+
                 <li>
                   Information you voluntarily provide when contacting us.
                 </li>
+
                 <li>
                   Technical information required to operate and secure the
                   platform.
@@ -87,6 +115,7 @@ export default function PrivacyPolicy() {
               </ul>
             </section>
 
+            {/* 3 */}
             <section>
               <h2 className="text-2xl font-black">
                 3. How We Use Information
@@ -98,21 +127,31 @@ export default function PrivacyPolicy() {
 
               <ul className="mt-4 list-disc space-y-2 pl-6 leading-7 text-slate-600 dark:text-slate-300">
                 <li>Create and manage your account.</li>
+
                 <li>
                   Provide learning resources and platform features.
                 </li>
-                <li>Track learning activity and progress.</li>
+
+                <li>
+                  Track learning activity and progress.
+                </li>
+
                 <li>
                   Improve the functionality and user experience of Ranker
                   Bhaiya.
                 </li>
-                <li>Provide support and respond to your requests.</li>
+
+                <li>
+                  Provide support and respond to your requests.
+                </li>
+
                 <li>
                   Maintain platform security and prevent misuse.
                 </li>
               </ul>
             </section>
 
+            {/* 4 */}
             <section>
               <h2 className="text-2xl font-black">
                 4. Account Information
@@ -125,6 +164,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            {/* 5 */}
             <section>
               <h2 className="text-2xl font-black">
                 5. Learning Activity
@@ -143,6 +183,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            {/* 6 */}
             <section>
               <h2 className="text-2xl font-black">
                 6. Ask Vidhya
@@ -161,6 +202,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            {/* 7 */}
             <section>
               <h2 className="text-2xl font-black">
                 7. Cookies and Local Storage
@@ -173,6 +215,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            {/* 8 */}
             <section>
               <h2 className="text-2xl font-black">
                 8. Third-Party Services
@@ -190,6 +233,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            {/* 9 */}
             <section>
               <h2 className="text-2xl font-black">
                 9. Data Security
@@ -203,6 +247,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            {/* 10 */}
             <section>
               <h2 className="text-2xl font-black">
                 10. Children's Privacy
@@ -216,6 +261,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            {/* 11 */}
             <section>
               <h2 className="text-2xl font-black">
                 11. Your Choices
@@ -227,6 +273,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
+            {/* 12 */}
             <section>
               <h2 className="text-2xl font-black">
                 12. Changes to This Policy
@@ -239,7 +286,7 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
-            {/* Contact */}
+            {/* 13 */}
             <section className="rounded-2xl bg-indigo-50 p-6 dark:bg-indigo-950/40">
               <h2 className="text-2xl font-black">
                 13. Contact Us
@@ -278,11 +325,17 @@ export default function PrivacyPolicy() {
           </p>
 
           <div className="flex gap-4">
-            <Link to="/about" className="hover:text-indigo-600">
+            <Link
+              to="/about"
+              className="hover:text-indigo-600"
+            >
               About Us
             </Link>
 
-            <Link to="/contact" className="hover:text-indigo-600">
+            <Link
+              to="/contact"
+              className="hover:text-indigo-600"
+            >
               Contact Us
             </Link>
           </div>
