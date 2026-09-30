@@ -17,6 +17,8 @@ type Question = {
   difficulty?: string;
 };
 
+const BATCH_SIZE = 25;
+
 const CATEGORY_ORDER = [
   "All",
   "Current Affairs",
@@ -29,6 +31,36 @@ const normalizeCategory = (category: string) => {
   return category.trim();
 };
 
+/* =====================================================
+   RANDOM SHUFFLE
+===================================================== */
+
+function shuffleQuestions(
+  items: Question[],
+): Question[] {
+  const shuffled = [...items];
+
+  for (
+    let index = shuffled.length - 1;
+    index > 0;
+    index--
+  ) {
+    const randomIndex = Math.floor(
+      Math.random() * (index + 1),
+    );
+
+    [
+      shuffled[index],
+      shuffled[randomIndex],
+    ] = [
+      shuffled[randomIndex],
+      shuffled[index],
+    ];
+  }
+
+  return shuffled;
+}
+
 export default function PracticeQuestions() {
   const navigate = useNavigate();
 
@@ -36,21 +68,29 @@ export default function PracticeQuestions() {
      STATE
   ===================================================== */
 
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [questions, setQuestions] =
+    useState<Question[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
 
   const [selectedCategory, setSelectedCategory] =
     useState("All");
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] =
+    useState("");
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] =
+    useState(0);
 
   const [selectedAnswer, setSelectedAnswer] =
     useState<string | null>(null);
 
-  const [score, setScore] = useState(0);
+  const [score, setScore] =
+    useState(0);
 
   const [answeredCount, setAnsweredCount] =
     useState(0);
@@ -58,14 +98,22 @@ export default function PracticeQuestions() {
   const [savingAttempt, setSavingAttempt] =
     useState(false);
 
-  const [finished, setFinished] = useState(false);
+  const [finished, setFinished] =
+    useState(false);
+
+  /*
+    Changes whenever a new practice session
+    should receive a fresh random batch.
+  */
+  const [sessionRound, setSessionRound] =
+    useState(0);
 
   /* =====================================================
      LOAD QUESTIONS
   ===================================================== */
 
   useEffect(() => {
-    loadQuestions();
+    void loadQuestions();
   }, []);
 
   const loadQuestions = async () => {
@@ -86,24 +134,26 @@ export default function PracticeQuestions() {
       return;
     }
 
-    const { data, error: fetchError } =
-      await supabase
-        .from("practice_questions")
-        .select(
-          `
-            id,
-            category,
-            question,
-            options,
-            answer,
-            explanation,
-            difficulty
-          `,
-        )
-        .eq("published", true)
-        .order("created_at", {
-          ascending: true,
-        });
+    const {
+      data,
+      error: fetchError,
+    } = await supabase
+      .from("practice_questions")
+      .select(
+        `
+          id,
+          category,
+          question,
+          options,
+          answer,
+          explanation,
+          difficulty
+        `,
+      )
+      .eq("published", true)
+      .order("created_at", {
+        ascending: true,
+      });
 
     if (fetchError) {
       console.error(
@@ -127,7 +177,9 @@ export default function PracticeQuestions() {
 
           if (Array.isArray(item.options)) {
             options = item.options.filter(
-              (option): option is string =>
+              (
+                option,
+              ): option is string =>
                 typeof option === "string",
             );
           }
@@ -140,7 +192,8 @@ export default function PracticeQuestions() {
             question: item.question,
             options,
             answer: item.answer,
-            explanation: item.explanation ?? "",
+            explanation:
+              item.explanation ?? "",
             difficulty:
               item.difficulty ?? "Easy",
           };
@@ -152,12 +205,30 @@ export default function PracticeQuestions() {
             question.answer.trim() !== "",
         );
 
-    setQuestions(formattedQuestions);
+    /*
+      Randomize the complete question pool
+      immediately after loading.
+    */
+    const randomizedQuestions =
+      shuffleQuestions(
+        formattedQuestions,
+      );
+
+    setQuestions(randomizedQuestions);
+
     setCurrentIndex(0);
     setSelectedAnswer(null);
     setScore(0);
     setAnsweredCount(0);
     setFinished(false);
+
+    /*
+      New load = fresh random session.
+    */
+    setSessionRound(
+      (value) => value + 1,
+    );
+
     setLoading(false);
   };
 
@@ -166,27 +237,33 @@ export default function PracticeQuestions() {
   ===================================================== */
 
   const categories = useMemo(() => {
-    const databaseCategories = Array.from(
-      new Set(
-        questions
-          .map(
-            (question) => question.category,
-          )
-          .filter(Boolean),
-      ),
-    );
+    const databaseCategories =
+      Array.from(
+        new Set(
+          questions
+            .map(
+              (question) =>
+                question.category,
+            )
+            .filter(Boolean),
+        ),
+      );
 
     const orderedCategories =
       CATEGORY_ORDER.filter(
         (category) =>
           category === "All" ||
-          databaseCategories.includes(category),
+          databaseCategories.includes(
+            category,
+          ),
       );
 
     const additionalCategories =
       databaseCategories.filter(
         (category) =>
-          !CATEGORY_ORDER.includes(category),
+          !CATEGORY_ORDER.includes(
+            category,
+          ),
       );
 
     return [
@@ -203,25 +280,34 @@ export default function PracticeQuestions() {
     const query =
       searchQuery.trim().toLowerCase();
 
-    return questions.filter((question) => {
-      const categoryMatch =
-        selectedCategory === "All" ||
-        question.category === selectedCategory;
+    return questions.filter(
+      (question) => {
+        const categoryMatch =
+          selectedCategory === "All" ||
+          question.category ===
+            selectedCategory;
 
-      const searchMatch =
-        !query ||
-        question.question
-          .toLowerCase()
-          .includes(query) ||
-        question.category
-          .toLowerCase()
-          .includes(query) ||
-        question.options.some((option) =>
-          option.toLowerCase().includes(query),
+        const searchMatch =
+          !query ||
+          question.question
+            .toLowerCase()
+            .includes(query) ||
+          question.category
+            .toLowerCase()
+            .includes(query) ||
+          question.options.some(
+            (option) =>
+              option
+                .toLowerCase()
+                .includes(query),
+          );
+
+        return (
+          categoryMatch &&
+          searchMatch
         );
-
-      return categoryMatch && searchMatch;
-    });
+      },
+    );
   }, [
     questions,
     selectedCategory,
@@ -229,11 +315,36 @@ export default function PracticeQuestions() {
   ]);
 
   /* =====================================================
+     RANDOM 25 QUESTION BATCH
+  ===================================================== */
+
+  const batchQuestions = useMemo(() => {
+    if (
+      filteredQuestions.length === 0
+    ) {
+      return [];
+    }
+
+    /*
+      Every new session:
+      1. Filter questions
+      2. Randomly shuffle them
+      3. Take maximum 25
+    */
+    return shuffleQuestions(
+      filteredQuestions,
+    ).slice(0, BATCH_SIZE);
+  }, [
+    filteredQuestions,
+    sessionRound,
+  ]);
+
+  /* =====================================================
      CURRENT QUESTION
   ===================================================== */
 
   const currentQuestion =
-    filteredQuestions[currentIndex];
+    batchQuestions[currentIndex];
 
   /* =====================================================
      RESET WHEN FILTER CHANGES
@@ -242,7 +353,17 @@ export default function PracticeQuestions() {
   useEffect(() => {
     setCurrentIndex(0);
     setSelectedAnswer(null);
+    setScore(0);
+    setAnsweredCount(0);
     setFinished(false);
+
+    /*
+      Changing category/search starts
+      a completely new random 25-question batch.
+    */
+    setSessionRound(
+      (value) => value + 1,
+    );
   }, [
     selectedCategory,
     searchQuery,
@@ -270,7 +391,8 @@ export default function PracticeQuestions() {
     );
 
     const isCorrect =
-      option === currentQuestion.answer;
+      option ===
+      currentQuestion.answer;
 
     if (isCorrect) {
       setScore(
@@ -285,15 +407,17 @@ export default function PracticeQuestions() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      const { error: attemptError } =
-        await supabase
-          .from("practice_attempts")
-          .insert({
-            user_id: user.id,
-            question_id: currentQuestion.id,
-            selected_answer: option,
-            is_correct: isCorrect,
-          });
+      const {
+        error: attemptError,
+      } = await supabase
+        .from("practice_attempts")
+        .insert({
+          user_id: user.id,
+          question_id:
+            currentQuestion.id,
+          selected_answer: option,
+          is_correct: isCorrect,
+        });
 
       if (attemptError) {
         console.error(
@@ -315,41 +439,37 @@ export default function PracticeQuestions() {
       return;
     }
 
-    if (
-      currentIndex <
-      filteredQuestions.length - 1
-    ) {
-      setCurrentIndex(
-        (value) => value + 1,
-      );
-
-      setSelectedAnswer(null);
-
-      return;
-    }
-
     /*
-     * Last question completed.
-     *
-     * Record meaningful practice activity
-     * for streak + Today's Mission.
-     */
-    setFinished(true);
+      25th question / last question
+      of the current batch.
+    */
+    if (
+      currentIndex >=
+      batchQuestions.length - 1
+    ) {
+      setFinished(true);
 
-    if (answeredCount > 0) {
-      const result =
+      const activityResult =
         await recordStudentActivity({
           activityType:
             "practice_questions",
         });
 
-      if (!result.success) {
+      if (!activityResult.success) {
         console.error(
           "Failed to record practice activity:",
-          result.error,
+          activityResult.error,
         );
       }
+
+      return;
     }
+
+    setCurrentIndex(
+      (value) => value + 1,
+    );
+
+    setSelectedAnswer(null);
   };
 
   /* =====================================================
@@ -378,6 +498,13 @@ export default function PracticeQuestions() {
     setScore(0);
     setAnsweredCount(0);
     setFinished(false);
+
+    /*
+      Fresh random 25-question batch.
+    */
+    setSessionRound(
+      (value) => value + 1,
+    );
   };
 
   /* =====================================================
@@ -391,7 +518,17 @@ export default function PracticeQuestions() {
     setSearchQuery("");
     setCurrentIndex(0);
     setSelectedAnswer(null);
+    setScore(0);
+    setAnsweredCount(0);
     setFinished(false);
+
+    /*
+      Fresh random batch for the
+      selected category.
+    */
+    setSessionRound(
+      (value) => value + 1,
+    );
   };
 
   /* =====================================================
@@ -399,16 +536,16 @@ export default function PracticeQuestions() {
   ===================================================== */
 
   const questionNumber =
-    filteredQuestions.length === 0
+    batchQuestions.length === 0
       ? 0
       : currentIndex + 1;
 
   const questionProgress =
-    filteredQuestions.length === 0
+    batchQuestions.length === 0
       ? 0
       : Math.round(
           (questionNumber /
-            filteredQuestions.length) *
+            batchQuestions.length) *
             100,
         );
 
@@ -416,7 +553,9 @@ export default function PracticeQuestions() {
     answeredCount === 0
       ? 0
       : Math.round(
-          (score / answeredCount) * 100,
+          (score /
+            answeredCount) *
+            100,
         );
 
   /* =====================================================
@@ -431,14 +570,16 @@ export default function PracticeQuestions() {
     }
 
     if (
-      option === currentQuestion?.answer
+      option ===
+      currentQuestion?.answer
     ) {
       return "border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-300";
     }
 
     if (
       option === selectedAnswer &&
-      option !== currentQuestion?.answer
+      option !==
+        currentQuestion?.answer
     ) {
       return "border-red-500 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950/30 dark:text-red-300";
     }
@@ -458,7 +599,8 @@ export default function PracticeQuestions() {
     }
 
     if (
-      option === currentQuestion?.answer
+      option ===
+      currentQuestion?.answer
     ) {
       return "✓";
     }
@@ -518,7 +660,7 @@ export default function PracticeQuestions() {
                 </h1>
 
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Practice complete
+                  25-question batch complete
                 </p>
               </div>
             </div>
@@ -532,7 +674,7 @@ export default function PracticeQuestions() {
             </div>
 
             <p className="mt-6 text-xs font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">
-              Practice Complete
+              Batch Complete
             </p>
 
             <h2 className="mt-2 text-3xl font-black sm:text-4xl">
@@ -540,9 +682,12 @@ export default function PracticeQuestions() {
             </h2>
 
             <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-500 dark:text-slate-400">
-              You completed the available
-              practice questions in this
-              session.
+              You completed this random
+              batch of{" "}
+              <span className="font-black text-slate-700 dark:text-slate-200">
+                {batchQuestions.length}
+              </span>{" "}
+              practice questions.
             </p>
 
             <div className="mt-8 grid grid-cols-3 gap-3">
@@ -583,7 +728,7 @@ export default function PracticeQuestions() {
                 onClick={handleRetry}
                 className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 active:scale-95"
               >
-                ↻ Practice Again
+                ↻ New Random 25
               </button>
 
               <button
@@ -610,8 +755,7 @@ export default function PracticeQuestions() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-      {/* HEADER */}
-
+      {/* Header */}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
@@ -634,28 +778,29 @@ export default function PracticeQuestions() {
               </h1>
 
               <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
-                Test yourself. Learn from every answer.
+                Random batch of 25 questions
               </p>
             </div>
           </div>
 
           <button
             type="button"
-            onClick={loadQuestions}
+            onClick={() =>
+              void loadQuestions()
+            }
             disabled={loading}
             className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             ↻
             <span className="ml-1 hidden sm:inline">
-              Refresh
+              New Batch
             </span>
           </button>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-        {/* HERO */}
-
+        {/* Hero */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-xl shadow-purple-600/20 sm:p-8 lg:p-10">
           <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-white/10 blur-3xl" />
 
@@ -673,15 +818,18 @@ export default function PracticeQuestions() {
             </h2>
 
             <p className="mt-4 max-w-2xl text-sm leading-6 text-purple-50 sm:text-base">
-              Solve exam-focused questions, check
-              your mistakes, and build stronger
-              concepts with every attempt.
+              Every session gives you a
+              fresh random batch of 25
+              exam-focused questions.
             </p>
+
+            <div className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black backdrop-blur">
+              🎯 {batchQuestions.length} Questions This Batch
+            </div>
           </div>
         </section>
 
-        {/* ERROR */}
-
+        {/* Error */}
         {error && (
           <div className="mt-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
             <span className="text-lg">
@@ -708,8 +856,7 @@ export default function PracticeQuestions() {
           </div>
         )}
 
-        {/* SEARCH */}
-
+        {/* Search */}
         <section className="mt-6">
           <div className="relative">
             <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
@@ -730,8 +877,7 @@ export default function PracticeQuestions() {
           </div>
         </section>
 
-        {/* CATEGORY FILTER */}
-
+        {/* Category Filter */}
         {categories.length > 0 && (
           <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
             {categories.map(
@@ -758,10 +904,8 @@ export default function PracticeQuestions() {
           </div>
         )}
 
-        {/* EMPTY STATE */}
-
-        {filteredQuestions.length ===
-          0 && (
+        {/* Empty State */}
+        {batchQuestions.length === 0 && (
           <section className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center dark:border-slate-700 dark:bg-slate-900 sm:p-14">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50 text-3xl dark:bg-purple-950/40">
               📝
@@ -772,15 +916,20 @@ export default function PracticeQuestions() {
             </h3>
 
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Try another category or change
-              your search.
+              Try another category or
+              change your search.
             </p>
 
             <button
               type="button"
               onClick={() => {
-                setSelectedCategory("All");
+                setSelectedCategory(
+                  "All",
+                );
                 setSearchQuery("");
+                setSessionRound(
+                  (value) => value + 1,
+                );
               }}
               className="mt-6 rounded-xl bg-purple-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-purple-700"
             >
@@ -789,193 +938,211 @@ export default function PracticeQuestions() {
           </section>
         )}
 
-        {/* QUESTION AREA */}
-
+        {/* Question Area */}
         {currentQuestion &&
-          filteredQuestions.length > 0 && (
-          <section className="mt-6">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Question {questionNumber} of{" "}
-                  {filteredQuestions.length}
-                </p>
+          batchQuestions.length > 0 && (
+            <section className="mt-6">
+              {/* Progress */}
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Question{" "}
+                    {questionNumber} of{" "}
+                    {batchQuestions.length}
+                  </p>
 
-                <div className="mt-2 h-2 w-48 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800 sm:w-64">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-500 transition-all duration-500"
-                    style={{
-                      width: `${questionProgress}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-black text-purple-600 dark:bg-purple-950/30 dark:text-purple-400">
-                  {currentQuestion.category}
-                </span>
-
-                <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  {currentQuestion.difficulty ??
-                    "Easy"}
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7 lg:p-8">
-              <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-sm font-black text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
-                  {questionNumber}
-                </div>
-
-                <h2 className="pt-1 text-lg font-black leading-7 sm:text-xl sm:leading-8 lg:text-2xl lg:leading-9">
-                  {currentQuestion.question}
-                </h2>
-              </div>
-
-              {/* OPTIONS */}
-
-              <div className="mt-7 grid gap-3">
-                {currentQuestion.options.map(
-                  (option, optionIndex) => (
-                    <button
-                      key={`${currentQuestion.id}-${option}`}
-                      type="button"
-                      disabled={
-                        selectedAnswer !== null ||
-                        savingAttempt
-                      }
-                      onClick={() =>
-                        handleAnswer(option)
-                      }
-                      className={`group flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition active:scale-[0.99] disabled:cursor-default sm:p-5 ${getOptionClass(
-                        option,
-                      )}`}
-                    >
-                      <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-black ${
-                          selectedAnswer &&
-                          option ===
-                            currentQuestion.answer
-                            ? "border-emerald-500 bg-emerald-500 text-white"
-                            : selectedAnswer &&
-                                option ===
-                                  selectedAnswer
-                              ? "border-red-500 bg-red-500 text-white"
-                              : "border-slate-200 bg-slate-50 text-slate-600 group-hover:border-purple-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
-                        }`}
-                      >
-                        {getOptionIcon(option) ||
-                          String.fromCharCode(
-                            65 + optionIndex,
-                          )}
-                      </span>
-
-                      <span className="flex-1 text-sm font-bold leading-6 sm:text-base">
-                        {option}
-                      </span>
-                    </button>
-                  ),
-                )}
-              </div>
-
-              {/* FEEDBACK */}
-
-              {selectedAnswer && (
-                <div
-                  className={`mt-6 rounded-2xl border p-4 ${
-                    selectedAnswer ===
-                    currentQuestion.answer
-                      ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/20"
-                      : "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="text-2xl">
-                      {selectedAnswer ===
-                      currentQuestion.answer
-                        ? "🎉"
-                        : "💡"}
-                    </div>
-
-                    <div>
-                      <h3
-                        className={`font-black ${
-                          selectedAnswer ===
-                          currentQuestion.answer
-                            ? "text-emerald-700 dark:text-emerald-300"
-                            : "text-red-700 dark:text-red-300"
-                        }`}
-                      >
-                        {selectedAnswer ===
-                        currentQuestion.answer
-                          ? "Correct answer!"
-                          : "Not quite right"}
-                      </h3>
-
-                      {selectedAnswer !==
-                        currentQuestion.answer && (
-                        <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                          Correct answer:{" "}
-                          <span className="font-black">
-                            {currentQuestion.answer}
-                          </span>
-                        </p>
-                      )}
-
-                      {currentQuestion.explanation && (
-                        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                          {currentQuestion.explanation}
-                        </p>
-                      )}
-                    </div>
+                  <div className="mt-2 h-2 w-48 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800 sm:w-64">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-500 transition-all duration-500"
+                      style={{
+                        width: `${questionProgress}%`,
+                      }}
+                    />
                   </div>
                 </div>
-              )}
 
-              {/* NAVIGATION */}
+                <div className="flex items-center gap-2">
+                  <span className="rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-black text-purple-600 dark:bg-purple-950/30 dark:text-purple-400">
+                    {currentQuestion.category}
+                  </span>
 
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <button
-                  type="button"
-                  onClick={handlePrevious}
-                  disabled={currentIndex === 0}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  ← Previous
-                </button>
-
-                <p className="order-first text-center text-xs font-semibold text-slate-400 sm:order-none">
-                  {savingAttempt
-                    ? "Saving your answer..."
-                    : selectedAnswer
-                      ? "Review the explanation"
-                      : "Choose an answer"}
-                </p>
-
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  disabled={
-                    !selectedAnswer ||
-                    savingAttempt
-                  }
-                  className="rounded-xl bg-purple-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {currentIndex ===
-                  filteredQuestions.length - 1
-                    ? "Finish Practice ✓"
-                    : "Next Question →"}
-                </button>
+                  <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {currentQuestion.difficulty ??
+                      "Easy"}
+                  </span>
+                </div>
               </div>
-            </div>
-          </section>
-        )}
 
-        {/* SCORE */}
+              {/* Question Card */}
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7 lg:p-8">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-sm font-black text-purple-700 dark:bg-purple-950/50 dark:text-purple-300">
+                    {questionNumber}
+                  </div>
 
-        {filteredQuestions.length > 0 && (
+                  <h2 className="pt-1 text-lg font-black leading-7 sm:text-xl sm:leading-8 lg:text-2xl lg:leading-9">
+                    {currentQuestion.question}
+                  </h2>
+                </div>
+
+                {/* Options */}
+                <div className="mt-7 grid gap-3">
+                  {currentQuestion.options.map(
+                    (
+                      option,
+                      optionIndex,
+                    ) => (
+                      <button
+                        key={`${currentQuestion.id}-${option}`}
+                        type="button"
+                        disabled={
+                          selectedAnswer !==
+                            null ||
+                          savingAttempt
+                        }
+                        onClick={() =>
+                          void handleAnswer(
+                            option,
+                          )
+                        }
+                        className={`group flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition active:scale-[0.99] disabled:cursor-default sm:p-5 ${getOptionClass(
+                          option,
+                        )}`}
+                      >
+                        <span
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-black ${
+                            selectedAnswer &&
+                            option ===
+                              currentQuestion.answer
+                              ? "border-emerald-500 bg-emerald-500 text-white"
+                              : selectedAnswer &&
+                                  option ===
+                                    selectedAnswer
+                                ? "border-red-500 bg-red-500 text-white"
+                                : "border-slate-200 bg-slate-50 text-slate-600 group-hover:border-purple-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                          }`}
+                        >
+                          {getOptionIcon(
+                            option,
+                          ) ||
+                            String.fromCharCode(
+                              65 +
+                                optionIndex,
+                            )}
+                        </span>
+
+                        <span className="flex-1 text-sm font-bold leading-6 sm:text-base">
+                          {option}
+                        </span>
+                      </button>
+                    ),
+                  )}
+                </div>
+
+                {/* Feedback */}
+                {selectedAnswer && (
+                  <div
+                    className={`mt-6 rounded-2xl border p-4 ${
+                      selectedAnswer ===
+                      currentQuestion.answer
+                        ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+                        : "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="text-2xl">
+                        {selectedAnswer ===
+                        currentQuestion.answer
+                          ? "🎉"
+                          : "💡"}
+                      </div>
+
+                      <div>
+                        <h3
+                          className={`font-black ${
+                            selectedAnswer ===
+                            currentQuestion.answer
+                              ? "text-emerald-700 dark:text-emerald-300"
+                              : "text-red-700 dark:text-red-300"
+                          }`}
+                        >
+                          {selectedAnswer ===
+                          currentQuestion.answer
+                            ? "Correct answer!"
+                            : "Not quite right"}
+                        </h3>
+
+                        {selectedAnswer !==
+                          currentQuestion.answer && (
+                          <p className="mt-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                            Correct answer:{" "}
+                            <span className="font-black">
+                              {
+                                currentQuestion.answer
+                              }
+                            </span>
+                          </p>
+                        )}
+
+                        {currentQuestion.explanation && (
+                          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                            {
+                              currentQuestion.explanation
+                            }
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Navigation */}
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={
+                      handlePrevious
+                    }
+                    disabled={
+                      currentIndex === 0
+                    }
+                    className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    ← Previous
+                  </button>
+
+                  <p className="order-first text-center text-xs font-semibold text-slate-400 sm:order-none">
+                    {savingAttempt
+                      ? "Saving your answer..."
+                      : selectedAnswer
+                        ? "Review the explanation"
+                        : "Choose an answer"}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleNext()
+                    }
+                    disabled={
+                      !selectedAnswer ||
+                      savingAttempt
+                    }
+                    className="rounded-xl bg-purple-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {currentIndex ===
+                    batchQuestions.length -
+                      1
+                      ? "Finish Practice ✓"
+                      : "Next Question →"}
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+        {/* Score */}
+        {batchQuestions.length > 0 && (
           <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -1016,8 +1183,7 @@ export default function PracticeQuestions() {
           </section>
         )}
 
-        {/* TIP */}
-
+        {/* Tip */}
         <section className="mt-6 overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-5 dark:border-amber-900/40 dark:from-amber-950/20 dark:to-orange-950/20 sm:p-6">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-2xl dark:bg-amber-900/40">
@@ -1030,18 +1196,18 @@ export default function PracticeQuestions() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-amber-800/80 dark:text-amber-200/70">
-                Don't just focus on your score.
-                Read the explanation after every
-                question and understand why an
-                answer is correct. That's where
-                real improvement happens.
+                Don't just focus on your
+                score. Read the explanation
+                after every question and
+                understand why an answer is
+                correct. That's where real
+                improvement happens.
               </p>
             </div>
           </div>
         </section>
 
-        {/* FOOTER */}
-
+        {/* Footer Button */}
         <div className="mt-8 flex justify-center pb-6">
           <button
             type="button"
