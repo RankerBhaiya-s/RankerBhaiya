@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { supabase } from "../../lib/supabase";
+import { recordStudentActivity } from "../../lib/studentActivity";
 
 interface MCQ {
   question: string;
@@ -805,11 +806,25 @@ export function WeeklyCurrentAffairs() {
                         </span>
 
                         <button
-                          onClick={() =>
+                          onClick={async () => {
+                            const result =
+                              await recordStudentActivity({
+                                userId: user.id,
+                                activityType:
+                                  "current_affairs",
+                              });
+
+                            if (!result.success) {
+                              console.error(
+                                "Failed to record Current Affairs activity:",
+                                result.error,
+                              );
+                            }
+
                             navigate(
                               `/student/current-affairs/${item.id}`,
-                            )
-                          }
+                            );
+                          }}
                           className="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-indigo-700"
                         >
                           {isHindi
