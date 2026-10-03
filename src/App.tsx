@@ -31,6 +31,10 @@ import DailyChallenge from "./pages/student/DailyChallenge";
 import HandwrittenNotes from "./pages/student/HandwrittenNotes";
 import ShortVideos from "./pages/student/ShortVideos";
 
+// NEW: Student resource pages
+import NCERTBooks from "./pages/student/NCERTBooks";
+import PreviousYearPapers from "./pages/student/PreviousYearPapers";
+
 // Admin pages
 import { AdminLogin } from "./pages/admin/Login";
 import { AdminDashboard } from "./pages/admin/Dashboard";
@@ -51,6 +55,7 @@ export default function App() {
           <HashRouter>
             <Routes>
               <Route element={<RootLayout />}>
+
                 {/* =========================
                     PUBLIC ROUTES
                 ========================== */}
@@ -90,36 +95,43 @@ export default function App() {
                     <ProtectedRoute allowedRole="student" />
                   }
                 >
+                  {/* Dashboard */}
                   <Route
                     path="student/dashboard"
                     element={<StudentDashboard />}
                   />
 
+                  {/* Profile */}
                   <Route
                     path="student/profile"
                     element={<StudentProfile />}
                   />
 
+                  {/* Syllabus */}
                   <Route
                     path="student/syllabus"
                     element={<StudentSyllabus />}
                   />
 
+                  {/* Ask Vidhya */}
                   <Route
                     path="student/ask"
                     element={<AskVidhya />}
                   />
 
+                  {/* Handwritten Notes */}
                   <Route
                     path="student/handwritten-notes"
                     element={<HandwrittenNotes />}
                   />
 
+                  {/* Daily Newspaper */}
                   <Route
                     path="student/daily-newspaper"
                     element={<DailyNewspaper />}
                   />
 
+                  {/* Current Affairs */}
                   <Route
                     path="student/current-affairs"
                     element={<WeeklyCurrentAffairs />}
@@ -130,44 +142,68 @@ export default function App() {
                     element={<CurrentAffairDetail />}
                   />
 
+                  {/* Quick Revision */}
                   <Route
                     path="student/quick-revision"
                     element={<FastRevision />}
                   />
 
+                  {/* Vocabulary */}
                   <Route
                     path="student/vocabulary"
                     element={<Vocabulary />}
                   />
 
+                  {/* Exam Tips */}
                   <Route
                     path="student/exam-tips"
                     element={<ExamTips />}
                   />
 
+                  {/* Study Planner */}
                   <Route
                     path="student/study-planner"
                     element={<StudyPlanner />}
                   />
 
+                  {/* Practice Questions */}
                   <Route
                     path="student/practice-questions"
                     element={<PracticeQuestions />}
                   />
 
+                  {/* Progress */}
                   <Route
                     path="student/progress"
                     element={<ProgressTracker />}
                   />
 
+                  {/* Daily Challenge */}
                   <Route
                     path="student/daily-challenge"
                     element={<DailyChallenge />}
                   />
 
+                  {/* Short Videos */}
                   <Route
                     path="student/short-videos"
                     element={<ShortVideos />}
+                  />
+
+                  {/* =========================
+                      EXAM RESOURCES
+                  ========================== */}
+
+                  {/* NCERT Complete Books */}
+                  <Route
+                    path="student/ncert-books"
+                    element={<NCERTBooks />}
+                  />
+
+                  {/* Previous Year Question Papers */}
+                  <Route
+                    path="student/previous-year-papers"
+                    element={<PreviousYearPapers />}
                   />
                 </Route>
 
@@ -189,22 +225,25 @@ export default function App() {
                     <ProtectedRoute allowedRole="admin" />
                   }
                 >
+                  {/* Admin Dashboard */}
                   <Route
                     path="admin/dashboard"
                     element={<AdminDashboard />}
                   />
 
+                  {/* Current Affairs Management */}
                   <Route
                     path="admin/current-affairs"
                     element={<AdminCurrentAffairs />}
                   />
 
+                  {/* Newspaper Management */}
                   <Route
                     path="admin/newspaper"
                     element={<AdminNewspaper />}
                   />
 
-                  {/* NCERT COMPLETE BOOK MANAGEMENT */}
+                  {/* NCERT Complete Book Management */}
                   <Route
                     path="admin/ncert"
                     element={<AdminNCERT />}
@@ -219,6 +258,7 @@ export default function App() {
                   path="*"
                   element={<NotFound />}
                 />
+
               </Route>
             </Routes>
           </HashRouter>
