@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import {
@@ -13,7 +13,7 @@ type SettingRowProps = {
   title: string;
   description: string;
   onClick?: () => void;
-  right?: React.ReactNode;
+  right?: ReactNode;
 };
 
 function SettingRow({
@@ -155,7 +155,7 @@ export default function Settings() {
 
   /*
    * ----------------------------------------
-   * INITIAL SETTINGS
+   * BASIC SETTINGS
    * ----------------------------------------
    */
 
@@ -196,9 +196,7 @@ export default function Settings() {
     }
 
     setNotificationsSupported(true);
-    setNotificationsPermission(
-      Notification.permission,
-    );
+    setNotificationsPermission(Notification.permission);
   }, []);
 
   /*
@@ -210,6 +208,7 @@ export default function Settings() {
   useEffect(() => {
     if (!user?.id) return;
 
+    const userId = user.id;
     let cancelled = false;
 
     async function loadNotificationPreferences() {
@@ -223,7 +222,7 @@ export default function Settings() {
           streak_reminders
         `,
         )
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle();
 
       if (cancelled) return;
@@ -234,9 +233,6 @@ export default function Settings() {
           error,
         );
 
-        /*
-         * Keep safe defaults if the database request fails.
-         */
         setNotificationPreferences(
           defaultNotificationPreferences,
         );
@@ -262,17 +258,14 @@ export default function Settings() {
         return;
       }
 
-      /*
-       * First time for this student.
-       * Create the default preference row.
-       */
-
       const { error: insertError } = await supabase
         .from("notification_preferences")
         .insert({
-          user_id: user.id,
+          user_id: userId,
           ...defaultNotificationPreferences,
         });
+
+      if (cancelled) return;
 
       if (insertError) {
         console.error(
@@ -297,7 +290,7 @@ export default function Settings() {
 
   /*
    * ----------------------------------------
-   * SHOW MESSAGE
+   * MESSAGE
    * ----------------------------------------
    */
 
@@ -315,7 +308,7 @@ export default function Settings() {
 
   /*
    * ----------------------------------------
-   * CHECK IF ANY NOTIFICATION IS ENABLED
+   * CHECK ANY NOTIFICATION ENABLED
    * ----------------------------------------
    */
 
@@ -332,7 +325,7 @@ export default function Settings() {
 
   /*
    * ----------------------------------------
-   * UPDATE ONE NOTIFICATION
+   * UPDATE NOTIFICATION
    * ----------------------------------------
    */
 
@@ -348,20 +341,20 @@ export default function Settings() {
       return;
     }
 
+    const userId = user.id;
+
     if (notificationLoading) return;
 
     const previousPreferences =
       notificationPreferences;
 
-    const nextPreferences = {
+    const nextPreferences: NotificationPreferences = {
       ...previousPreferences,
       [key]: newValue,
     };
 
     /*
-     * If user is turning ON a notification,
-     * first request browser permission and create
-     * the push subscription.
+     * ENABLE
      */
 
     if (newValue) {
@@ -377,31 +370,24 @@ export default function Settings() {
         setNotificationLoading(true);
         setMessage("");
 
-        /*
-         * registerPushNotifications internally:
-         *
-         * 1. Requests permission
-         * 2. Registers service worker
-         * 3. Creates push subscription
-         * 4. Saves subscription in Supabase
-         */
+        await registerPushNotifications(userId);
 
-        await registerPushNotifications(user.id);
-
-        setNotificationsPermission(
-          Notification.permission,
-        );
+        if ("Notification" in window) {
+          setNotificationsPermission(
+            Notification.permission,
+          );
+        }
       } catch (error) {
         console.error(
           "Enable notification error:",
           error,
         );
 
-        setNotificationsPermission(
-          "Notification" in window
-            ? Notification.permission
-            : "unsupported",
-        );
+        if ("Notification" in window) {
+          setNotificationsPermission(
+            Notification.permission,
+          );
+        }
 
         showMessage(
           error instanceof Error
@@ -416,21 +402,20 @@ export default function Settings() {
     }
 
     /*
-     * Update UI immediately after successful
-     * permission/subscription.
+     * UPDATE LOCAL UI
      */
 
     setNotificationPreferences(nextPreferences);
 
     /*
-     * Save this preference in Supabase.
+     * SAVE TO SUPABASE
      */
 
     const { error } = await supabase
       .from("notification_preferences")
       .upsert(
         {
-          user_id: user.id,
+          user_id: userId,
           [key]: newValue,
           updated_at: new Date().toISOString(),
         },
@@ -459,13 +444,13 @@ export default function Settings() {
     }
 
     /*
-     * If all four notification types are now OFF,
-     * remove the browser push subscription.
+     * REMOVE PUSH SUBSCRIPTION
+     * WHEN ALL NOTIFICATIONS ARE OFF
      */
 
     if (!hasAnyNotificationEnabled(nextPreferences)) {
       try {
-        await removePushSubscription(user.id);
+        await removePushSubscription(userId);
       } catch (error) {
         console.error(
           "Remove push subscription error:",
@@ -593,7 +578,8 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-white">
-      {/* Top header */}
+      {/* HEADER */}
+
       <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
@@ -636,7 +622,8 @@ export default function Settings() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        {/* Hero */}
+        {/* HERO */}
+
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white shadow-xl sm:p-8">
           <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
 
@@ -676,7 +663,8 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* Saved message */}
+        {/* MESSAGE */}
+
         {message && (
           <div
             className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-medium ${
@@ -693,7 +681,8 @@ export default function Settings() {
         )}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          {/* Account */}
+          {/* ACCOUNT */}
+
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="border-b border-slate-100 px-5 py-5 dark:border-slate-800">
               <div className="flex items-center gap-3">
@@ -758,7 +747,8 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* Appearance */}
+          {/* APPEARANCE */}
+
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="border-b border-slate-100 px-5 py-5 dark:border-slate-800">
               <div className="flex items-center gap-3">
@@ -810,7 +800,8 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* Language */}
+          {/* LANGUAGE */}
+
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="border-b border-slate-100 px-5 py-5 dark:border-slate-800">
               <div className="flex items-center gap-3">
@@ -861,7 +852,8 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* Study preferences */}
+          {/* STUDY PREFERENCES */}
+
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="border-b border-slate-100 px-5 py-5 dark:border-slate-800">
               <div className="flex items-center gap-3">
@@ -947,7 +939,8 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* Notifications */}
+          {/* NOTIFICATIONS */}
+
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-2">
             <div className="border-b border-slate-100 px-5 py-5 dark:border-slate-800">
               <div className="flex items-center gap-3">
@@ -1076,7 +1069,8 @@ export default function Settings() {
             )}
           </section>
 
-          {/* Privacy & Security */}
+          {/* PRIVACY & SECURITY */}
+
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="border-b border-slate-100 px-5 py-5 dark:border-slate-800">
               <div className="flex items-center gap-3">
@@ -1117,7 +1111,8 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* About */}
+          {/* ABOUT */}
+
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div className="border-b border-slate-100 px-5 py-5 dark:border-slate-800">
               <div className="flex items-center gap-3">
@@ -1159,7 +1154,8 @@ export default function Settings() {
           </section>
         </div>
 
-        {/* Save */}
+        {/* SAVE */}
+
         <div className="mt-6 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-bold">
@@ -1185,7 +1181,8 @@ export default function Settings() {
           </button>
         </div>
 
-        {/* Footer */}
+        {/* FOOTER */}
+
         <footer className="py-8 text-center">
           <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
             Ranker Bhaiya
