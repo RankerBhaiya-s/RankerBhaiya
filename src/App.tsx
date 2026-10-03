@@ -6,22 +6,31 @@ import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { RootLayout } from "./layouts/RootLayout";
 
+// =========================
 // Public pages
+// =========================
+
 import { Home } from "./pages/Home";
 import AboutUs from "./pages/AboutUs";
 import ContactUs from "./pages/ContactUs";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 
+// =========================
 // Student pages
+// =========================
+
 import { StudentLogin } from "./pages/student/Login";
 import { StudentDashboard } from "./pages/student/Dashboard";
 import { StudentProfile } from "./pages/student/Profile";
 import { StudentSyllabus } from "./pages/student/Syllabus";
 import { AskVidhya } from "./pages/student/AskVidhya";
 import { DailyNewspaper } from "./pages/student/DailyNewspaper";
+
 import WeeklyCurrentAffairs from "./pages/student/WeeklyCurrentAffairs";
+
 import { CurrentAffairDetail } from "./pages/student/CurrentAffairDetail";
 import { FastRevision } from "./pages/student/FastRevision";
+
 import Vocabulary from "./pages/student/Vocabulary";
 import ExamTips from "./pages/student/ExamTips";
 import StudyPlanner from "./pages/student/StudyPlanner";
@@ -31,18 +40,25 @@ import DailyChallenge from "./pages/student/DailyChallenge";
 import HandwrittenNotes from "./pages/student/HandwrittenNotes";
 import ShortVideos from "./pages/student/ShortVideos";
 
-// NEW: Student resource pages
+// Exam resources
 import NCERTBooks from "./pages/student/NCERTBooks";
 import PreviousYearPapers from "./pages/student/PreviousYearPapers";
 
+// =========================
 // Admin pages
+// =========================
+
 import { AdminLogin } from "./pages/admin/Login";
 import { AdminDashboard } from "./pages/admin/Dashboard";
 import { AdminCurrentAffairs } from "./pages/admin/AdminCurrentAffairs";
 import AdminNewspaper from "./pages/admin/AdminNewspaper";
 import AdminNCERT from "./pages/admin/AdminNCERT";
+import AdminPreviousYearPapers from "./pages/admin/AdminPreviousYearPapers";
 
+// =========================
 // 404
+// =========================
+
 import { NotFound } from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,11 +72,14 @@ export default function App() {
             <Routes>
               <Route element={<RootLayout />}>
 
-                {/* =========================
+                {/* ==================================================
                     PUBLIC ROUTES
-                ========================== */}
+                ================================================== */}
 
-                <Route index element={<Home />} />
+                <Route
+                  index
+                  element={<Home />}
+                />
 
                 <Route
                   path="about"
@@ -77,18 +96,18 @@ export default function App() {
                   element={<PrivacyPolicy />}
                 />
 
-                {/* =========================
+                {/* ==================================================
                     STUDENT LOGIN
-                ========================== */}
+                ================================================== */}
 
                 <Route
                   path="student/login"
                   element={<StudentLogin />}
                 />
 
-                {/* =========================
+                {/* ==================================================
                     STUDENT PROTECTED ROUTES
-                ========================== */}
+                ================================================== */}
 
                 <Route
                   element={
@@ -190,9 +209,9 @@ export default function App() {
                     element={<ShortVideos />}
                   />
 
-                  {/* =========================
+                  {/* ==================================================
                       EXAM RESOURCES
-                  ========================== */}
+                  ================================================== */}
 
                   {/* NCERT Complete Books */}
                   <Route
@@ -207,18 +226,18 @@ export default function App() {
                   />
                 </Route>
 
-                {/* =========================
+                {/* ==================================================
                     ADMIN LOGIN
-                ========================== */}
+                ================================================== */}
 
                 <Route
                   path="admin/login"
                   element={<AdminLogin />}
                 />
 
-                {/* =========================
+                {/* ==================================================
                     ADMIN PROTECTED ROUTES
-                ========================== */}
+                ================================================== */}
 
                 <Route
                   element={
@@ -248,11 +267,17 @@ export default function App() {
                     path="admin/ncert"
                     element={<AdminNCERT />}
                   />
+
+                  {/* Previous Year Papers Management */}
+                  <Route
+                    path="admin/previous-year-papers"
+                    element={<AdminPreviousYearPapers />}
+                  />
                 </Route>
 
-                {/* =========================
+                {/* ==================================================
                     404
-                ========================== */}
+                ================================================== */}
 
                 <Route
                   path="*"
