@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
+import {
+  registerPushNotifications,
+  removePushSubscription,
+} from "../../lib/pushNotifications";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -38,6 +42,7 @@ function SettingRow({
         <p className="font-semibold text-slate-900 dark:text-white">
           {title}
         </p>
+
         <p className="mt-0.5 text-sm leading-5 text-slate-500 dark:text-slate-400">
           {description}
         </p>
@@ -57,14 +62,20 @@ function SettingRow({
 type ToggleProps = {
   enabled: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean;
 };
 
-function Toggle({ enabled, onChange }: ToggleProps) {
+function Toggle({
+  enabled,
+  onChange,
+  disabled = false,
+}: ToggleProps) {
   return (
     <button
       type="button"
       aria-label={enabled ? "Disable" : "Enable"}
       aria-pressed={enabled}
+      disabled={disabled}
       onClick={(event) => {
         event.stopPropagation();
         onChange(!enabled);
@@ -73,6 +84,10 @@ function Toggle({ enabled, onChange }: ToggleProps) {
         enabled
           ? "bg-indigo-600"
           : "bg-slate-300 dark:bg-slate-700"
+      } ${
+        disabled
+          ? "cursor-not-allowed opacity-50"
+          : "cursor-pointer"
       }`}
     >
       <span
@@ -84,133 +99,497 @@ function Toggle({ enabled, onChange }: ToggleProps) {
   );
 }
 
+type NotificationKey =
+  | "daily_current_affairs"
+  | "newspaper_updates"
+  | "practice_reminders"
+  | "streak_reminders";
+
+type NotificationPreferences = {
+  daily_current_affairs: boolean;
+  newspaper_updates: boolean;
+  practice_reminders: boolean;
+  streak_reminders: boolean;
+};
+
+const defaultNotificationPreferences: NotificationPreferences = {
+  daily_current_affairs: true,
+  newspaper_updates: true,
+  practice_reminders: true,
+  streak_reminders: true,
+};
+
 export default function Settings() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const [email, setEmail] = useState("");
-  const [dailyCurrentAffairs, setDailyCurrentAffairs] = useState(true);
-  const [newspaperUpdates, setNewspaperUpdates] = useState(true);
-  const [practiceReminders, setPracticeReminders] = useState(true);
-  const [streakReminders, setStreakReminders] = useState(true);
+
+  const [notificationPreferences, setNotificationPreferences] =
+    useState<NotificationPreferences>(
+      defaultNotificationPreferences,
+    );
+
   const [dailyGoal, setDailyGoal] = useState("60");
   const [language, setLanguage] = useState("English");
+
   const [saving, setSaving] = useState(false);
+  const [notificationLoading, setNotificationLoading] =
+    useState(false);
+
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<
+    "success" | "error"
+  >("success");
+
+  const [notificationsSupported, setNotificationsSupported] =
+    useState(true);
+
+  const [notificationsPermission, setNotificationsPermission] =
+    useState<NotificationPermission | "unsupported">(
+      "default",
+    );
+
+  const isDark = theme === "dark";
+
+  /*
+   * ----------------------------------------
+   * INITIAL SETTINGS
+   * ----------------------------------------
+   */
 
   useEffect(() => {
     setEmail(user?.email ?? "");
 
-    const savedLanguage = localStorage.getItem("ranker-bhaiya-language");
-    const savedGoal = localStorage.getItem("ranker-bhaiya-daily-goal");
-
-    const savedCurrentAffairs = localStorage.getItem(
-      "ranker-bhaiya-notify-current-affairs"
-    );
-    const savedNewspaper = localStorage.getItem(
-      "ranker-bhaiya-notify-newspaper"
-    );
-    const savedPractice = localStorage.getItem(
-      "ranker-bhaiya-notify-practice"
-    );
-    const savedStreak = localStorage.getItem(
-      "ranker-bhaiya-notify-streak"
+    const savedLanguage = localStorage.getItem(
+      "ranker-bhaiya-language",
     );
 
-    if (savedLanguage) setLanguage(savedLanguage);
-    if (savedGoal) setDailyGoal(savedGoal);
+    const savedGoal = localStorage.getItem(
+      "ranker-bhaiya-daily-goal",
+    );
 
-    if (savedCurrentAffairs !== null) {
-      setDailyCurrentAffairs(savedCurrentAffairs === "true");
+    if (savedLanguage) {
+      setLanguage(savedLanguage);
     }
 
-    if (savedNewspaper !== null) {
-      setNewspaperUpdates(savedNewspaper === "true");
-    }
-
-    if (savedPractice !== null) {
-      setPracticeReminders(savedPractice === "true");
-    }
-
-    if (savedStreak !== null) {
-      setStreakReminders(savedStreak === "true");
+    if (savedGoal) {
+      setDailyGoal(savedGoal);
     }
   }, [user?.email]);
 
-  const isDark = theme === "dark";
+  /*
+   * ----------------------------------------
+   * BROWSER NOTIFICATION SUPPORT
+   * ----------------------------------------
+   */
 
-  const initials = useMemo(() => {
-    const value = user?.email?.split("@")[0] ?? "RB";
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !("Notification" in window)
+    ) {
+      setNotificationsSupported(false);
+      setNotificationsPermission("unsupported");
+      return;
+    }
 
-    return value
-      .split(/[.\-_ ]+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part.charAt(0).toUpperCase())
-      .join("");
-  }, [user?.email]);
+    setNotificationsSupported(true);
+    setNotificationsPermission(
+      Notification.permission,
+    );
+  }, []);
+
+  /*
+   * ----------------------------------------
+   * LOAD NOTIFICATION PREFERENCES
+   * ----------------------------------------
+   */
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let cancelled = false;
+
+    async function loadNotificationPreferences() {
+      const { data, error } = await supabase
+        .from("notification_preferences")
+        .select(
+          `
+          daily_current_affairs,
+          newspaper_updates,
+          practice_reminders,
+          streak_reminders
+        `,
+        )
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error(
+          "Notification preferences load error:",
+          error,
+        );
+
+        /*
+         * Keep safe defaults if the database request fails.
+         */
+        setNotificationPreferences(
+          defaultNotificationPreferences,
+        );
+
+        return;
+      }
+
+      if (data) {
+        setNotificationPreferences({
+          daily_current_affairs:
+            Boolean(data.daily_current_affairs),
+
+          newspaper_updates:
+            Boolean(data.newspaper_updates),
+
+          practice_reminders:
+            Boolean(data.practice_reminders),
+
+          streak_reminders:
+            Boolean(data.streak_reminders),
+        });
+
+        return;
+      }
+
+      /*
+       * First time for this student.
+       * Create the default preference row.
+       */
+
+      const { error: insertError } = await supabase
+        .from("notification_preferences")
+        .insert({
+          user_id: user.id,
+          ...defaultNotificationPreferences,
+        });
+
+      if (insertError) {
+        console.error(
+          "Notification preferences insert error:",
+          insertError,
+        );
+
+        return;
+      }
+
+      setNotificationPreferences(
+        defaultNotificationPreferences,
+      );
+    }
+
+    loadNotificationPreferences();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  /*
+   * ----------------------------------------
+   * SHOW MESSAGE
+   * ----------------------------------------
+   */
+
+  function showMessage(
+    text: string,
+    type: "success" | "error" = "success",
+  ) {
+    setMessage(text);
+    setMessageType(type);
+
+    window.setTimeout(() => {
+      setMessage("");
+    }, 5000);
+  }
+
+  /*
+   * ----------------------------------------
+   * CHECK IF ANY NOTIFICATION IS ENABLED
+   * ----------------------------------------
+   */
+
+  function hasAnyNotificationEnabled(
+    preferences: NotificationPreferences,
+  ) {
+    return (
+      preferences.daily_current_affairs ||
+      preferences.newspaper_updates ||
+      preferences.practice_reminders ||
+      preferences.streak_reminders
+    );
+  }
+
+  /*
+   * ----------------------------------------
+   * UPDATE ONE NOTIFICATION
+   * ----------------------------------------
+   */
+
+  async function updateNotificationPreference(
+    key: NotificationKey,
+    newValue: boolean,
+  ) {
+    if (!user?.id) {
+      showMessage(
+        "Please login again to change notification settings.",
+        "error",
+      );
+      return;
+    }
+
+    if (notificationLoading) return;
+
+    const previousPreferences =
+      notificationPreferences;
+
+    const nextPreferences = {
+      ...previousPreferences,
+      [key]: newValue,
+    };
+
+    /*
+     * If user is turning ON a notification,
+     * first request browser permission and create
+     * the push subscription.
+     */
+
+    if (newValue) {
+      if (!notificationsSupported) {
+        showMessage(
+          "Your browser does not support push notifications.",
+          "error",
+        );
+        return;
+      }
+
+      try {
+        setNotificationLoading(true);
+        setMessage("");
+
+        /*
+         * registerPushNotifications internally:
+         *
+         * 1. Requests permission
+         * 2. Registers service worker
+         * 3. Creates push subscription
+         * 4. Saves subscription in Supabase
+         */
+
+        await registerPushNotifications(user.id);
+
+        setNotificationsPermission(
+          Notification.permission,
+        );
+      } catch (error) {
+        console.error(
+          "Enable notification error:",
+          error,
+        );
+
+        setNotificationsPermission(
+          "Notification" in window
+            ? Notification.permission
+            : "unsupported",
+        );
+
+        showMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to enable notifications.",
+          "error",
+        );
+
+        setNotificationLoading(false);
+        return;
+      }
+    }
+
+    /*
+     * Update UI immediately after successful
+     * permission/subscription.
+     */
+
+    setNotificationPreferences(nextPreferences);
+
+    /*
+     * Save this preference in Supabase.
+     */
+
+    const { error } = await supabase
+      .from("notification_preferences")
+      .upsert(
+        {
+          user_id: user.id,
+          [key]: newValue,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id",
+        },
+      );
+
+    if (error) {
+      console.error(
+        "Notification preference update error:",
+        error,
+      );
+
+      setNotificationPreferences(
+        previousPreferences,
+      );
+
+      showMessage(
+        "Unable to save notification preference.",
+        "error",
+      );
+
+      setNotificationLoading(false);
+      return;
+    }
+
+    /*
+     * If all four notification types are now OFF,
+     * remove the browser push subscription.
+     */
+
+    if (!hasAnyNotificationEnabled(nextPreferences)) {
+      try {
+        await removePushSubscription(user.id);
+      } catch (error) {
+        console.error(
+          "Remove push subscription error:",
+          error,
+        );
+      }
+    }
+
+    setNotificationLoading(false);
+
+    showMessage(
+      newValue
+        ? "Notifications enabled."
+        : "Notification preference updated.",
+      "success",
+    );
+  }
+
+  /*
+   * ----------------------------------------
+   * SAVE LOCAL PREFERENCES
+   * ----------------------------------------
+   */
 
   function savePreferences() {
     setSaving(true);
     setMessage("");
 
-    localStorage.setItem("ranker-bhaiya-language", language);
-    localStorage.setItem("ranker-bhaiya-daily-goal", dailyGoal);
-
     localStorage.setItem(
-      "ranker-bhaiya-notify-current-affairs",
-      String(dailyCurrentAffairs)
+      "ranker-bhaiya-language",
+      language,
     );
 
     localStorage.setItem(
-      "ranker-bhaiya-notify-newspaper",
-      String(newspaperUpdates)
-    );
-
-    localStorage.setItem(
-      "ranker-bhaiya-notify-practice",
-      String(practiceReminders)
-    );
-
-    localStorage.setItem(
-      "ranker-bhaiya-notify-streak",
-      String(streakReminders)
+      "ranker-bhaiya-daily-goal",
+      dailyGoal,
     );
 
     window.setTimeout(() => {
       setSaving(false);
-      setMessage("Your preferences have been saved.");
+
+      showMessage(
+        "Your preferences have been saved.",
+        "success",
+      );
     }, 450);
   }
+
+  /*
+   * ----------------------------------------
+   * LOGOUT
+   * ----------------------------------------
+   */
 
   async function handleLogout() {
     await signOut();
     navigate("/student/login");
   }
 
+  /*
+   * ----------------------------------------
+   * CHANGE PASSWORD
+   * ----------------------------------------
+   */
+
   async function handleChangePassword() {
     if (!email) {
-      setMessage("Your email address could not be found.");
+      showMessage(
+        "Your email address could not be found.",
+        "error",
+      );
       return;
     }
 
     setSaving(true);
     setMessage("");
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/RankerBhaiya/#/student/login`,
-    });
+    const { error } =
+      await supabase.auth.resetPasswordForEmail(
+        email,
+        {
+          redirectTo:
+            `${window.location.origin}/RankerBhaiya/#/student/login`,
+        },
+      );
 
     setSaving(false);
 
     if (error) {
-      setMessage(error.message);
+      showMessage(error.message, "error");
       return;
     }
 
-    setMessage("Password reset instructions have been sent to your email.");
+    showMessage(
+      "Password reset instructions have been sent to your email.",
+      "success",
+    );
   }
+
+  /*
+   * ----------------------------------------
+   * USER INITIALS
+   * ----------------------------------------
+   */
+
+  const initials = useMemo(() => {
+    const value =
+      user?.email?.split("@")[0] ?? "RB";
+
+    return value
+      .split(/[.\-_ ]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) =>
+        part.charAt(0).toUpperCase(),
+      )
+      .join("");
+  }, [user?.email]);
+
+  /*
+   * ----------------------------------------
+   * UI
+   * ----------------------------------------
+   */
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-white">
@@ -220,7 +599,9 @@ export default function Settings() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate("/student/dashboard")}
+              onClick={() =>
+                navigate("/student/dashboard")
+              }
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-xl shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
               aria-label="Back to dashboard"
             >
@@ -231,6 +612,7 @@ export default function Settings() {
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Ranker Bhaiya
               </p>
+
               <h1 className="text-lg font-bold tracking-tight">
                 Settings
               </h1>
@@ -242,7 +624,10 @@ export default function Settings() {
             onClick={toggleTheme}
             className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
           >
-            <span>{isDark ? "☀️" : "🌙"}</span>
+            <span>
+              {isDark ? "☀️" : "🌙"}
+            </span>
+
             <span className="hidden sm:inline">
               {isDark ? "Light" : "Dark"}
             </span>
@@ -254,6 +639,7 @@ export default function Settings() {
         {/* Hero */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white shadow-xl sm:p-8">
           <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+
           <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-fuchsia-400/20 blur-3xl" />
 
           <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -267,8 +653,8 @@ export default function Settings() {
               </h2>
 
               <p className="mt-3 max-w-xl text-sm leading-6 text-indigo-100 sm:text-base">
-                Manage your account, appearance, study preferences and
-                notifications from one place.
+                Manage your account, appearance, study
+                preferences and notifications from one place.
               </p>
             </div>
 
@@ -281,6 +667,7 @@ export default function Settings() {
                 <p className="text-xs font-medium text-indigo-100">
                   Signed in as
                 </p>
+
                 <p className="truncate text-sm font-bold">
                   {email || "Student"}
                 </p>
@@ -291,8 +678,17 @@ export default function Settings() {
 
         {/* Saved message */}
         {message && (
-          <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
-            ✓ {message}
+          <div
+            className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-medium ${
+              messageType === "error"
+                ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
+            }`}
+          >
+            {messageType === "error"
+              ? "⚠️"
+              : "✓"}{" "}
+            {message}
           </div>
         )}
 
@@ -306,7 +702,10 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <h2 className="font-bold">Account</h2>
+                  <h2 className="font-bold">
+                    Account
+                  </h2>
+
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     Manage your account details
                   </p>
@@ -319,13 +718,18 @@ export default function Settings() {
                 icon="🪪"
                 title="Profile"
                 description="Update your name, class, board and exam"
-                onClick={() => navigate("/student/profile")}
+                onClick={() =>
+                  navigate("/student/profile")
+                }
               />
 
               <SettingRow
                 icon="📧"
                 title="Email address"
-                description={email || "No email address available"}
+                description={
+                  email ||
+                  "No email address available"
+                }
                 right={
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                     Read only
@@ -363,7 +767,10 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <h2 className="font-bold">Appearance</h2>
+                  <h2 className="font-bold">
+                    Appearance
+                  </h2>
+
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     Customize how Ranker Bhaiya looks
                   </p>
@@ -383,7 +790,9 @@ export default function Settings() {
                 right={
                   <Toggle
                     enabled={isDark}
-                    onChange={() => toggleTheme()}
+                    onChange={() =>
+                      toggleTheme()
+                    }
                   />
                 }
               />
@@ -410,7 +819,10 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <h2 className="font-bold">Language</h2>
+                  <h2 className="font-bold">
+                    Language
+                  </h2>
+
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     Choose your preferred learning language
                   </p>
@@ -420,11 +832,17 @@ export default function Settings() {
 
             <div className="p-5">
               <div className="grid grid-cols-3 gap-2">
-                {["English", "हिंदी", "Hinglish"].map((item) => (
+                {[
+                  "English",
+                  "हिंदी",
+                  "Hinglish",
+                ].map((item) => (
                   <button
                     key={item}
                     type="button"
-                    onClick={() => setLanguage(item)}
+                    onClick={() =>
+                      setLanguage(item)
+                    }
                     className={`rounded-2xl border px-3 py-3 text-sm font-bold transition ${
                       language === item
                         ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm dark:border-indigo-500 dark:bg-indigo-950/40 dark:text-indigo-300"
@@ -437,7 +855,8 @@ export default function Settings() {
               </div>
 
               <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Language preference is saved locally on this device.
+                Language preference is saved locally
+                on this device.
               </p>
             </div>
           </section>
@@ -451,7 +870,10 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <h2 className="font-bold">Study Preferences</h2>
+                  <h2 className="font-bold">
+                    Study Preferences
+                  </h2>
+
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     Set your daily learning target
                   </p>
@@ -467,28 +889,57 @@ export default function Settings() {
 
                 <select
                   value={dailyGoal}
-                  onChange={(event) => setDailyGoal(event.target.value)}
+                  onChange={(event) =>
+                    setDailyGoal(
+                      event.target.value,
+                    )
+                  }
                   className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 >
-                  <option value="30">30 minutes</option>
-                  <option value="45">45 minutes</option>
-                  <option value="60">1 hour</option>
-                  <option value="90">1.5 hours</option>
-                  <option value="120">2 hours</option>
-                  <option value="180">3 hours</option>
-                  <option value="240">4 hours</option>
+                  <option value="30">
+                    30 minutes
+                  </option>
+
+                  <option value="45">
+                    45 minutes
+                  </option>
+
+                  <option value="60">
+                    1 hour
+                  </option>
+
+                  <option value="90">
+                    1.5 hours
+                  </option>
+
+                  <option value="120">
+                    2 hours
+                  </option>
+
+                  <option value="180">
+                    3 hours
+                  </option>
+
+                  <option value="240">
+                    4 hours
+                  </option>
                 </select>
               </label>
 
               <div className="mt-4 rounded-2xl bg-gradient-to-r from-indigo-50 to-violet-50 p-4 dark:from-indigo-950/30 dark:to-violet-950/30">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">🔥</span>
+                  <span className="text-2xl">
+                    🔥
+                  </span>
+
                   <div>
                     <p className="text-sm font-bold text-slate-900 dark:text-white">
                       Consistency beats intensity
                     </p>
+
                     <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                      Small daily progress builds strong preparation.
+                      Small daily progress builds strong
+                      preparation.
                     </p>
                   </div>
                 </div>
@@ -504,14 +955,33 @@ export default function Settings() {
                   🔔
                 </div>
 
-                <div>
-                  <h2 className="font-bold">Notifications</h2>
+                <div className="min-w-0">
+                  <h2 className="font-bold">
+                    Notifications
+                  </h2>
+
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     Choose which learning reminders you want
                   </p>
                 </div>
               </div>
             </div>
+
+            {!notificationsSupported && (
+              <div className="border-b border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                ⚠️ Your current browser does not support
+                push notifications.
+              </div>
+            )}
+
+            {notificationsPermission ===
+              "denied" && (
+              <div className="border-b border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
+                🔕 Browser notifications are blocked.
+                Please allow notifications for Ranker
+                Bhaiya from your browser's site settings.
+              </div>
+            )}
 
             <div className="grid divide-y divide-slate-100 dark:divide-slate-800 md:grid-cols-2 md:divide-x md:divide-y-0">
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -521,8 +991,16 @@ export default function Settings() {
                   description="Get reminded to stay updated"
                   right={
                     <Toggle
-                      enabled={dailyCurrentAffairs}
-                      onChange={setDailyCurrentAffairs}
+                      enabled={
+                        notificationPreferences.daily_current_affairs
+                      }
+                      disabled={notificationLoading}
+                      onChange={(value) =>
+                        updateNotificationPreference(
+                          "daily_current_affairs",
+                          value,
+                        )
+                      }
                     />
                   }
                 />
@@ -533,8 +1011,16 @@ export default function Settings() {
                   description="Daily newspaper reading reminders"
                   right={
                     <Toggle
-                      enabled={newspaperUpdates}
-                      onChange={setNewspaperUpdates}
+                      enabled={
+                        notificationPreferences.newspaper_updates
+                      }
+                      disabled={notificationLoading}
+                      onChange={(value) =>
+                        updateNotificationPreference(
+                          "newspaper_updates",
+                          value,
+                        )
+                      }
                     />
                   }
                 />
@@ -547,8 +1033,16 @@ export default function Settings() {
                   description="Remember to complete daily practice"
                   right={
                     <Toggle
-                      enabled={practiceReminders}
-                      onChange={setPracticeReminders}
+                      enabled={
+                        notificationPreferences.practice_reminders
+                      }
+                      disabled={notificationLoading}
+                      onChange={(value) =>
+                        updateNotificationPreference(
+                          "practice_reminders",
+                          value,
+                        )
+                      }
                     />
                   }
                 />
@@ -559,13 +1053,27 @@ export default function Settings() {
                   description="Don't lose your preparation streak"
                   right={
                     <Toggle
-                      enabled={streakReminders}
-                      onChange={setStreakReminders}
+                      enabled={
+                        notificationPreferences.streak_reminders
+                      }
+                      disabled={notificationLoading}
+                      onChange={(value) =>
+                        updateNotificationPreference(
+                          "streak_reminders",
+                          value,
+                        )
+                      }
                     />
                   }
                 />
               </div>
             </div>
+
+            {notificationLoading && (
+              <div className="border-t border-slate-100 px-5 py-3 text-center text-xs font-semibold text-indigo-600 dark:border-slate-800 dark:text-indigo-300">
+                Updating notification settings...
+              </div>
+            )}
           </section>
 
           {/* Privacy & Security */}
@@ -577,7 +1085,10 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <h2 className="font-bold">Privacy & Security</h2>
+                  <h2 className="font-bold">
+                    Privacy & Security
+                  </h2>
+
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     Manage your account security
                   </p>
@@ -590,14 +1101,18 @@ export default function Settings() {
                 icon="🔒"
                 title="Privacy Policy"
                 description="Read how Ranker Bhaiya handles your data"
-                onClick={() => navigate("/privacy-policy")}
+                onClick={() =>
+                  navigate("/privacy-policy")
+                }
               />
 
               <SettingRow
                 icon="📩"
                 title="Contact Support"
                 description="Need help? Get in touch with us"
-                onClick={() => navigate("/contact")}
+                onClick={() =>
+                  navigate("/contact")
+                }
               />
             </div>
           </section>
@@ -611,7 +1126,10 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <h2 className="font-bold">About Ranker Bhaiya</h2>
+                  <h2 className="font-bold">
+                    About Ranker Bhaiya
+                  </h2>
+
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     Learn more about the platform
                   </p>
@@ -624,14 +1142,18 @@ export default function Settings() {
                 icon="📚"
                 title="About us"
                 description="Know more about Ranker Bhaiya"
-                onClick={() => navigate("/about")}
+                onClick={() =>
+                  navigate("/about")
+                }
               />
 
               <SettingRow
                 icon="💬"
                 title="Support"
                 description="help.theharbyco@gmail.com"
-                onClick={() => navigate("/contact")}
+                onClick={() =>
+                  navigate("/contact")
+                }
               />
             </div>
           </section>
@@ -640,10 +1162,14 @@ export default function Settings() {
         {/* Save */}
         <div className="mt-6 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-bold">Save your preferences</p>
+            <p className="font-bold">
+              Save your preferences
+            </p>
+
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Your notification, language and study preferences are stored on
-              this device.
+              Your language and study preferences are
+              stored on this device. Notification settings
+              are saved automatically.
             </p>
           </div>
 
@@ -653,7 +1179,9 @@ export default function Settings() {
             disabled={saving}
             className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:scale-[1.01] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Saving..." : "Save Preferences"}
+            {saving
+              ? "Saving..."
+              : "Save Preferences"}
           </button>
         </div>
 
@@ -662,6 +1190,7 @@ export default function Settings() {
           <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
             Ranker Bhaiya
           </p>
+
           <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
             Aapki Mehnat, Hamari Strategy.
           </p>
