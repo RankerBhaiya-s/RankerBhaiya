@@ -28,10 +28,7 @@ const DAILY_TARGET = 20;
 
 const getLocalDateString = (date: Date) => {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(
-    2,
-    "0",
-  );
+  const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
@@ -60,13 +57,9 @@ export function StudentDashboard() {
 
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const [showProfileMenu, setShowProfileMenu] =
-    useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  const dailyMindset = useMemo(
-    () => getDailyMindset(),
-    [],
-  );
+  const dailyMindset = useMemo(() => getDailyMindset(), []);
 
   /* =====================================================
      USER
@@ -81,14 +74,11 @@ export function StudentDashboard() {
      STREAK
   ===================================================== */
 
-  const [streakLoading, setStreakLoading] =
-    useState(true);
+  const [streakLoading, setStreakLoading] = useState(true);
 
-  const [currentStreak, setCurrentStreak] =
-    useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
 
-  const [activeDates, setActiveDates] =
-    useState<string[]>([]);
+  const [activeDates, setActiveDates] = useState<string[]>([]);
 
   /* =====================================================
      PREPARATION STATS
@@ -108,11 +98,9 @@ export function StudentDashboard() {
      WEAK TOPICS
   ===================================================== */
 
-  const [weakTopics, setWeakTopics] =
-    useState<WeakTopic[]>([]);
+  const [weakTopics, setWeakTopics] = useState<WeakTopic[]>([]);
 
-  const [weakTopicsLoading, setWeakTopicsLoading] =
-    useState(true);
+  const [weakTopicsLoading, setWeakTopicsLoading] = useState(true);
 
   /* =====================================================
      DAILY PRACTICE
@@ -124,23 +112,20 @@ export function StudentDashboard() {
      TODAY'S MISSION
   ===================================================== */
 
-  const [missionCompleted, setMissionCompleted] =
-    useState({
-      practice: false,
-      challenge: false,
-      currentAffairs: false,
-    });
+  const [missionCompleted, setMissionCompleted] = useState({
+    practice: false,
+    challenge: false,
+    currentAffairs: false,
+  });
 
-  const [missionLoading, setMissionLoading] =
-    useState(true);
+  const [missionLoading, setMissionLoading] = useState(true);
 
   /* =====================================================
      DOCUMENT TITLE
   ===================================================== */
 
   useEffect(() => {
-    document.title =
-      "Student Dashboard | Ranker Bhaiya";
+    document.title = "Student Dashboard | Ranker Bhaiya";
   }, []);
 
   /* =====================================================
@@ -153,34 +138,23 @@ export function StudentDashboard() {
         replace: true,
       });
     }
-  }, [
-    authLoading,
-    user,
-    navigate,
-  ]);
+  }, [authLoading, user, navigate]);
 
   /* =====================================================
      CLOSE PROFILE MENU
   ===================================================== */
 
   useEffect(() => {
-    function handleOutsideClick(
-      event: MouseEvent,
-    ) {
+    function handleOutsideClick(event: MouseEvent) {
       if (
         menuRef.current &&
-        !menuRef.current.contains(
-          event.target as Node,
-        )
+        !menuRef.current.contains(event.target as Node)
       ) {
         setShowProfileMenu(false);
       }
     }
 
-    document.addEventListener(
-      "mousedown",
-      handleOutsideClick,
-    );
+    document.addEventListener("mousedown", handleOutsideClick);
 
     return () => {
       document.removeEventListener(
@@ -239,19 +213,14 @@ export function StudentDashboard() {
     const uniqueDates = Array.from(
       new Set(
         (data ?? [])
-          .map(
-            (item) =>
-              item.activity_date,
-          )
+          .map((item) => item.activity_date)
           .filter(Boolean),
       ),
     );
 
     setActiveDates(uniqueDates);
 
-    const today = getLocalDateString(
-      new Date(),
-    );
+    const today = getLocalDateString(new Date());
 
     if (!uniqueDates.includes(today)) {
       setCurrentStreak(0);
@@ -264,14 +233,9 @@ export function StudentDashboard() {
     let checkDate = today;
 
     while (true) {
-      const previousDate =
-        getPreviousDate(checkDate);
+      const previousDate = getPreviousDate(checkDate);
 
-      if (
-        uniqueDates.includes(
-          previousDate,
-        )
-      ) {
+      if (uniqueDates.includes(previousDate)) {
         streak += 1;
         checkDate = previousDate;
       } else {
@@ -296,9 +260,7 @@ export function StudentDashboard() {
 
     const { data, error } = await supabase
       .from("practice_attempts")
-      .select(
-        "question_id, is_correct",
-      )
+      .select("question_id, is_correct")
       .eq("user_id", user.id);
 
     if (error) {
@@ -323,16 +285,13 @@ export function StudentDashboard() {
     const attempted = attempts.length;
 
     const correct = attempts.filter(
-      (attempt) =>
-        attempt.is_correct === true,
+      (attempt) => attempt.is_correct === true,
     ).length;
 
     const accuracy =
       attempted === 0
         ? 0
-        : Math.round(
-            (correct / attempted) * 100,
-          );
+        : Math.round((correct / attempted) * 100);
 
     setPreparationStats({
       attempted,
@@ -386,74 +345,50 @@ export function StudentDashboard() {
       }
     >();
 
-    (data ?? []).forEach(
-      (attempt) => {
-        const question =
-          Array.isArray(
-            attempt.practice_questions,
-          )
-            ? attempt.practice_questions[0]
-            : attempt.practice_questions;
-
-        const category =
-          question?.category?.trim();
-
-        if (!category) {
-          return;
-        }
-
-        const existing =
-          topicMap.get(category) ?? {
-            attempted: 0,
-            correct: 0,
-          };
-
-        existing.attempted += 1;
-
-        if (
-          attempt.is_correct === true
-        ) {
-          existing.correct += 1;
-        }
-
-        topicMap.set(
-          category,
-          existing,
-        );
-      },
-    );
-
-    const topics: WeakTopic[] =
-      Array.from(
-        topicMap.entries(),
+    (data ?? []).forEach((attempt) => {
+      const question = Array.isArray(
+        attempt.practice_questions,
       )
-        .map(
-          ([category, stats]) => ({
-            category,
-            attempted:
-              stats.attempted,
-            correct:
-              stats.correct,
-            accuracy:
-              stats.attempted === 0
-                ? 0
-                : Math.round(
-                    (stats.correct /
-                      stats.attempted) *
-                      100,
-                  ),
-          }),
-        )
-        .filter(
-          (topic) =>
-            topic.attempted >= 2,
-        )
-        .sort(
-          (a, b) =>
-            a.accuracy -
-            b.accuracy,
-        )
-        .slice(0, 3);
+        ? attempt.practice_questions[0]
+        : attempt.practice_questions;
+
+      const category = question?.category?.trim();
+
+      if (!category) {
+        return;
+      }
+
+      const existing = topicMap.get(category) ?? {
+        attempted: 0,
+        correct: 0,
+      };
+
+      existing.attempted += 1;
+
+      if (attempt.is_correct === true) {
+        existing.correct += 1;
+      }
+
+      topicMap.set(category, existing);
+    });
+
+    const topics: WeakTopic[] = Array.from(
+      topicMap.entries(),
+    )
+      .map(([category, stats]) => ({
+        category,
+        attempted: stats.attempted,
+        correct: stats.correct,
+        accuracy:
+          stats.attempted === 0
+            ? 0
+            : Math.round(
+                (stats.correct / stats.attempted) * 100,
+              ),
+      }))
+      .filter((topic) => topic.attempted >= 2)
+      .sort((a, b) => a.accuracy - b.accuracy)
+      .slice(0, 3);
 
     setWeakTopics(topics);
     setWeakTopicsLoading(false);
@@ -470,9 +405,7 @@ export function StudentDashboard() {
 
     setMissionLoading(true);
 
-    const today = getLocalDateString(
-      new Date(),
-    );
+    const today = getLocalDateString(new Date());
 
     const { data, error } = await supabase
       .from("student_daily_activity")
@@ -498,25 +431,13 @@ export function StudentDashboard() {
     }
 
     const activityTypes = new Set(
-      (data ?? []).map(
-        (item) =>
-          item.activity_type,
-      ),
+      (data ?? []).map((item) => item.activity_type),
     );
 
     setMissionCompleted({
-      practice:
-        activityTypes.has(
-          "practice_questions",
-        ),
-      challenge:
-        activityTypes.has(
-          "daily_challenge",
-        ),
-      currentAffairs:
-        activityTypes.has(
-          "current_affairs",
-        ),
+      practice: activityTypes.has("practice_questions"),
+      challenge: activityTypes.has("daily_challenge"),
+      currentAffairs: activityTypes.has("current_affairs"),
     });
 
     setMissionLoading(false);
@@ -542,15 +463,9 @@ export function StudentDashboard() {
   ===================================================== */
 
   const missionCount =
-    Number(
-      missionCompleted.practice,
-    ) +
-    Number(
-      missionCompleted.challenge,
-    ) +
-    Number(
-      missionCompleted.currentAffairs,
-    );
+    Number(missionCompleted.practice) +
+    Number(missionCompleted.challenge) +
+    Number(missionCompleted.currentAffairs);
 
   /* =====================================================
      STREAK DAYS
@@ -561,20 +476,13 @@ export function StudentDashboard() {
     (_, index) => {
       const date = new Date();
 
-      date.setDate(
-        date.getDate() -
-          (6 - index),
-      );
+      date.setDate(date.getDate() - (6 - index));
 
-      const dateString =
-        getLocalDateString(date);
+      const dateString = getLocalDateString(date);
 
       return {
         date: dateString,
-        active:
-          activeDates.includes(
-            dateString,
-          ),
+        active: activeDates.includes(dateString),
       };
     },
   );
@@ -583,107 +491,73 @@ export function StudentDashboard() {
      DAILY PRACTICE
   ===================================================== */
 
-  const dailyPracticePercent =
-    Math.min(
-      100,
-      Math.round(
-        (dailyPractice /
-          DAILY_TARGET) *
-          100,
-      ),
-    );
+  const dailyPracticePercent = Math.min(
+    100,
+    Math.round((dailyPractice / DAILY_TARGET) * 100),
+  );
 
   /* =====================================================
      NAVIGATION HANDLERS
   ===================================================== */
 
-  const handleDailyPractice =
-    () => {
-      navigate(
-        "/student/practice-questions",
-      );
-    };
+  const handleDailyPractice = () => {
+    navigate("/student/practice-questions");
+  };
 
-  const handleStudyPlanner =
-    () => {
-      navigate(
-        "/student/study-planner",
-      );
-    };
+  const handleStudyPlanner = () => {
+    navigate("/student/study-planner");
+  };
 
-  const handlePracticeQuestions =
-    () => {
-      navigate(
-        "/student/practice-questions",
-      );
-    };
+  const handlePracticeQuestions = () => {
+    navigate("/student/practice-questions");
+  };
 
-  const handleShortVideos =
-    () => {
-      navigate(
-        "/student/short-videos",
-      );
-    };
+  const handleShortVideos = () => {
+    navigate("/student/short-videos");
+  };
 
-  const handleDailyChallenge =
-    () => {
-      navigate(
-        "/student/daily-challenge",
-      );
-    };
+  const handleDailyChallenge = () => {
+    navigate("/student/daily-challenge");
+  };
 
-  const handleAskVidhya =
-    () => {
-      navigate("/student/ask");
-    };
+  const handleAskVidhya = () => {
+    navigate("/student/ask");
+  };
 
-  const handleCurrentAffairs =
-    () => {
-      navigate(
-        "/student/current-affairs",
-      );
-    };
+  const handleCurrentAffairs = () => {
+    navigate("/student/current-affairs");
+  };
 
-  const handleDailyNewspaper =
-    () => {
-      navigate(
-        "/student/daily-newspaper",
-      );
-    };
+  const handleDailyNewspaper = () => {
+    navigate("/student/daily-newspaper");
+  };
 
-  const handleVocabulary =
-    () => {
-      navigate(
-        "/student/vocabulary",
-      );
-    };
+  const handleVocabulary = () => {
+    navigate("/student/vocabulary");
+  };
 
-  const handleExamTips =
-    () => {
-      navigate(
-        "/student/exam-tips",
-      );
-    };
+  const handleExamTips = () => {
+    navigate("/student/exam-tips");
+  };
 
-  const handleProgress =
-    () => {
-      navigate(
-        "/student/progress",
-      );
-    };
+  const handleProgress = () => {
+    navigate("/student/progress");
+  };
 
-  const handleWeakTopic = (
-    topic: WeakTopic,
-  ) => {
-    navigate(
-      "/student/practice-questions",
-      {
-        state: {
-          category:
-            topic.category,
-        },
+  const handleNCERTBooks = () => {
+    navigate("/student/ncert-books");
+  };
+
+  const handlePreviousYearPapers = () => {
+    navigate("/student/previous-year-papers");
+  };
+
+  const handleWeakTopic = (topic: WeakTopic) => {
+    navigate("/student/practice-questions", {
+      state: {
+        category: topic.category,
       },
-    );
+    });
   };
 
   /* =====================================================
@@ -756,17 +630,11 @@ export function StudentDashboard() {
             </h1>
           </div>
 
-          {/* PROFILE MENU */}
-          <div
-            ref={menuRef}
-            className="relative"
-          >
+          <div ref={menuRef} className="relative">
             <button
               type="button"
               onClick={() =>
-                setShowProfileMenu(
-                  (value) => !value,
-                )
+                setShowProfileMenu((value) => !value)
               }
               className={`flex items-center gap-2 rounded-full border px-2 py-2 transition ${
                 isDark
@@ -776,9 +644,7 @@ export function StudentDashboard() {
               aria-label="Open profile menu"
             >
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-pink-500 text-sm font-black text-white">
-                {firstName
-                  .charAt(0)
-                  .toUpperCase()}
+                {firstName.charAt(0).toUpperCase()}
               </span>
 
               <span className="hidden max-w-[120px] truncate text-sm font-bold sm:block">
@@ -800,8 +666,7 @@ export function StudentDashboard() {
               >
                 <div className="border-b border-inherit px-4 py-3">
                   <p className="truncate text-sm font-bold">
-                    {profile?.full_name ||
-                      firstName}
+                    {profile?.full_name || firstName}
                   </p>
 
                   <p className="truncate text-xs opacity-60">
@@ -812,12 +677,8 @@ export function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowProfileMenu(
-                      false,
-                    );
-                    navigate(
-                      "/student/profile",
-                    );
+                    setShowProfileMenu(false);
+                    navigate("/student/profile");
                   }}
                   className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
                 >
@@ -827,12 +688,8 @@ export function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowProfileMenu(
-                      false,
-                    );
-                    navigate(
-                      "/student/settings",
-                    );
+                    setShowProfileMenu(false);
+                    navigate("/student/settings");
                   }}
                   className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
                 >
@@ -844,9 +701,7 @@ export function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowProfileMenu(
-                      false,
-                    );
+                    setShowProfileMenu(false);
                     navigate("/about");
                   }}
                   className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
@@ -857,12 +712,8 @@ export function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowProfileMenu(
-                      false,
-                    );
-                    navigate(
-                      "/contact",
-                    );
+                    setShowProfileMenu(false);
+                    navigate("/contact");
                   }}
                   className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
                 >
@@ -872,12 +723,8 @@ export function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowProfileMenu(
-                      false,
-                    );
-                    navigate(
-                      "/privacy-policy",
-                    );
+                    setShowProfileMenu(false);
+                    navigate("/privacy-policy");
                   }}
                   className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
                 >
@@ -889,6 +736,7 @@ export function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => {
+                    setShowProfileMenu(false);
                     void handleLogout();
                   }}
                   className="block w-full px-4 py-3 text-left text-sm font-bold text-red-500 transition hover:bg-red-500/5"
@@ -906,7 +754,6 @@ export function StudentDashboard() {
       ================================================= */}
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-
         {/* =================================================
             HERO
         ================================================= */}
@@ -927,10 +774,9 @@ export function StudentDashboard() {
 
             <p className="mt-4 max-w-2xl text-sm leading-7 text-purple-50 sm:text-base">
               Ranker Bhaiya brings learning
-              resources, current affairs,
-              and AI-powered guidance
-              together in one place —
-              helping you learn smarter,
+              resources, current affairs, and
+              AI-powered guidance together in one
+              place — helping you learn smarter,
               stay ahead, and prepare with
               confidence.
             </p>
@@ -938,9 +784,7 @@ export function StudentDashboard() {
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={
-                  handleAskVidhya
-                }
+                onClick={handleAskVidhya}
                 className="rounded-xl bg-white px-5 py-3 text-sm font-black text-purple-700 shadow-xl transition hover:bg-purple-50 active:scale-95"
               >
                 🤖 Ask Vidhya →
@@ -948,9 +792,7 @@ export function StudentDashboard() {
 
               <button
                 type="button"
-                onClick={
-                  handlePracticeQuestions
-                }
+                onClick={handlePracticeQuestions}
                 className="rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/20 active:scale-95"
               >
                 📝 Practice Now
@@ -984,18 +826,16 @@ export function StudentDashboard() {
                       : "text-slate-600"
                   }`}
                 >
-                  Add your class, board and
-                  exam details for a better
-                  Ranker Bhaiya experience.
+                  Add your class, board and exam
+                  details for a better Ranker Bhaiya
+                  experience.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() =>
-                  navigate(
-                    "/student/profile",
-                  )
+                  navigate("/student/profile")
                 }
                 className="rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-black text-white transition hover:bg-amber-600"
               >
@@ -1048,7 +888,6 @@ export function StudentDashboard() {
         ================================================= */}
 
         <section className="mt-6 grid gap-4 lg:grid-cols-3">
-
           {/* STREAK */}
 
           <div
@@ -1061,9 +900,7 @@ export function StudentDashboard() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">
-                    🔥
-                  </span>
+                  <span className="text-2xl">🔥</span>
 
                   <h3 className="font-black">
                     7 Day Streak
@@ -1071,16 +908,11 @@ export function StudentDashboard() {
                 </div>
 
                 <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {currentStreak ===
-                  0
+                  {currentStreak === 0
                     ? "Start your streak today!"
-                    : currentStreak >=
-                        7
+                    : currentStreak >= 7
                       ? "Amazing! Keep the streak alive."
-                      : `${
-                          7 -
-                          currentStreak
-                        } more days to reach 7.`}
+                      : `${7 - currentStreak} more days to reach 7.`}
                 </p>
               </div>
 
@@ -1092,36 +924,28 @@ export function StudentDashboard() {
             </div>
 
             <div className="mt-5 flex justify-between gap-1">
-              {streakDays.map(
-                (day, index) => (
+              {streakDays.map((day, index) => (
+                <div
+                  key={day.date}
+                  className="flex flex-1 flex-col items-center gap-2"
+                >
                   <div
-                    key={day.date}
-                    className="flex flex-1 flex-col items-center gap-2"
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${
+                      day.active
+                        ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
+                        : isDark
+                          ? "bg-slate-800 text-slate-500"
+                          : "bg-slate-100 text-slate-400"
+                    }`}
                   >
-                    <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${
-                        day.active
-                          ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
-                          : isDark
-                            ? "bg-slate-800 text-slate-500"
-                            : "bg-slate-100 text-slate-400"
-                      }`}
-                    >
-                      {day.active
-                        ? "✓"
-                        : "•"}
-                    </div>
-
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {index === 6
-                        ? "Today"
-                        : `D${
-                            index + 1
-                          }`}
-                    </span>
+                    {day.active ? "✓" : "•"}
                   </div>
-                ),
-              )}
+
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {index === 6 ? "Today" : `D${index + 1}`}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -1136,9 +960,7 @@ export function StudentDashboard() {
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">
-                  🎯
-                </span>
+                <span className="text-2xl">🎯</span>
 
                 <div>
                   <h3 className="font-black">
@@ -1146,85 +968,63 @@ export function StudentDashboard() {
                   </h3>
 
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    Complete your daily
-                    targets
+                    Complete your daily targets
                   </p>
                 </div>
               </div>
 
               <span className="rounded-xl bg-purple-50 px-3 py-1.5 text-xs font-black text-purple-600 dark:bg-purple-950/30 dark:text-purple-300">
-                {missionLoading
-                  ? "..."
-                  : `${missionCount}/3`}
+                {missionLoading ? "..." : `${missionCount}/3`}
               </span>
             </div>
 
             <div className="mt-4 space-y-2.5">
               {[
                 {
-                  label:
-                    "Complete Practice Questions",
-                  done:
-                    missionCompleted.practice,
-                  onClick:
-                    handlePracticeQuestions,
+                  label: "Complete Practice Questions",
+                  done: missionCompleted.practice,
+                  onClick: handlePracticeQuestions,
                 },
                 {
-                  label:
-                    "Complete Daily Challenge",
-                  done:
-                    missionCompleted.challenge,
-                  onClick:
-                    handleDailyChallenge,
+                  label: "Complete Daily Challenge",
+                  done: missionCompleted.challenge,
+                  onClick: handleDailyChallenge,
                 },
                 {
-                  label:
-                    "Read Today's Current Affairs",
-                  done:
-                    missionCompleted.currentAffairs,
-                  onClick:
-                    handleCurrentAffairs,
+                  label: "Read Today's Current Affairs",
+                  done: missionCompleted.currentAffairs,
+                  onClick: handleCurrentAffairs,
                 },
-              ].map(
-                (mission) => (
-                  <button
-                    key={
-                      mission.label
-                    }
-                    type="button"
-                    onClick={
-                      mission.onClick
-                    }
-                    className="flex w-full items-center gap-3 text-left"
+              ].map((mission) => (
+                <button
+                  key={mission.label}
+                  type="button"
+                  onClick={mission.onClick}
+                  className="flex w-full items-center gap-3 text-left"
+                >
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                      mission.done
+                        ? "bg-emerald-500 text-white"
+                        : isDark
+                          ? "border border-slate-700 bg-slate-800 text-slate-500"
+                          : "border border-slate-200 bg-slate-50 text-slate-400"
+                    }`}
                   >
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
-                        mission.done
-                          ? "bg-emerald-500 text-white"
-                          : isDark
-                            ? "border border-slate-700 bg-slate-800 text-slate-500"
-                            : "border border-slate-200 bg-slate-50 text-slate-400"
-                      }`}
-                    >
-                      {mission.done
-                        ? "✓"
-                        : "○"}
-                    </span>
+                    {mission.done ? "✓" : "○"}
+                  </span>
 
-                    <span
-                      className={`text-xs font-bold ${
-                        mission.done
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-slate-600 dark:text-slate-300"
-                      }`}
-                    >
-                      {
-                        mission.label
-                      }
-                    </span>
-                  </button>
-                ),
-              )}
+                  <span
+                    className={`text-xs font-bold ${
+                      mission.done
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {mission.label}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1240,9 +1040,7 @@ export function StudentDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">
-                    📊
-                  </span>
+                  <span className="text-2xl">📊</span>
 
                   <h3 className="font-black">
                     Your Preparation
@@ -1256,9 +1054,7 @@ export function StudentDashboard() {
 
               <button
                 type="button"
-                onClick={
-                  handleProgress
-                }
+                onClick={handleProgress}
                 className="text-xs font-black text-purple-600 hover:text-purple-700 dark:text-purple-400"
               >
                 View →
@@ -1270,20 +1066,15 @@ export function StudentDashboard() {
                 <div
                   className="absolute inset-1 rounded-full"
                   style={{
-                    background:
-                      `conic-gradient(#8b5cf6 ${preparationStats.accuracy}%, ${
-                        isDark
-                          ? "#1e293b"
-                          : "#e2e8f0"
-                      } ${preparationStats.accuracy}% 100%)`,
+                    background: `conic-gradient(#8b5cf6 ${preparationStats.accuracy}%, ${
+                      isDark ? "#1e293b" : "#e2e8f0"
+                    } ${preparationStats.accuracy}% 100%)`,
                   }}
                 />
 
                 <div
                   className={`relative flex h-20 w-20 items-center justify-center rounded-full text-lg font-black ${
-                    isDark
-                      ? "bg-slate-900"
-                      : "bg-white"
+                    isDark ? "bg-slate-900" : "bg-white"
                   }`}
                 >
                   {preparationLoading
@@ -1311,12 +1102,10 @@ export function StudentDashboard() {
                       className="h-full rounded-full bg-purple-500 transition-all"
                       style={{
                         width: `${
-                          preparationStats.attempted >
-                          0
+                          preparationStats.attempted > 0
                             ? Math.min(
                                 100,
-                                preparationStats.attempted *
-                                  2,
+                                preparationStats.attempted * 2,
                               )
                             : 0
                         }%`,
@@ -1363,9 +1152,8 @@ export function StudentDashboard() {
             </h2>
 
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Tools designed to keep your
-              preparation organized and
-              consistent.
+              Tools designed to keep your preparation
+              organized and consistent.
             </p>
           </div>
 
@@ -1373,80 +1161,66 @@ export function StudentDashboard() {
             {[
               {
                 icon: "📅",
-                title:
-                  "Study Planner",
+                title: "Study Planner",
                 description:
                   "Plan your study sessions and stay consistent.",
-                action:
-                  handleStudyPlanner,
+                action: handleStudyPlanner,
               },
               {
                 icon: "📝",
-                title:
-                  "Practice Questions",
+                title: "Practice Questions",
                 description:
                   "Practice exam-style questions and improve accuracy.",
-                action:
-                  handlePracticeQuestions,
+                action: handlePracticeQuestions,
               },
               {
                 icon: "🎬",
-                title:
-                  "Short Videos",
+                title: "Short Videos",
                 description:
                   "Learn important topics through short focused videos.",
-                action:
-                  handleShortVideos,
+                action: handleShortVideos,
               },
               {
                 icon: "⚡",
-                title:
-                  "Daily Challenge",
+                title: "Daily Challenge",
                 description:
                   "Challenge yourself with quick daily practice.",
-                action:
-                  handleDailyChallenge,
+                action: handleDailyChallenge,
               },
-            ].map(
-              (tool) => (
-                <button
-                  key={tool.title}
-                  type="button"
-                  onClick={
-                    tool.action
-                  }
-                  className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
-                    isDark
-                      ? "border-slate-800 bg-slate-900 hover:border-purple-800"
-                      : "border-slate-200 bg-white hover:border-purple-200"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-2xl dark:bg-purple-950/40">
-                      {tool.icon}
-                    </div>
-
-                    <span className="text-purple-600 transition group-hover:translate-x-1 dark:text-purple-400">
-                      →
-                    </span>
+            ].map((tool) => (
+              <button
+                key={tool.title}
+                type="button"
+                onClick={tool.action}
+                className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                  isDark
+                    ? "border-slate-800 bg-slate-900 hover:border-purple-800"
+                    : "border-slate-200 bg-white hover:border-purple-200"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-2xl dark:bg-purple-950/40">
+                    {tool.icon}
                   </div>
 
-                  <h3 className="mt-5 font-black">
-                    {tool.title}
-                  </h3>
+                  <span className="text-purple-600 transition group-hover:translate-x-1 dark:text-purple-400">
+                    →
+                  </span>
+                </div>
 
-                  <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    {
-                      tool.description
-                    }
-                  </p>
+                <h3 className="mt-5 font-black">
+                  {tool.title}
+                </h3>
 
-                  <p className="mt-4 text-xs font-black text-purple-600 dark:text-purple-400">
-                    Open →
-                  </p>
-                </button>
-              ),
-            )}
+                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  {tool.description}
+                </p>
+
+                <p className="mt-4 text-xs font-black text-purple-600 dark:text-purple-400">
+                  Open →
+                </p>
+              </button>
+            ))}
           </div>
         </section>
 
@@ -1461,20 +1235,16 @@ export function StudentDashboard() {
             </h2>
 
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Learn, revise and stay updated,
-              every day.
+              Learn, revise and stay updated, every day.
             </p>
           </div>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
-
             {/* ASK VIDHYA */}
 
             <button
               type="button"
-              onClick={
-                handleAskVidhya
-              }
+              onClick={handleAskVidhya}
               className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-left text-white shadow-xl shadow-purple-600/20 lg:row-span-2"
             >
               <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
@@ -1500,9 +1270,9 @@ export function StudentDashboard() {
                   </h3>
 
                   <p className="mt-4 text-sm leading-6 text-purple-50">
-                    Ask questions, understand
-                    concepts, create learning
-                    support and learn smarter.
+                    Ask questions, understand concepts,
+                    create learning support and learn
+                    smarter.
                   </p>
                 </div>
 
@@ -1518,9 +1288,7 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={
-                handleCurrentAffairs
-              }
+              onClick={handleCurrentAffairs}
               className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1542,8 +1310,8 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Stay updated with important
-                national and international news.
+                Stay updated with important national
+                and international news.
               </p>
 
               <p className="mt-4 text-xs font-black text-blue-600 dark:text-blue-400">
@@ -1555,9 +1323,7 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={
-                handleDailyNewspaper
-              }
+              onClick={handleDailyNewspaper}
               className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1579,8 +1345,7 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Read daily newspapers and stay
-                informed.
+                Read daily newspapers and stay informed.
               </p>
 
               <p className="mt-4 text-xs font-black text-pink-600 dark:text-pink-400">
@@ -1592,9 +1357,7 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={
-                handleVocabulary
-              }
+              onClick={handleVocabulary}
               className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1616,8 +1379,8 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Build vocabulary with words,
-                idioms and more.
+                Build vocabulary with words, idioms and
+                more.
               </p>
 
               <p className="mt-4 text-xs font-black text-cyan-600 dark:text-cyan-400">
@@ -1629,9 +1392,7 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={
-                handleExamTips
-              }
+              onClick={handleExamTips}
               className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1653,12 +1414,82 @@ export function StudentDashboard() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Practical strategies for smarter
-                exam preparation.
+                Practical strategies for smarter exam
+                preparation.
               </p>
 
               <p className="mt-4 text-xs font-black text-emerald-600 dark:text-emerald-400">
                 Explore →
+              </p>
+            </button>
+
+            {/* NCERT BOOKS */}
+
+            <button
+              type="button"
+              onClick={handleNCERTBooks}
+              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-2xl dark:bg-amber-950/40">
+                  📚
+                </div>
+
+                <span className="text-amber-600 transition group-hover:translate-x-1 dark:text-amber-400">
+                  →
+                </span>
+              </div>
+
+              <h3 className="mt-5 font-black">
+                NCERT Books
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Read complete NCERT books in PDF format
+                for your preparation.
+              </p>
+
+              <p className="mt-4 text-xs font-black text-amber-600 dark:text-amber-400">
+                Read Books →
+              </p>
+            </button>
+
+            {/* PREVIOUS YEAR PAPERS */}
+
+            <button
+              type="button"
+              onClick={handlePreviousYearPapers}
+              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-2xl dark:bg-indigo-950/40">
+                  📄
+                </div>
+
+                <span className="text-indigo-600 transition group-hover:translate-x-1 dark:text-indigo-400">
+                  →
+                </span>
+              </div>
+
+              <h3 className="mt-5 font-black">
+                Previous Year Papers
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Practice mixed previous year question
+                paper sets.
+              </p>
+
+              <p className="mt-4 text-xs font-black text-indigo-600 dark:text-indigo-400">
+                Practice Papers →
               </p>
             </button>
           </div>
@@ -1669,7 +1500,6 @@ export function StudentDashboard() {
         ================================================= */}
 
         <section className="mt-10 grid gap-5 lg:grid-cols-5">
-
           {/* RECOMMENDATION */}
 
           <div className="relative overflow-hidden rounded-3xl border border-purple-200 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-pink-50 p-6 dark:border-purple-900/40 dark:from-purple-950/30 dark:via-fuchsia-950/20 dark:to-pink-950/20 lg:col-span-3">
@@ -1684,38 +1514,28 @@ export function StudentDashboard() {
 
               {weakTopicsLoading ? (
                 <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Analysing your practice
-                  performance...
+                  Analysing your practice performance...
                 </p>
-              ) : weakTopics.length >
-                0 ? (
+              ) : weakTopics.length > 0 ? (
                 <>
                   <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
                     Today, focus on{" "}
                     <span className="font-black text-purple-700 dark:text-purple-300">
-                      {
-                        weakTopics[0]
-                          .category
-                      }
+                      {weakTopics[0].category}
                     </span>
-                    . Your current accuracy
-                    in this topic is{" "}
+                    . Your current accuracy in this
+                    topic is{" "}
                     <span className="font-black">
-                      {
-                        weakTopics[0]
-                          .accuracy
-                      }%
+                      {weakTopics[0].accuracy}%
                     </span>
-                    . Practice more questions
-                    from this topic to improve.
+                    . Practice more questions from this
+                    topic to improve.
                   </p>
 
                   <button
                     type="button"
                     onClick={() =>
-                      handleWeakTopic(
-                        weakTopics[0],
-                      )
+                      handleWeakTopic(weakTopics[0])
                     }
                     className="mt-6 rounded-xl bg-purple-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700"
                   >
@@ -1725,17 +1545,14 @@ export function StudentDashboard() {
               ) : (
                 <>
                   <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Start solving practice
-                    questions and Ranker Bhaiya
-                    will identify the topics that
-                    need more attention.
+                    Start solving practice questions and
+                    Ranker Bhaiya will identify the topics
+                    that need more attention.
                   </p>
 
                   <button
                     type="button"
-                    onClick={
-                      handlePracticeQuestions
-                    }
+                    onClick={handlePracticeQuestions}
                     className="mt-6 rounded-xl bg-purple-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700"
                   >
                     Start Practicing →
@@ -1760,9 +1577,7 @@ export function StudentDashboard() {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">
-                  🧠
-                </span>
+                <span className="text-2xl">🧠</span>
 
                 <h3 className="font-black">
                   Your Weak Topics
@@ -1771,9 +1586,7 @@ export function StudentDashboard() {
 
               <button
                 type="button"
-                onClick={
-                  handleProgress
-                }
+                onClick={handleProgress}
                 className="text-xs font-black text-purple-600 dark:text-purple-400"
               >
                 View All →
@@ -1782,21 +1595,18 @@ export function StudentDashboard() {
 
             {weakTopicsLoading ? (
               <div className="mt-6 space-y-4">
-                {[1, 2, 3].map(
-                  (item) => (
-                    <div
-                      key={item}
-                      className="animate-pulse"
-                    >
-                      <div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" />
+                {[1, 2, 3].map((item) => (
+                  <div
+                    key={item}
+                    className="animate-pulse"
+                  >
+                    <div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" />
 
-                      <div className="mt-2 h-2 rounded bg-slate-200 dark:bg-slate-800" />
-                    </div>
-                  ),
-                )}
+                    <div className="mt-2 h-2 rounded bg-slate-200 dark:bg-slate-800" />
+                  </div>
+                ))}
               </div>
-            ) : weakTopics.length ===
-              0 ? (
+            ) : weakTopics.length === 0 ? (
               <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-center dark:bg-slate-950">
                 <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
                   Not enough practice data yet.
@@ -1804,9 +1614,7 @@ export function StudentDashboard() {
 
                 <button
                   type="button"
-                  onClick={
-                    handlePracticeQuestions
-                  }
+                  onClick={handlePracticeQuestions}
                   className="mt-3 text-xs font-black text-purple-600 dark:text-purple-400"
                 >
                   Practice Questions →
@@ -1814,60 +1622,43 @@ export function StudentDashboard() {
               </div>
             ) : (
               <div className="mt-6 space-y-5">
-                {weakTopics.map(
-                  (topic) => (
-                    <button
-                      key={
-                        topic.category
-                      }
-                      type="button"
-                      onClick={() =>
-                        handleWeakTopic(
-                          topic,
-                        )
-                      }
-                      className="w-full text-left"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="truncate text-sm font-bold">
-                          {
-                            topic.category
-                          }
-                        </span>
+                {weakTopics.map((topic) => (
+                  <button
+                    key={topic.category}
+                    type="button"
+                    onClick={() => handleWeakTopic(topic)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate text-sm font-bold">
+                        {topic.category}
+                      </span>
 
-                        <span className="shrink-0 text-xs font-black text-red-500">
-                          {
-                            topic.accuracy
-                          }%
-                        </span>
-                      </div>
+                      <span className="shrink-0 text-xs font-black text-red-500">
+                        {topic.accuracy}%
+                      </span>
+                    </div>
 
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            topic.accuracy <
-                            50
-                              ? "bg-red-500"
-                              : topic.accuracy <
-                                  70
-                                ? "bg-amber-500"
-                                : "bg-emerald-500"
-                          }`}
-                          style={{
-                            width: `${topic.accuracy}%`,
-                          }}
-                        />
-                      </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          topic.accuracy < 50
+                            ? "bg-red-500"
+                            : topic.accuracy < 70
+                              ? "bg-amber-500"
+                              : "bg-emerald-500"
+                        }`}
+                        style={{
+                          width: `${topic.accuracy}%`,
+                        }}
+                      />
+                    </div>
 
-                      <p className="mt-1 text-[10px] font-semibold text-slate-400">
-                        {
-                          topic.attempted
-                        }{" "}
-                        questions attempted
-                      </p>
-                    </button>
-                  ),
-                )}
+                    <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                      {topic.attempted} questions attempted
+                    </p>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -1891,20 +1682,16 @@ export function StudentDashboard() {
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-pink-50">
-                Practice questions, check your
-                accuracy and build a consistent
-                study habit.
+                Practice questions, check your accuracy
+                and build a consistent study habit.
               </p>
 
               <div className="mt-5 max-w-md">
                 <div className="flex items-center justify-between text-xs font-black">
-                  <span>
-                    Today's progress
-                  </span>
+                  <span>Today's progress</span>
 
                   <span>
-                    {dailyPractice}/
-                    {DAILY_TARGET}
+                    {dailyPractice}/{DAILY_TARGET}
                   </span>
                 </div>
 
@@ -1921,9 +1708,7 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={
-                handleDailyPractice
-              }
+              onClick={handleDailyPractice}
               className="shrink-0 rounded-2xl bg-white px-6 py-4 text-sm font-black text-pink-600 shadow-xl transition hover:bg-pink-50 active:scale-95"
             >
               Start Practice →
@@ -1950,30 +1735,19 @@ export function StudentDashboard() {
             {[
               {
                 icon: "🔥",
-                title:
-                  "7 Day Streak",
-                unlocked:
-                  currentStreak >=
-                  7,
+                title: "7 Day Streak",
+                unlocked: currentStreak >= 7,
                 value:
-                  currentStreak >=
-                  7
+                  currentStreak >= 7
                     ? "UNLOCKED"
-                    : `${Math.min(
-                        currentStreak,
-                        7,
-                      )}/7 DAYS`,
+                    : `${Math.min(currentStreak, 7)}/7 DAYS`,
               },
               {
                 icon: "📝",
-                title:
-                  "100 Questions",
-                unlocked:
-                  preparationStats.attempted >=
-                  100,
+                title: "100 Questions",
+                unlocked: preparationStats.attempted >= 100,
                 value:
-                  preparationStats.attempted >=
-                  100
+                  preparationStats.attempted >= 100
                     ? "UNLOCKED"
                     : `${Math.min(
                         preparationStats.attempted,
@@ -1982,88 +1756,69 @@ export function StudentDashboard() {
               },
               {
                 icon: "🎯",
-                title:
-                  "80% Accuracy",
-                unlocked:
-                  preparationStats.accuracy >=
-                  80,
+                title: "80% Accuracy",
+                unlocked: preparationStats.accuracy >= 80,
                 value:
-                  preparationStats.attempted ===
-                  0
+                  preparationStats.attempted === 0
                     ? "START"
-                    : preparationStats.accuracy >=
-                        80
+                    : preparationStats.accuracy >= 80
                       ? "UNLOCKED"
                       : `${preparationStats.accuracy}%`,
               },
               {
                 icon: "🚀",
-                title:
-                  "Keep Learning",
-                unlocked:
-                  preparationStats.attempted >=
-                  20,
+                title: "Keep Learning",
+                unlocked: preparationStats.attempted >= 20,
                 value:
-                  preparationStats.attempted >=
-                  20
+                  preparationStats.attempted >= 20
                     ? "UNLOCKED"
                     : `${Math.min(
                         preparationStats.attempted,
                         20,
                       )}/20`,
               },
-            ].map(
-              (achievement) => (
-                <div
-                  key={
-                    achievement.title
-                  }
-                  className={`rounded-3xl border p-5 ${
-                    achievement.unlocked
-                      ? isDark
-                        ? "border-emerald-900/50 bg-emerald-950/20"
-                        : "border-emerald-200 bg-emerald-50"
-                      : isDark
-                        ? "border-slate-800 bg-slate-900"
-                        : "border-slate-200 bg-white"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="text-3xl">
-                      {
-                        achievement.icon
-                      }
-                    </span>
+            ].map((achievement) => (
+              <div
+                key={achievement.title}
+                className={`rounded-3xl border p-5 ${
+                  achievement.unlocked
+                    ? isDark
+                      ? "border-emerald-900/50 bg-emerald-950/20"
+                      : "border-emerald-200 bg-emerald-50"
+                    : isDark
+                      ? "border-slate-800 bg-slate-900"
+                      : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-3xl">
+                    {achievement.icon}
+                  </span>
 
-                    <span
-                      className={`rounded-lg px-2 py-1 text-[9px] font-black ${
-                        achievement.unlocked
-                          ? "bg-emerald-500 text-white"
-                          : isDark
-                            ? "bg-slate-800 text-slate-500"
-                            : "bg-slate-100 text-slate-400"
-                      }`}
-                    >
-                      {
-                        achievement.value
-                      }
-                    </span>
-                  </div>
-
-                  <h3 className="mt-5 font-black">
-                    {
-                      achievement.title
-                    }
-                  </h3>
-
-                  <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    {achievement.unlocked
-                      ? "Achievement unlocked"
-                      : "Keep going"}
-                  </p>
+                  <span
+                    className={`rounded-lg px-2 py-1 text-[9px] font-black ${
+                      achievement.unlocked
+                        ? "bg-emerald-500 text-white"
+                        : isDark
+                          ? "bg-slate-800 text-slate-500"
+                          : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {achievement.value}
+                  </span>
                 </div>
-              ),
-            )}
+
+                <h3 className="mt-5 font-black">
+                  {achievement.title}
+                </h3>
+
+                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {achievement.unlocked
+                    ? "Achievement unlocked"
+                    : "Keep going"}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -2089,19 +1844,15 @@ export function StudentDashboard() {
               </h2>
 
               <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600 dark:text-slate-300">
-                Ranker Bhaiya is a
-                student-focused learning
-                platform built to make exam
-                preparation simpler, smarter,
-                and more effective. From daily
-                current affairs and newspaper
-                reading to fast revision,
-                vocabulary building, and
-                AI-powered learning support,
-                everything is designed to help
-                students stay consistent, learn
-                with clarity, and prepare with
-                confidence.
+                Ranker Bhaiya is a student-focused
+                learning platform built to make exam
+                preparation simpler, smarter, and more
+                effective. From daily current affairs and
+                newspaper reading to fast revision,
+                vocabulary building, and AI-powered
+                learning support, everything is designed
+                to help students stay consistent, learn
+                with clarity, and prepare with confidence.
               </p>
             </div>
           </div>
@@ -2113,9 +1864,8 @@ export function StudentDashboard() {
 
         <footer className="py-8 text-center">
           <p className="text-xs font-semibold text-slate-400">
-            © {new Date().getFullYear()} Ranker
-            Bhaiya · Aapki Mehnat, Hamari
-            Strategy.
+            © {new Date().getFullYear()} Ranker Bhaiya ·
+            Aapki Mehnat, Hamari Strategy.
           </p>
         </footer>
       </main>
