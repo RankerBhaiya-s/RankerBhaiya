@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -9,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
+import { recordStudentActivity } from "../../lib/studentActivity";
 
 /* =====================================================
    TYPES
@@ -30,6 +32,18 @@ interface Message {
 }
 
 /* =====================================================
+   CONSTANTS
+===================================================== */
+
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
+
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
+
+/* =====================================================
    COMPONENT
 ===================================================== */
 
@@ -41,6 +55,9 @@ export function AskVidhya() {
     profile,
     loading: authLoading,
   } = useAuth();
+
+  const imageInputRef =
+    useRef<HTMLInputElement | null>(null);
 
   const [conversations, setConversations] =
     useState<Conversation[]>([]);
@@ -54,6 +71,12 @@ export function AskVidhya() {
   ] = useState<string | null>(null);
 
   const [question, setQuestion] =
+    useState("");
+
+  const [imageDataUrl, setImageDataUrl] =
+    useState<string | null>(null);
+
+  const [imageName, setImageName] =
     useState("");
 
   const [loading, setLoading] =
@@ -193,7 +216,13 @@ export function AskVidhya() {
     setSelectedConversationId(null);
     setMessages([]);
     setQuestion("");
+    setImageDataUrl(null);
+    setImageName("");
     setError("");
+
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
   }
 
   /* ===================================================
@@ -227,10 +256,6 @@ export function AskVidhya() {
     setError("");
 
     try {
-      /*
-       * Delete messages first.
-       */
-
       const {
         error: messagesDeleteError,
       } = await supabase
@@ -244,10 +269,6 @@ export function AskVidhya() {
       if (messagesDeleteError) {
         throw messagesDeleteError;
       }
-
-      /*
-       * Delete conversation.
-       */
 
       const {
         error: conversationDeleteError,
@@ -267,10 +288,6 @@ export function AskVidhya() {
         throw conversationDeleteError;
       }
 
-      /*
-       * Update local history.
-       */
-
       setConversations(
         (previous) =>
           previous.filter(
@@ -279,10 +296,6 @@ export function AskVidhya() {
               conversation.id,
           ),
       );
-
-      /*
-       * Reset currently opened chat.
-       */
 
       if (
         selectedConversationId ===
@@ -294,6 +307,8 @@ export function AskVidhya() {
 
         setMessages([]);
         setQuestion("");
+        setImageDataUrl(null);
+        setImageName("");
       }
     } catch (err) {
       console.error(
@@ -329,6 +344,125 @@ export function AskVidhya() {
   }, [authLoading, user]);
 
   /* ===================================================
+     IMAGE TO DATA URL
+  =================================================== */
+
+  function readImageAsDataUrl(
+    file: File,
+  ): Promise<string> {
+    return new Promise(
+      (resolve, reject) => {
+        const reader =
+          new FileReader();
+
+        reader.onload = () => {
+          if (
+            typeof reader.result !==
+            "string"
+          ) {
+            reject(
+              new Error(
+                "Unable to read image.",
+              ),
+            );
+            return;
+          }
+
+          resolve(reader.result);
+        };
+
+        reader.onerror = () => {
+          reject(
+            new Error(
+              "Unable to read image.",
+            ),
+          );
+        };
+
+        reader.readAsDataURL(file);
+      },
+    );
+  }
+
+  /* ===================================================
+     IMAGE UPLOAD
+  =================================================== */
+
+  async function handleImageChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setError("");
+
+    if (
+      !ALLOWED_IMAGE_TYPES.includes(
+        file.type,
+      )
+    ) {
+      event.target.value = "";
+
+      setError(
+        "Please upload a JPG, PNG or WEBP image.",
+      );
+
+      return;
+    }
+
+    if (
+      file.size >
+      MAX_IMAGE_SIZE
+    ) {
+      event.target.value = "";
+
+      setError(
+        "Image size must be 8 MB or smaller.",
+      );
+
+      return;
+    }
+
+    try {
+      const dataUrl =
+        await readImageAsDataUrl(
+          file,
+        );
+
+      setImageDataUrl(dataUrl);
+      setImageName(file.name);
+    } catch (err) {
+      console.error(
+        "Image upload error:",
+        err,
+      );
+
+      setError(
+        "Unable to process this image.",
+      );
+
+      event.target.value = "";
+    }
+  }
+
+  /* ===================================================
+     REMOVE IMAGE
+  =================================================== */
+
+  function removeImage() {
+    setImageDataUrl(null);
+    setImageName("");
+
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  }
+
+  /* ===================================================
      ASK VIDHYA
   =================================================== */
 
@@ -340,10 +474,14 @@ export function AskVidhya() {
     const trimmedQuestion =
       question.trim();
 
-    if (!trimmedQuestion) {
+    if (
+      !trimmedQuestion &&
+      !imageDataUrl
+    ) {
       setError(
-        "Please enter your question.",
+        "Please enter a question or upload a photo.",
       );
+
       return;
     }
 
@@ -351,6 +489,7 @@ export function AskVidhya() {
       setError(
         "Please login first.",
       );
+
       return;
     }
 
@@ -370,6 +509,16 @@ export function AskVidhya() {
         "========================================",
       );
 
+      /*
+       * The image is sent as a data URL.
+       * The Edge Function must support
+       * image_data_url for vision questions.
+       */
+
+      const displayQuestion =
+        trimmedQuestion ||
+        "Please solve/explain this question from the uploaded image.";
+
       const {
         data,
         error: functionError,
@@ -378,7 +527,10 @@ export function AskVidhya() {
         {
           body: {
             question:
-              trimmedQuestion,
+              displayQuestion,
+
+            image_data_url:
+              imageDataUrl,
 
             conversation_id:
               selectedConversationId,
@@ -430,6 +582,24 @@ export function AskVidhya() {
         );
       }
 
+      /*
+       * Record Ask Vidhya activity.
+       */
+
+      const activityResult =
+        await recordStudentActivity({
+          userId: user.id,
+          activityType:
+            "ask_vidhya",
+        });
+
+      if (!activityResult.success) {
+        console.error(
+          "Failed to record Ask Vidhya activity:",
+          activityResult.error,
+        );
+      }
+
       const conversationId =
         typeof data.conversation_id ===
         "string"
@@ -448,6 +618,13 @@ export function AskVidhya() {
       const currentConversationId =
         conversationId || "";
 
+      const userContent =
+        imageDataUrl
+          ? trimmedQuestion
+            ? `📷 ${trimmedQuestion}\n\n[Photo attached: ${imageName || "uploaded image"}]`
+            : `📷 Photo question\n\n[Photo attached: ${imageName || "uploaded image"}]`
+          : trimmedQuestion;
+
       const userMessage: Message = {
         id: `temp-user-${Date.now()}`,
 
@@ -457,7 +634,7 @@ export function AskVidhya() {
         role: "user",
 
         content:
-          trimmedQuestion,
+          userContent,
 
         created_at: now,
       };
@@ -486,9 +663,7 @@ export function AskVidhya() {
 
       setQuestion("");
 
-      /*
-       * Refresh chat history.
-       */
+      removeImage();
 
       await loadConversations();
 
@@ -527,12 +702,6 @@ export function AskVidhya() {
   function openHandwrittenNotes(
     message: Message,
   ) {
-    /*
-     * Find the closest previous user message.
-     * This gives the notes page the original
-     * question/topic instead of using a generic title.
-     */
-
     const messageIndex =
       messages.findIndex(
         (item) =>
@@ -693,8 +862,6 @@ export function AskVidhya() {
             </div>
 
             <div className="mt-4 space-y-2">
-              {/* LOADING */}
-
               {historyLoading && (
                 <div className="rounded-xl bg-slate-50 p-4 text-center dark:bg-slate-800">
                   <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
@@ -704,8 +871,6 @@ export function AskVidhya() {
                   </p>
                 </div>
               )}
-
-              {/* EMPTY */}
 
               {!historyLoading &&
                 conversations.length ===
@@ -725,8 +890,6 @@ export function AskVidhya() {
                   </div>
                 )}
 
-              {/* HISTORY */}
-
               {conversations.map(
                 (conversation) => (
                   <div
@@ -740,8 +903,6 @@ export function AskVidhya() {
                         : "hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   >
-                    {/* CHAT */}
-
                     <button
                       type="button"
                       onClick={() =>
@@ -771,8 +932,6 @@ export function AskVidhya() {
                         )}
                       </p>
                     </button>
-
-                    {/* DELETE */}
 
                     <button
                       type="button"
@@ -856,8 +1015,6 @@ export function AskVidhya() {
             ================================================= */}
 
             <div className="flex-1 space-y-5 overflow-y-auto p-5">
-              {/* EMPTY CHAT */}
-
               {messages.length ===
                 0 && (
                 <div className="flex min-h-[420px] items-center justify-center text-center">
@@ -891,14 +1048,12 @@ export function AskVidhya() {
                       </span>
 
                       <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
-                        ✍️ Handwritten Notes
+                        📷 Photo Questions
                       </span>
                     </div>
                   </div>
                 </div>
               )}
-
-              {/* MESSAGES */}
 
               {messages.map(
                 (message) => {
@@ -924,16 +1079,12 @@ export function AskVidhya() {
                             : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
                         }`}
                       >
-                        {/* SENDER */}
-
                         <p className="mb-2 text-xs font-semibold opacity-70">
                           {message.role ===
                           "user"
                             ? "You"
                             : "🤖 Vidhya"}
                         </p>
-
-                        {/* AI */}
 
                         {isAssistant ? (
                           <>
@@ -1134,9 +1285,7 @@ export function AskVidhya() {
                               </ReactMarkdown>
                             </div>
 
-                            {/* =================================================
-                                HANDWRITTEN NOTES BUTTON
-                            ================================================= */}
+                            {/* HANDWRITTEN NOTES */}
 
                             <div className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
                               <button
@@ -1146,31 +1295,7 @@ export function AskVidhya() {
                                     message,
                                   )
                                 }
-                                className="
-                                  inline-flex
-                                  items-center
-                                  gap-2
-                                  rounded-xl
-                                  border
-                                  border-violet-200
-                                  bg-gradient-to-r
-                                  from-violet-50
-                                  to-blue-50
-                                  px-4
-                                  py-2.5
-                                  text-sm
-                                  font-black
-                                  text-violet-700
-                                  shadow-sm
-                                  transition
-                                  hover:-translate-y-0.5
-                                  hover:border-violet-300
-                                  hover:shadow-md
-                                  dark:border-violet-900
-                                  dark:from-violet-950/50
-                                  dark:to-blue-950/50
-                                  dark:text-violet-300
-                                "
+                                className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-blue-50 px-4 py-2.5 text-sm font-black text-violet-700 shadow-sm transition hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md dark:border-violet-900 dark:from-violet-950/50 dark:to-blue-950/50 dark:text-violet-300"
                               >
                                 <span className="text-base">
                                   ✍️
@@ -1225,16 +1350,12 @@ export function AskVidhya() {
               )}
             </div>
 
-            {/* =================================================
-                ERROR
-            ================================================= */}
+            {/* ERROR */}
 
             {error && (
               <div className="mx-5 mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
                 <div className="flex items-start gap-2">
-                  <span>
-                    ❌
-                  </span>
+                  <span>❌</span>
 
                   <span>
                     {error}
@@ -1251,6 +1372,42 @@ export function AskVidhya() {
               onSubmit={handleAsk}
               className="border-t border-slate-200 p-4 dark:border-slate-800"
             >
+              {/* IMAGE PREVIEW */}
+
+              {imageDataUrl && (
+                <div className="mb-3 rounded-2xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/30">
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={imageDataUrl}
+                      alt="Uploaded question"
+                      className="h-24 w-24 rounded-xl border border-slate-200 object-cover dark:border-slate-700"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
+                        📷 Photo attached
+                      </p>
+
+                      <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                        {imageName ||
+                          "Uploaded image"}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={
+                          removeImage
+                        }
+                        disabled={loading}
+                        className="mt-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:bg-slate-900 dark:text-red-400"
+                      >
+                        Remove Photo
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <textarea
                 value={question}
                 onChange={(event) =>
@@ -1258,25 +1415,58 @@ export function AskVidhya() {
                     event.target.value,
                   )
                 }
-                placeholder="Ask Vidhya anything about your studies..."
+                placeholder={
+                  imageDataUrl
+                    ? "Ask Vidhya about this photo..."
+                    : "Ask Vidhya anything about your studies..."
+                }
                 rows={3}
                 disabled={loading}
                 className="w-full resize-none rounded-2xl border border-slate-300 bg-white p-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
               />
 
               <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-slate-400">
-                  Vidhya can explain
-                  concepts, solve
-                  questions and help with
-                  exam preparation.
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* HIDDEN FILE INPUT */}
+
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={
+                      handleImageChange
+                    }
+                    className="hidden"
+                  />
+
+                  {/* UPLOAD BUTTON */}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      imageInputRef.current?.click()
+                    }
+                    disabled={loading}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-blue-800 dark:hover:bg-blue-950/30 dark:hover:text-blue-300"
+                  >
+                    <span className="text-base">
+                      📷
+                    </span>
+
+                    Upload Photo
+                  </button>
+
+                  <p className="hidden text-xs text-slate-400 sm:block">
+                    JPG, PNG or WEBP • Max 8 MB
+                  </p>
+                </div>
 
                 <button
                   type="submit"
                   disabled={
                     loading ||
-                    !question.trim()
+                    (!question.trim() &&
+                      !imageDataUrl)
                   }
                   className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -1285,6 +1475,13 @@ export function AskVidhya() {
                     : "Ask Vidhya 🤖"}
                 </button>
               </div>
+
+              <p className="mt-3 text-xs text-slate-400">
+                Vidhya can explain concepts,
+                solve questions, analyse uploaded
+                photos and help with exam
+                preparation.
+              </p>
             </form>
           </section>
         </div>
