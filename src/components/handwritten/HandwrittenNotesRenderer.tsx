@@ -260,9 +260,7 @@ function Section({
 }) {
   return (
     <section className="hw-section">
-      {/* -----------------------------------------------
-          HEADING
-      ------------------------------------------------ */}
+      {/* HEADING */}
 
       <div className="hw-section-heading">
         <span className="hw-heading-bullet">
@@ -284,9 +282,7 @@ function Section({
         </span>
       </div>
 
-      {/* -----------------------------------------------
-          DEFINITIONS
-      ------------------------------------------------ */}
+      {/* DEFINITIONS */}
 
       {section.type ===
         "definitions" &&
@@ -325,9 +321,7 @@ function Section({
           </div>
         )}
 
-      {/* -----------------------------------------------
-          BULLETS
-      ------------------------------------------------ */}
+      {/* BULLETS */}
 
       {section.type ===
         "bullets" &&
@@ -337,17 +331,13 @@ function Section({
           />
         )}
 
-      {/* -----------------------------------------------
-          DIAGRAM
-      ------------------------------------------------ */}
+      {/* DIAGRAM */}
 
       {section.type === "diagram" && (
         <Diagram section={section} />
       )}
 
-      {/* -----------------------------------------------
-          FLOWCHART
-      ------------------------------------------------ */}
+      {/* FLOWCHART */}
 
       {section.type ===
         "flowchart" &&
@@ -374,9 +364,7 @@ function Section({
           </div>
         )}
 
-      {/* -----------------------------------------------
-          EQUATION
-      ------------------------------------------------ */}
+      {/* EQUATION */}
 
       {section.type ===
         "equation" &&
@@ -396,9 +384,7 @@ function Section({
           </div>
         )}
 
-      {/* -----------------------------------------------
-          EXAM POINTS
-      ------------------------------------------------ */}
+      {/* EXAM POINTS */}
 
       {section.type ===
         "exam_points" &&
@@ -429,9 +415,7 @@ function Section({
           </div>
         )}
 
-      {/* -----------------------------------------------
-          QUICK REVISION
-      ------------------------------------------------ */}
+      {/* QUICK REVISION */}
 
       {section.type ===
         "quick_revision" &&
@@ -465,9 +449,7 @@ function Section({
           </div>
         )}
 
-      {/* -----------------------------------------------
-          MEMORY TRICK
-      ------------------------------------------------ */}
+      {/* MEMORY TRICK */}
 
       {section.type ===
         "mnemonic" &&
@@ -487,9 +469,7 @@ function Section({
 }
 
 /* =====================================================
-   PAGE HEADER
-   IMPORTANT:
-   This header stays on EVERY rendered notebook page.
+   PAGE BRANDING
 ===================================================== */
 
 function PageBranding() {
@@ -506,7 +486,7 @@ function PageBranding() {
           </div>
 
           <div className="hw-brand-tagline">
-            Smart Study • Better Revision
+            Aapki Mehnat, Hamari Strategy.
           </div>
         </div>
       </div>
@@ -618,21 +598,9 @@ export default function HandwrittenNotesRenderer({
   return (
     <div className="hw-renderer-wrapper">
       <article className="hw-page">
-        {/* ---------------------------------------------
-            EVERY PAGE BRANDING
-        ---------------------------------------------- */}
-
         <PageBranding />
 
-        {/* ---------------------------------------------
-            MAIN TITLE
-        ---------------------------------------------- */}
-
         <NoteTitle notes={notes} />
-
-        {/* ---------------------------------------------
-            CONTENT
-        ---------------------------------------------- */}
 
         <main className="hw-content">
           {notes.sections.map(
@@ -644,10 +612,6 @@ export default function HandwrittenNotesRenderer({
             ),
           )}
         </main>
-
-        {/* ---------------------------------------------
-            FOOTER
-        ---------------------------------------------- */}
 
         <PageFooter
           footerTip={notes.footerTip}
