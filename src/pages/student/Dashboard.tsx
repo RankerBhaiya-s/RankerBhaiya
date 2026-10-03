@@ -10,22 +10,29 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { supabase } from "../../lib/supabase";
-import { getDailyMindset } from "../../data/dailyMindsets";
-
-type ActivityType =
-  | "practice_questions"
-  | "daily_challenge"
-  | "current_affairs"
-  | "daily_newspaper"
-  | "fast_revision"
-  | "short_videos"
-  | "ask_vidhya"
-  | "vocabulary"
-  | "five_minute_challenge";
+import { getMindsetText } from "../../data/dailyMindsets";
 
 type ActivityRow = {
   activity_date: string;
   activity_type: string;
+};
+
+type PracticeQuestionRelation =
+  | {
+      category: string | null;
+    }
+  | {
+      category: string | null;
+    }[]
+  | null;
+
+type PracticeAttemptRow = {
+  id: string;
+  user_id: string;
+  question_id: string;
+  is_correct: boolean;
+  created_at: string;
+  practice_questions?: PracticeQuestionRelation;
 };
 
 type PracticeAttempt = {
@@ -74,10 +81,12 @@ function formatDate(date: Date) {
 function getLastSevenDates() {
   const dates: string[] = [];
 
-  for (let i = 6; i >= 0; i--) {
+  for (let i = 6; i >= 0; i -= 1) {
     const date = new Date();
+
     date.setHours(12, 0, 0, 0);
     date.setDate(date.getDate() - i);
+
     dates.push(formatDate(date));
   }
 
@@ -86,22 +95,23 @@ function getLastSevenDates() {
 
 function calculateStreak(activity: ActivityRow[]) {
   const activityDates = new Set(
-    activity.map((item) => item.activity_date)
+    activity.map((item) => item.activity_date),
   );
 
   let streak = 0;
 
   const today = new Date();
 
-  for (let i = 0; i < 365; i++) {
+  for (let i = 0; i < 365; i += 1) {
     const date = new Date(today);
+
     date.setHours(12, 0, 0, 0);
     date.setDate(date.getDate() - i);
 
     const dateString = formatDate(date);
 
     if (activityDates.has(dateString)) {
-      streak++;
+      streak += 1;
     } else {
       break;
     }
@@ -135,34 +145,96 @@ function getInitials(name: string) {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
+function normalizePracticeAttempts(
+  rows: PracticeAttemptRow[],
+): PracticeAttempt[] {
+  return rows.map((row) => {
+    const relation = row.practice_questions;
+
+    const practiceQuestion = Array.isArray(relation)
+      ? relation[0]
+      : relation;
+
+    return {
+      id: String(row.id),
+      user_id: String(row.user_id),
+      question_id: String(row.question_id),
+      is_correct: Boolean(row.is_correct),
+      created_at: String(row.created_at),
+      practice_questions: practiceQuestion
+        ? {
+            category: practiceQuestion.category ?? null,
+          }
+        : null,
+    };
+  });
+}
+
 export function StudentDashboard() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+
+  const { i18n } = useTranslation();
+
   const { user, signOut } = useAuth();
-  const { isDark } = useTheme();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { theme } = useTheme();
 
-  const [activities, setActivities] = useState<ActivityRow[]>(
-    []
-  );
+  const isDark = theme === "dark";
 
-  const [attempts, setAttempts] = useState<PracticeAttempt[]>(
-    []
-  );
+  const [profile, setProfile] =
+    useState<Profile | null>(null);
 
-  const [loading, setLoading] = useState(true);
+  const [activities, setActivities] =
+    useState<ActivityRow[]>([]);
+
+  const [attempts, setAttempts] =
+    useState<PracticeAttempt[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
   const [profileMenuOpen, setProfileMenuOpen] =
     useState(false);
 
   const [missionCompleted, setMissionCompleted] =
     useState(false);
 
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  /*
+   * =========================================================
+   * DAILY MINDSET
+   * =========================================================
+   */
 
   const dailyMindset = useMemo(() => {
-    return getDailyMindset();
-  }, []);
+    const language =
+      i18n.language?.toLowerCase() || "en";
+
+    if (
+      language === "hi" ||
+      language.startsWith("hi-") ||
+      language.startsWith("hindi")
+    ) {
+      return getMindsetText("hi");
+    }
+
+    if (
+      language === "hinglish" ||
+      language.startsWith("hinglish")
+    ) {
+      return getMindsetText("hinglish");
+    }
+
+    return getMindsetText("en");
+  }, [i18n.language]);
+
+  /*
+   * =========================================================
+   * USER
+   * =========================================================
+   */
 
   const userName = useMemo(() => {
     return (
@@ -175,242 +247,440 @@ export function StudentDashboard() {
     );
   }, [profile, user]);
 
-  const displayName = userName.trim().split(/\s+/)[0];
+  const displayName =
+    userName.trim().split(/\s+/)[0] || "Student";
 
-  const fullDisplayName = userName.trim();
+  const fullDisplayName =
+    userName.trim() || "Student";
 
-  const userInitials = getInitials(fullDisplayName);
+  const userInitials =
+    getInitials(fullDisplayName);
 
   const className =
     profile?.className ||
     profile?.class_name ||
     "";
 
-  const examName = profile?.exam || "";
+  const examName =
+    profile?.exam || "";
 
-  const today = formatDate(new Date());
+  const today =
+    formatDate(new Date());
 
-  const lastSevenDates = useMemo(
-    () => getLastSevenDates(),
-    []
-  );
+  const lastSevenDates =
+    useMemo(
+      () => getLastSevenDates(),
+      [],
+    );
 
-  const streak = useMemo(() => {
-    return calculateStreak(activities);
-  }, [activities]);
+  /*
+   * =========================================================
+   * STREAK
+   * =========================================================
+   */
 
-  const preparationStats = useMemo(() => {
-    const total = attempts.length;
+  const streak =
+    useMemo(
+      () =>
+        calculateStreak(
+          activities,
+        ),
+      [activities],
+    );
 
-    const correct = attempts.filter(
-      (attempt) => attempt.is_correct
-    ).length;
+  /*
+   * =========================================================
+   * PREPARATION STATS
+   * =========================================================
+   */
 
-    const accuracy =
-      total > 0 ? Math.round((correct / total) * 100) : 0;
+  const preparationStats =
+    useMemo(() => {
+      const total =
+        attempts.length;
 
-    return {
-      total,
-      correct,
-      accuracy,
-    };
-  }, [attempts]);
+      const correct =
+        attempts.filter(
+          (attempt) =>
+            attempt.is_correct,
+        ).length;
 
-  const weakTopics = useMemo<WeakTopic[]>(() => {
-    const topicMap = new Map<
-      string,
-      {
-        total: number;
-        wrong: number;
-      }
-    >();
+      const accuracy =
+        total > 0
+          ? Math.round(
+              (correct / total) *
+                100,
+            )
+          : 0;
 
-    attempts.forEach((attempt) => {
-      const category =
-        attempt.practice_questions?.category ||
-        "General Practice";
-
-      const current = topicMap.get(category) || {
-        total: 0,
-        wrong: 0,
+      return {
+        total,
+        correct,
+        accuracy,
       };
+    }, [attempts]);
 
-      current.total += 1;
+  /*
+   * =========================================================
+   * WEAK TOPICS
+   * =========================================================
+   */
 
-      if (!attempt.is_correct) {
-        current.wrong += 1;
-      }
+  const weakTopics =
+    useMemo<WeakTopic[]>(() => {
+      const topicMap =
+        new Map<
+          string,
+          {
+            total: number;
+            wrong: number;
+          }
+        >();
 
-      topicMap.set(category, current);
-    });
+      attempts.forEach(
+        (attempt) => {
+          const category =
+            attempt
+              .practice_questions
+              ?.category ||
+            "General Practice";
 
-    return Array.from(topicMap.entries())
-      .map(([name, values]) => ({
-        name,
-        total: values.total,
-        wrong: values.wrong,
-        accuracy:
-          values.total > 0
-            ? Math.round(
-                ((values.total - values.wrong) /
-                  values.total) *
-                  100
-              )
-            : 0,
-      }))
-      .filter((topic) => topic.total >= 2)
-      .sort((a, b) => {
-        if (b.wrong !== a.wrong) {
-          return b.wrong - a.wrong;
-        }
+          const current =
+            topicMap.get(
+              category,
+            ) || {
+              total: 0,
+              wrong: 0,
+            };
 
-        return a.accuracy - b.accuracy;
-      })
-      .slice(0, 3);
-  }, [attempts]);
+          current.total += 1;
 
-  const todayActivities = useMemo(() => {
-    return activities.filter(
-      (activity) => activity.activity_date === today
+          if (
+            !attempt.is_correct
+          ) {
+            current.wrong += 1;
+          }
+
+          topicMap.set(
+            category,
+            current,
+          );
+        },
+      );
+
+      return Array.from(
+        topicMap.entries(),
+      )
+        .map(
+          ([name, values]) => ({
+            name,
+            total:
+              values.total,
+            wrong:
+              values.wrong,
+            accuracy:
+              values.total > 0
+                ? Math.round(
+                    ((values.total -
+                      values.wrong) /
+                      values.total) *
+                      100,
+                  )
+                : 0,
+          }),
+        )
+        .filter(
+          (topic) =>
+            topic.total >= 2,
+        )
+        .sort((a, b) => {
+          if (
+            b.wrong !==
+            a.wrong
+          ) {
+            return (
+              b.wrong -
+              a.wrong
+            );
+          }
+
+          return (
+            a.accuracy -
+            b.accuracy
+          );
+        })
+        .slice(0, 3);
+    }, [attempts]);
+
+  /*
+   * =========================================================
+   * TODAY ACTIVITY
+   * =========================================================
+   */
+
+  const todayActivities =
+    useMemo(
+      () =>
+        activities.filter(
+          (activity) =>
+            activity.activity_date ===
+            today,
+        ),
+      [activities, today],
     );
-  }, [activities, today]);
 
-  const weeklyActiveDays = useMemo(() => {
-    const dates = new Set(
-      activities.map((item) => item.activity_date)
-    );
+  /*
+   * =========================================================
+   * WEEKLY ACTIVE DAYS
+   * =========================================================
+   */
 
-    return lastSevenDates.filter((date) =>
-      dates.has(date)
-    ).length;
-  }, [activities, lastSevenDates]);
-
-  const missionText = missionCompleted
-    ? "Today's mission completed!"
-    : "Complete one focused learning activity today.";
-
-  const fetchDashboardData = useCallback(
-    async (showRefresh = false) => {
-      if (!user?.id) return;
-
-      if (showRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      try {
-        const [
-          profileResponse,
-          activityResponse,
-          attemptsResponse,
-        ] = await Promise.all([
-          supabase
-            .from("profiles")
-            .select(`
-              full_name,
-              class_name,
-              board,
-              exam
-            `)
-            .eq("id", user.id)
-            .maybeSingle(),
-
-          supabase
-            .from("student_daily_activity")
-            .select(`
-              activity_date,
-              activity_type
-            `)
-            .eq("user_id", user.id)
-            .order("activity_date", {
-              ascending: false,
-            }),
-
-          supabase
-            .from("practice_attempts")
-            .select(`
-              id,
-              user_id,
-              question_id,
-              is_correct,
-              created_at,
-              practice_questions (
-                category
-              )
-            `)
-            .eq("user_id", user.id)
-            .order("created_at", {
-              ascending: false,
-            }),
-        ]);
-
-        if (profileResponse.error) {
-          console.error(
-            "Profile fetch error:",
-            profileResponse.error
-          );
-        } else if (profileResponse.data) {
-          setProfile(profileResponse.data as Profile);
-        }
-
-        if (activityResponse.error) {
-          console.error(
-            "Activity fetch error:",
-            activityResponse.error
-          );
-          setActivities([]);
-        } else {
-          setActivities(
-            (activityResponse.data ||
-              []) as ActivityRow[]
-          );
-        }
-
-        if (attemptsResponse.error) {
-          console.error(
-            "Practice attempts fetch error:",
-            attemptsResponse.error
-          );
-          setAttempts([]);
-        } else {
-          setAttempts(
-            (attemptsResponse.data ||
-              []) as PracticeAttempt[]
-          );
-        }
-
-        const hasTodayMission =
-          activityResponse.data?.some(
-            (activity) =>
-              activity.activity_date === today
-          ) ?? false;
-
-        setMissionCompleted(hasTodayMission);
-      } catch (error) {
-        console.error(
-          "Dashboard data error:",
-          error
+  const weeklyActiveDays =
+    useMemo(() => {
+      const dates =
+        new Set(
+          activities.map(
+            (item) =>
+              item.activity_date,
+          ),
         );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [today, user?.id]
-  );
+
+      return lastSevenDates.filter(
+        (date) =>
+          dates.has(date),
+      ).length;
+    }, [
+      activities,
+      lastSevenDates,
+    ]);
+
+  /*
+   * =========================================================
+   * MISSION
+   * =========================================================
+   */
+
+  const missionText =
+    missionCompleted
+      ? "Today's mission completed!"
+      : "Complete one focused learning activity today.";
+
+  /*
+   * =========================================================
+   * FETCH DASHBOARD DATA
+   * =========================================================
+   */
+
+  const fetchDashboardData =
+    useCallback(
+      async (
+        showRefresh = false,
+      ) => {
+        if (!user?.id) {
+          setLoading(false);
+          return;
+        }
+
+        if (showRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        try {
+          const [
+            profileResponse,
+            activityResponse,
+            attemptsResponse,
+          ] =
+            await Promise.all([
+              supabase
+                .from("profiles")
+                .select(
+                  `
+                    full_name,
+                    class_name,
+                    board,
+                    exam
+                  `,
+                )
+                .eq(
+                  "id",
+                  user.id,
+                )
+                .maybeSingle(),
+
+              supabase
+                .from(
+                  "student_daily_activity",
+                )
+                .select(
+                  `
+                    activity_date,
+                    activity_type
+                  `,
+                )
+                .eq(
+                  "user_id",
+                  user.id,
+                )
+                .order(
+                  "activity_date",
+                  {
+                    ascending:
+                      false,
+                  },
+                ),
+
+              supabase
+                .from(
+                  "practice_attempts",
+                )
+                .select(
+                  `
+                    id,
+                    user_id,
+                    question_id,
+                    is_correct,
+                    created_at,
+                    practice_questions (
+                      category
+                    )
+                  `,
+                )
+                .eq(
+                  "user_id",
+                  user.id,
+                )
+                .order(
+                  "created_at",
+                  {
+                    ascending:
+                      false,
+                  },
+                ),
+            ]);
+
+          /*
+           * PROFILE
+           */
+
+          if (
+            profileResponse.error
+          ) {
+            console.error(
+              "Profile fetch error:",
+              profileResponse.error,
+            );
+          } else if (
+            profileResponse.data
+          ) {
+            setProfile(
+              profileResponse.data as Profile,
+            );
+          }
+
+          /*
+           * ACTIVITY
+           */
+
+          if (
+            activityResponse.error
+          ) {
+            console.error(
+              "Activity fetch error:",
+              activityResponse.error,
+            );
+
+            setActivities([]);
+          } else {
+            setActivities(
+              (activityResponse.data ||
+                []) as ActivityRow[],
+            );
+          }
+
+          /*
+           * PRACTICE ATTEMPTS
+           *
+           * Normalize Supabase nested relation
+           * before storing in state.
+           */
+
+          if (
+            attemptsResponse.error
+          ) {
+            console.error(
+              "Practice attempts fetch error:",
+              attemptsResponse.error,
+            );
+
+            setAttempts([]);
+          } else {
+            const normalized =
+              normalizePracticeAttempts(
+                (attemptsResponse.data ||
+                  []) as PracticeAttemptRow[],
+              );
+
+            setAttempts(
+              normalized,
+            );
+          }
+
+          /*
+           * TODAY'S MISSION
+           */
+
+          const hasTodayMission =
+            activityResponse.data?.some(
+              (activity) =>
+                activity.activity_date ===
+                today,
+            ) ?? false;
+
+          setMissionCompleted(
+            hasTodayMission,
+          );
+        } catch (error) {
+          console.error(
+            "Dashboard data error:",
+            error,
+          );
+        } finally {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      },
+      [today, user?.id],
+    );
+
+  /*
+   * =========================================================
+   * INITIAL LOAD
+   * =========================================================
+   */
 
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  /*
+   * =========================================================
+   * PROFILE MENU OUTSIDE CLICK
+   * =========================================================
+   */
+
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as HTMLElement;
+    function handleClickOutside(
+      event: MouseEvent,
+    ) {
+      const target =
+        event.target as HTMLElement;
 
       if (
         !target.closest(
-          "[data-profile-menu]"
+          "[data-profile-menu]",
         )
       ) {
         setProfileMenuOpen(false);
@@ -419,96 +689,141 @@ export function StudentDashboard() {
 
     document.addEventListener(
       "mousedown",
-      handleClickOutside
+      handleClickOutside,
     );
 
     return () => {
       document.removeEventListener(
         "mousedown",
-        handleClickOutside
+        handleClickOutside,
       );
     };
   }, []);
+
+  /*
+   * =========================================================
+   * NAVIGATION
+   * =========================================================
+   */
 
   async function handleLogout() {
     setProfileMenuOpen(false);
 
     try {
       await signOut();
-      navigate("/student/login");
+      navigate(
+        "/student/login",
+      );
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error(
+        "Logout error:",
+        error,
+      );
     }
   }
 
-  function handleActivity(path: string) {
+  function handleActivity(
+    path: string,
+  ) {
     navigate(path);
   }
 
   function handleNCERTBooks() {
-    navigate("/student/ncert-books");
+    navigate(
+      "/student/ncert-books",
+    );
   }
 
   function handlePreviousYearPapers() {
-    navigate("/student/previous-year-papers");
+    navigate(
+      "/student/previous-year-papers",
+    );
   }
 
   function handleAskVidhya() {
-    navigate("/student/ask");
+    navigate(
+      "/student/ask",
+    );
   }
 
   function handlePracticeQuestions() {
-    navigate("/student/practice-questions");
+    navigate(
+      "/student/practice-questions",
+    );
   }
 
   function handleStudyPlanner() {
-    navigate("/student/study-planner");
+    navigate(
+      "/student/study-planner",
+    );
   }
 
   function handleDailyChallenge() {
-    navigate("/student/daily-challenge");
+    navigate(
+      "/student/daily-challenge",
+    );
   }
 
   function handleShortVideos() {
-    navigate("/student/short-videos");
+    navigate(
+      "/student/short-videos",
+    );
   }
 
   function handleCurrentAffairs() {
-    navigate("/student/current-affairs");
+    navigate(
+      "/student/current-affairs",
+    );
   }
 
   function handleDailyNewspaper() {
-    navigate("/student/daily-newspaper");
+    navigate(
+      "/student/daily-newspaper",
+    );
   }
 
   function handleVocabulary() {
-    navigate("/student/vocabulary");
+    navigate(
+      "/student/vocabulary",
+    );
   }
 
   function handleExamTips() {
-    navigate("/student/exam-tips");
+    navigate(
+      "/student/exam-tips",
+    );
   }
 
   function handleQuickRevision() {
-    navigate("/student/quick-revision");
+    navigate(
+      "/student/quick-revision",
+    );
   }
 
   function handleHandwrittenNotes() {
-    navigate("/student/handwritten-notes");
+    navigate(
+      "/student/handwritten-notes",
+    );
   }
 
   function handleProgress() {
-    navigate("/student/progress");
+    navigate(
+      "/student/progress",
+    );
   }
 
   function handleProfile() {
     setProfileMenuOpen(false);
-    navigate("/student/profile");
+    navigate(
+      "/student/profile",
+    );
   }
 
   function handleSettings() {
     setProfileMenuOpen(false);
-    navigate("/student/settings");
+    navigate(
+      "/student/settings",
+    );
   }
 
   function handleAbout() {
@@ -523,8 +838,16 @@ export function StudentDashboard() {
 
   function handlePrivacy() {
     setProfileMenuOpen(false);
-    navigate("/privacy-policy");
+    navigate(
+      "/privacy-policy",
+    );
   }
+
+  /*
+   * =========================================================
+   * UI
+   * =========================================================
+   */
 
   return (
     <div
@@ -534,9 +857,9 @@ export function StudentDashboard() {
           : "bg-slate-50 text-slate-900"
       }`}
     >
-      {/* =========================================================
+      {/* =====================================================
           HEADER
-      ========================================================= */}
+      ===================================================== */}
 
       <header
         className={`sticky top-0 z-40 border-b backdrop-blur-xl ${
@@ -546,10 +869,15 @@ export function StudentDashboard() {
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          {/* Logo */}
+          {/* LOGO */}
+
           <button
             type="button"
-            onClick={() => navigate("/student/dashboard")}
+            onClick={() =>
+              navigate(
+                "/student/dashboard",
+              )
+            }
             className="flex items-center gap-3"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-sm font-black text-white shadow-lg shadow-blue-600/20">
@@ -573,12 +901,15 @@ export function StudentDashboard() {
             </div>
           </button>
 
-          {/* Right */}
+          {/* RIGHT */}
+
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() =>
-                fetchDashboardData(true)
+                fetchDashboardData(
+                  true,
+                )
               }
               disabled={refreshing}
               className={`rounded-xl p-2.5 transition ${
@@ -599,7 +930,8 @@ export function StudentDashboard() {
               </span>
             </button>
 
-            {/* Profile */}
+            {/* PROFILE */}
+
             <div
               className="relative"
               data-profile-menu
@@ -608,7 +940,8 @@ export function StudentDashboard() {
                 type="button"
                 onClick={() =>
                   setProfileMenuOpen(
-                    (value) => !value
+                    (value) =>
+                      !value,
                   )
                 }
                 className={`flex items-center gap-2 rounded-2xl border px-2 py-1.5 transition ${
@@ -675,20 +1008,28 @@ export function StudentDashboard() {
                   <div className="p-2">
                     <button
                       type="button"
-                      onClick={handleProfile}
+                      onClick={
+                        handleProfile
+                      }
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
                       👤
-                      <span>Profile</span>
+                      <span>
+                        Profile
+                      </span>
                     </button>
 
                     <button
                       type="button"
-                      onClick={handleSettings}
+                      onClick={
+                        handleSettings
+                      }
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
                       ⚙️
-                      <span>Settings</span>
+                      <span>
+                        Settings
+                      </span>
                     </button>
 
                     <button
@@ -697,25 +1038,35 @@ export function StudentDashboard() {
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
                       ℹ️
-                      <span>About Ranker Bhaiya</span>
+                      <span>
+                        About Ranker Bhaiya
+                      </span>
                     </button>
 
                     <button
                       type="button"
-                      onClick={handleContact}
+                      onClick={
+                        handleContact
+                      }
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
                       ✉️
-                      <span>Contact Us</span>
+                      <span>
+                        Contact Us
+                      </span>
                     </button>
 
                     <button
                       type="button"
-                      onClick={handlePrivacy}
+                      onClick={
+                        handlePrivacy
+                      }
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
                       🔒
-                      <span>Privacy Policy</span>
+                      <span>
+                        Privacy Policy
+                      </span>
                     </button>
 
                     <div
@@ -728,11 +1079,15 @@ export function StudentDashboard() {
 
                     <button
                       type="button"
-                      onClick={handleLogout}
+                      onClick={
+                        handleLogout
+                      }
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950/30"
                     >
                       🚪
-                      <span>Logout</span>
+                      <span>
+                        Logout
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -742,20 +1097,24 @@ export function StudentDashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 sm:py-8">
-        {/* =========================================================
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+
+        {/* =====================================================
             HERO
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-700 p-6 shadow-2xl shadow-indigo-700/20 sm:p-8 lg:p-10">
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+
           <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-cyan-300/10 blur-3xl" />
 
           <div className="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold text-blue-50 backdrop-blur">
                 <span>🎓</span>
-                <span>Ranker Bhaiya Student Zone</span>
+                <span>
+                  Ranker Bhaiya Student Zone
+                </span>
               </div>
 
               <p className="text-sm font-semibold text-blue-100">
@@ -774,7 +1133,8 @@ export function StudentDashboard() {
                 confidence.
               </p>
 
-              {(className || examName) && (
+              {(className ||
+                examName) && (
                 <div className="mt-5 flex flex-wrap gap-2">
                   {className && (
                     <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white">
@@ -793,7 +1153,9 @@ export function StudentDashboard() {
               <div className="mt-7 flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={handleAskVidhya}
+                  onClick={
+                    handleAskVidhya
+                  }
                   className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-50"
                 >
                   🤖 Ask Vidhya
@@ -801,7 +1163,9 @@ export function StudentDashboard() {
 
                 <button
                   type="button"
-                  onClick={handlePracticeQuestions}
+                  onClick={
+                    handlePracticeQuestions
+                  }
                   className="rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/20"
                 >
                   Practice Now →
@@ -809,10 +1173,13 @@ export function StudentDashboard() {
               </div>
             </div>
 
-            {/* Ask Vidhya feature */}
+            {/* ASK VIDHYA */}
+
             <button
               type="button"
-              onClick={handleAskVidhya}
+              onClick={
+                handleAskVidhya
+              }
               className="group relative overflow-hidden rounded-3xl border border-white/15 bg-white/10 p-5 text-left backdrop-blur transition hover:bg-white/15 lg:w-72"
             >
               <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-cyan-300/20 blur-xl" />
@@ -845,9 +1212,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             DAILY MINDSET
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-6">
           <div
@@ -868,31 +1235,21 @@ export function StudentDashboard() {
                 </p>
 
                 <h2 className="mt-1 text-lg font-black">
-                  {dailyMindset?.title ||
-                    "Consistency beats intensity."}
+                  {dailyMindset}
                 </h2>
-
-                <p
-                  className={`mt-1 text-sm leading-6 ${
-                    isDark
-                      ? "text-slate-400"
-                      : "text-slate-600"
-                  }`}
-                >
-                  {dailyMindset?.message ||
-                    "Aaj thoda progress karo. Kal usi progress ko build karo."}
-                </p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             TOP STATS
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-6 grid gap-4 sm:grid-cols-3">
-          {/* Streak */}
+
+          {/* STREAK */}
+
           <div
             className={`rounded-3xl border p-5 ${
               isDark
@@ -911,7 +1268,9 @@ export function StudentDashboard() {
             </div>
 
             <p className="mt-5 text-3xl font-black">
-              {loading ? "—" : streak}
+              {loading
+                ? "—"
+                : streak}
             </p>
 
             <p
@@ -925,7 +1284,8 @@ export function StudentDashboard() {
             </p>
           </div>
 
-          {/* Mission */}
+          {/* MISSION */}
+
           <div
             className={`rounded-3xl border p-5 ${
               isDark
@@ -966,7 +1326,8 @@ export function StudentDashboard() {
             </p>
           </div>
 
-          {/* Preparation */}
+          {/* PREPARATION */}
+
           <div
             className={`rounded-3xl border p-5 ${
               isDark
@@ -1002,28 +1363,30 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             PREPARATION TOOLS
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-10">
-          <div className="mb-5 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
-                Prepare Better
-              </p>
+          <div className="mb-5">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
+              Prepare Better
+            </p>
 
-              <h2 className="mt-1 text-2xl font-black">
-                Preparation Tools
-              </h2>
-            </div>
+            <h2 className="mt-1 text-2xl font-black">
+              Preparation Tools
+            </h2>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Study Planner */}
+
+            {/* STUDY PLANNER */}
+
             <button
               type="button"
-              onClick={handleStudyPlanner}
+              onClick={
+                handleStudyPlanner
+              }
               className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-blue-800"
@@ -1054,10 +1417,13 @@ export function StudentDashboard() {
               </span>
             </button>
 
-            {/* Practice */}
+            {/* PRACTICE */}
+
             <button
               type="button"
-              onClick={handlePracticeQuestions}
+              onClick={
+                handlePracticeQuestions
+              }
               className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-emerald-800"
@@ -1087,10 +1453,13 @@ export function StudentDashboard() {
               </span>
             </button>
 
-            {/* Short Videos */}
+            {/* SHORT VIDEOS */}
+
             <button
               type="button"
-              onClick={handleShortVideos}
+              onClick={
+                handleShortVideos
+              }
               className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-rose-800"
@@ -1121,10 +1490,13 @@ export function StudentDashboard() {
               </span>
             </button>
 
-            {/* Daily Challenge */}
+            {/* DAILY CHALLENGE */}
+
             <button
               type="button"
-              onClick={handleDailyChallenge}
+              onClick={
+                handleDailyChallenge
+              }
               className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900 hover:border-amber-800"
@@ -1156,9 +1528,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
-            EXAM RESOURCES — NEW
-        ========================================================= */}
+        {/* =====================================================
+            EXAM RESOURCES
+        ===================================================== */}
 
         <section className="mt-10">
           <div className="mb-5">
@@ -1183,10 +1555,14 @@ export function StudentDashboard() {
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
+
             {/* NCERT */}
+
             <button
               type="button"
-              onClick={handleNCERTBooks}
+              onClick={
+                handleNCERTBooks
+              }
               className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 p-6 text-left shadow-lg shadow-emerald-600/10 transition hover:-translate-y-1 hover:shadow-2xl"
             >
               <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white/10" />
@@ -1218,9 +1594,12 @@ export function StudentDashboard() {
             </button>
 
             {/* PYQ */}
+
             <button
               type="button"
-              onClick={handlePreviousYearPapers}
+              onClick={
+                handlePreviousYearPapers
+              }
               className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-600 via-rose-600 to-pink-600 p-6 text-left shadow-lg shadow-rose-600/10 transition hover:-translate-y-1 hover:shadow-2xl"
             >
               <div className="absolute -bottom-20 -right-10 h-48 w-48 rounded-full bg-white/10" />
@@ -1253,9 +1632,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             LEARNING HUB
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-10">
           <div className="mb-5">
@@ -1269,10 +1648,14 @@ export function StudentDashboard() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {/* Ask Vidhya */}
+
+            {/* ASK VIDHYA */}
+
             <button
               type="button"
-              onClick={handleAskVidhya}
+              onClick={
+                handleAskVidhya
+              }
               className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl lg:col-span-2 ${
                 isDark
                   ? "border-violet-900/60 bg-gradient-to-br from-violet-950/70 to-slate-900"
@@ -1309,10 +1692,13 @@ export function StudentDashboard() {
               </span>
             </button>
 
-            {/* Current Affairs */}
+            {/* CURRENT AFFAIRS */}
+
             <button
               type="button"
-              onClick={handleCurrentAffairs}
+              onClick={
+                handleCurrentAffairs
+              }
               className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1342,10 +1728,13 @@ export function StudentDashboard() {
               </span>
             </button>
 
-            {/* Newspaper */}
+            {/* NEWSPAPER */}
+
             <button
               type="button"
-              onClick={handleDailyNewspaper}
+              onClick={
+                handleDailyNewspaper
+              }
               className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1375,10 +1764,13 @@ export function StudentDashboard() {
               </span>
             </button>
 
-            {/* Vocabulary */}
+            {/* VOCABULARY */}
+
             <button
               type="button"
-              onClick={handleVocabulary}
+              onClick={
+                handleVocabulary
+              }
               className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1408,10 +1800,13 @@ export function StudentDashboard() {
               </span>
             </button>
 
-            {/* Exam Tips */}
+            {/* EXAM TIPS */}
+
             <button
               type="button"
-              onClick={handleExamTips}
+              onClick={
+                handleExamTips
+              }
               className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1443,9 +1838,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             RECOMMENDATION
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-10">
           <div
@@ -1462,7 +1857,8 @@ export function StudentDashboard() {
                 </p>
 
                 <h2 className="mt-2 text-2xl font-black">
-                  {weakTopics.length > 0
+                  {weakTopics.length >
+                  0
                     ? `Work on ${weakTopics[0].name}`
                     : "Build Your Preparation"}
                 </h2>
@@ -1474,14 +1870,17 @@ export function StudentDashboard() {
                       : "text-slate-500"
                   }`}
                 >
-                  {weakTopics.length > 0
+                  {weakTopics.length >
+                  0
                     ? `You have attempted ${weakTopics[0].total} questions in this area and ${weakTopics[0].wrong} were incorrect. Focused practice can improve your accuracy.`
                     : "Start with practice questions, current affairs and daily revision. Your dashboard will become more personalized as you practice."}
                 </p>
 
                 <button
                   type="button"
-                  onClick={handlePracticeQuestions}
+                  onClick={
+                    handlePracticeQuestions
+                  }
                   className="mt-6 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
                 >
                   Practice Now →
@@ -1490,7 +1889,9 @@ export function StudentDashboard() {
 
               <div className="flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600 p-8 lg:w-64">
                 <div className="text-center">
-                  <div className="text-5xl">🚀</div>
+                  <div className="text-5xl">
+                    🚀
+                  </div>
 
                   <p className="mt-3 text-sm font-black text-white">
                     Keep Going!
@@ -1505,9 +1906,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             WEAK TOPICS
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-10">
           <div className="mb-5 flex items-end justify-between gap-4">
@@ -1523,14 +1924,17 @@ export function StudentDashboard() {
 
             <button
               type="button"
-              onClick={handleProgress}
+              onClick={
+                handleProgress
+              }
               className="text-sm font-black text-blue-600 dark:text-blue-400"
             >
               View Progress →
             </button>
           </div>
 
-          {weakTopics.length === 0 ? (
+          {weakTopics.length ===
+          0 ? (
             <div
               className={`rounded-3xl border border-dashed p-8 text-center ${
                 isDark
@@ -1538,7 +1942,9 @@ export function StudentDashboard() {
                   : "border-slate-300 bg-white"
               }`}
             >
-              <div className="text-4xl">🧠</div>
+              <div className="text-4xl">
+                🧠
+              </div>
 
               <h3 className="mt-4 text-lg font-black">
                 Weak topics will appear here
@@ -1558,65 +1964,79 @@ export function StudentDashboard() {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-3">
-              {weakTopics.map((topic) => (
-                <div
-                  key={topic.name}
-                  className={`rounded-3xl border p-5 ${
-                    isDark
-                      ? "border-slate-800 bg-slate-900"
-                      : "border-slate-200 bg-white"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-black">
-                        {topic.name}
-                      </h3>
+              {weakTopics.map(
+                (topic) => (
+                  <div
+                    key={
+                      topic.name
+                    }
+                    className={`rounded-3xl border p-5 ${
+                      isDark
+                        ? "border-slate-800 bg-slate-900"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-black">
+                          {topic.name}
+                        </h3>
 
-                      <p
-                        className={`mt-1 text-xs ${
-                          isDark
-                            ? "text-slate-500"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        {topic.total} questions attempted
-                      </p>
+                        <p
+                          className={`mt-1 text-xs ${
+                            isDark
+                              ? "text-slate-500"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          {
+                            topic.total
+                          }{" "}
+                          questions attempted
+                        </p>
+                      </div>
+
+                      <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                        {
+                          topic.accuracy
+                        }
+                        %
+                      </span>
                     </div>
 
-                    <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
-                      {topic.accuracy}%
-                    </span>
-                  </div>
+                    <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-rose-500 to-orange-500"
+                        style={{
+                          width: `${Math.max(
+                            5,
+                            topic.accuracy,
+                          )}%`,
+                        }}
+                      />
+                    </div>
 
-                  <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-rose-500 to-orange-500"
-                      style={{
-                        width: `${Math.max(
-                          5,
-                          topic.accuracy
-                        )}%`,
-                      }}
-                    />
+                    <p className="mt-3 text-xs font-semibold text-rose-600 dark:text-rose-400">
+                      {
+                        topic.wrong
+                      }{" "}
+                      incorrect answers
+                    </p>
                   </div>
-
-                  <p className="mt-3 text-xs font-semibold text-rose-600 dark:text-rose-400">
-                    {topic.wrong} incorrect answers
-                  </p>
-                </div>
-              ))}
+                ),
+              )}
             </div>
           )}
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             5-MINUTE CHALLENGE
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-10">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-rose-500 to-pink-600 p-6 sm:p-8">
             <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-white/10" />
+
             <div className="absolute -bottom-24 left-20 h-56 w-56 rounded-full bg-white/10" />
 
             <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
@@ -1639,7 +2059,7 @@ export function StudentDashboard() {
                 type="button"
                 onClick={() =>
                   handleActivity(
-                    "/student/daily-challenge"
+                    "/student/daily-challenge",
                   )
                 }
                 className="shrink-0 rounded-2xl bg-white px-6 py-3.5 text-sm font-black text-rose-600 shadow-lg transition hover:bg-rose-50"
@@ -1650,9 +2070,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             DAILY PRACTICE
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-10">
           <div className="mb-5">
@@ -1666,9 +2086,14 @@ export function StudentDashboard() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
+
+            {/* QUICK REVISION */}
+
             <button
               type="button"
-              onClick={handleQuickRevision}
+              onClick={
+                handleQuickRevision
+              }
               className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1698,9 +2123,13 @@ export function StudentDashboard() {
               </span>
             </button>
 
+            {/* HANDWRITTEN NOTES */}
+
             <button
               type="button"
-              onClick={handleHandwrittenNotes}
+              onClick={
+                handleHandwrittenNotes
+              }
               className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1731,9 +2160,13 @@ export function StudentDashboard() {
               </span>
             </button>
 
+            {/* DAILY PRACTICE */}
+
             <button
               type="button"
-              onClick={handlePracticeQuestions}
+              onClick={
+                handlePracticeQuestions
+              }
               className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
@@ -1766,9 +2199,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             WEEKLY ACHIEVEMENTS
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-10">
           <div className="mb-5">
@@ -1782,7 +2215,9 @@ export function StudentDashboard() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Active Days */}
+
+            {/* ACTIVE DAYS */}
+
             <div
               className={`rounded-3xl border p-5 ${
                 isDark
@@ -1790,10 +2225,15 @@ export function StudentDashboard() {
                   : "border-slate-200 bg-white"
               }`}
             >
-              <div className="text-2xl">📅</div>
+              <div className="text-2xl">
+                📅
+              </div>
 
               <p className="mt-4 text-2xl font-black">
-                {weeklyActiveDays}/7
+                {
+                  weeklyActiveDays
+                }
+                /7
               </p>
 
               <p
@@ -1807,7 +2247,8 @@ export function StudentDashboard() {
               </p>
             </div>
 
-            {/* Questions */}
+            {/* QUESTIONS */}
+
             <div
               className={`rounded-3xl border p-5 ${
                 isDark
@@ -1815,10 +2256,14 @@ export function StudentDashboard() {
                   : "border-slate-200 bg-white"
               }`}
             >
-              <div className="text-2xl">📝</div>
+              <div className="text-2xl">
+                📝
+              </div>
 
               <p className="mt-4 text-2xl font-black">
-                {preparationStats.total}
+                {
+                  preparationStats.total
+                }
               </p>
 
               <p
@@ -1832,7 +2277,8 @@ export function StudentDashboard() {
               </p>
             </div>
 
-            {/* Correct */}
+            {/* CORRECT */}
+
             <div
               className={`rounded-3xl border p-5 ${
                 isDark
@@ -1840,10 +2286,14 @@ export function StudentDashboard() {
                   : "border-slate-200 bg-white"
               }`}
             >
-              <div className="text-2xl">🎯</div>
+              <div className="text-2xl">
+                🎯
+              </div>
 
               <p className="mt-4 text-2xl font-black">
-                {preparationStats.correct}
+                {
+                  preparationStats.correct
+                }
               </p>
 
               <p
@@ -1857,7 +2307,8 @@ export function StudentDashboard() {
               </p>
             </div>
 
-            {/* Accuracy */}
+            {/* ACCURACY */}
+
             <div
               className={`rounded-3xl border p-5 ${
                 isDark
@@ -1865,10 +2316,15 @@ export function StudentDashboard() {
                   : "border-slate-200 bg-white"
               }`}
             >
-              <div className="text-2xl">🏆</div>
+              <div className="text-2xl">
+                🏆
+              </div>
 
               <p className="mt-4 text-2xl font-black">
-                {preparationStats.accuracy}%
+                {
+                  preparationStats.accuracy
+                }
+                %
               </p>
 
               <p
@@ -1884,9 +2340,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             WEEKLY ACTIVITY
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-10">
           <div
@@ -1907,54 +2363,68 @@ export function StudentDashboard() {
                 </h2>
               </div>
 
-              <div className="text-2xl">📈</div>
+              <div className="text-2xl">
+                📈
+              </div>
             </div>
 
             <div className="mt-6 grid grid-cols-7 gap-2 sm:gap-3">
-              {lastSevenDates.map((date) => {
-                const active = activities.some(
-                  (activity) =>
-                    activity.activity_date === date
-                );
+              {lastSevenDates.map(
+                (date) => {
+                  const active =
+                    activities.some(
+                      (activity) =>
+                        activity.activity_date ===
+                        date,
+                    );
 
-                const day = new Date(
-                  `${date}T12:00:00`
-                ).toLocaleDateString("en-US", {
-                  weekday: "short",
-                });
+                  const day =
+                    new Date(
+                      `${date}T12:00:00`,
+                    ).toLocaleDateString(
+                      "en-US",
+                      {
+                        weekday:
+                          "short",
+                      },
+                    );
 
-                return (
-                  <div
-                    key={date}
-                    className="text-center"
-                  >
+                  return (
                     <div
-                      className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-black transition sm:h-12 sm:w-12 ${
-                        active
-                          ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/20"
-                          : isDark
-                            ? "bg-slate-800 text-slate-500"
-                            : "bg-slate-100 text-slate-400"
-                      }`}
+                      key={date}
+                      className="text-center"
                     >
-                      {active ? "✓" : "·"}
-                    </div>
+                      <div
+                        className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-black transition sm:h-12 sm:w-12 ${
+                          active
+                            ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/20"
+                            : isDark
+                              ? "bg-slate-800 text-slate-500"
+                              : "bg-slate-100 text-slate-400"
+                        }`}
+                      >
+                        {active
+                          ? "✓"
+                          : "·"}
+                      </div>
 
-                    <p
-                      className={`mt-2 text-[10px] font-bold sm:text-xs ${
-                        isDark
-                          ? "text-slate-500"
-                          : "text-slate-500"
-                      }`}
-                    >
-                      {day}
-                    </p>
-                  </div>
-                );
-              })}
+                      <p
+                        className={`mt-2 text-[10px] font-bold sm:text-xs ${
+                          isDark
+                            ? "text-slate-500"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {day}
+                      </p>
+                    </div>
+                  );
+                },
+              )}
             </div>
 
-            {todayActivities.length > 0 && (
+            {todayActivities.length >
+              0 && (
               <div className="mt-6 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-950/20">
                 <p className="text-sm font-black text-emerald-700 dark:text-emerald-300">
                   🎉 Today's activity
@@ -1964,30 +2434,37 @@ export function StudentDashboard() {
                   {Array.from(
                     new Set(
                       todayActivities.map(
-                        (activity) =>
+                        (
+                          activity,
+                        ) =>
                           ACTIVITY_LABELS[
-                            activity.activity_type
+                            activity
+                              .activity_type
                           ] ||
-                          activity.activity_type
-                      )
-                    )
-                  ).map((label) => (
-                    <span
-                      key={label}
-                      className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-slate-900 dark:text-emerald-300"
-                    >
-                      {label}
-                    </span>
-                  ))}
+                          activity.activity_type,
+                      ),
+                    ),
+                  ).map(
+                    (label) => (
+                      <span
+                        key={
+                          label
+                        }
+                        className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-slate-900 dark:text-emerald-300"
+                      >
+                        {label}
+                      </span>
+                    ),
+                  )}
                 </div>
               </div>
             )}
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             ABOUT
-        ========================================================= */}
+        ===================================================== */}
 
         <section className="mt-10">
           <div
@@ -2027,9 +2504,9 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* =========================================================
+        {/* =====================================================
             FOOTER
-        ========================================================= */}
+        ===================================================== */}
 
         <footer className="py-10 text-center">
           <p
@@ -2039,7 +2516,9 @@ export function StudentDashboard() {
                 : "text-slate-400"
             }`}
           >
-            © {new Date().getFullYear()} Ranker Bhaiya
+            ©{" "}
+            {new Date().getFullYear()}{" "}
+            Ranker Bhaiya
           </p>
 
           <p
