@@ -1,604 +1,530 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
-import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
+import { supabase } from "../../lib/supabase";
 import { getDailyMindset } from "../../data/dailyMindsets";
 
-type PreparationStats = {
-  attempted: number;
-  correct: number;
-  accuracy: number;
+type ActivityType =
+  | "practice_questions"
+  | "daily_challenge"
+  | "current_affairs"
+  | "daily_newspaper"
+  | "fast_revision"
+  | "short_videos"
+  | "ask_vidhya"
+  | "vocabulary"
+  | "five_minute_challenge";
+
+type ActivityRow = {
+  activity_date: string;
+  activity_type: string;
+};
+
+type PracticeAttempt = {
+  id: string;
+  user_id: string;
+  question_id: string;
+  is_correct: boolean;
+  created_at: string;
+  practice_questions?: {
+    category: string | null;
+  } | null;
+};
+
+type Profile = {
+  fullName?: string | null;
+  full_name?: string | null;
+  className?: string | null;
+  class_name?: string | null;
+  board?: string | null;
+  exam?: string | null;
 };
 
 type WeakTopic = {
-  category: string;
-  attempted: number;
-  correct: number;
+  name: string;
+  total: number;
+  wrong: number;
   accuracy: number;
 };
 
-const DAILY_TARGET = 20;
-
-const getLocalDateString = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+const ACTIVITY_LABELS: Record<string, string> = {
+  practice_questions: "Practice Questions",
+  daily_challenge: "Daily Challenge",
+  current_affairs: "Current Affairs",
+  daily_newspaper: "Daily Newspaper",
+  fast_revision: "Quick Revision",
+  short_videos: "Short Videos",
+  ask_vidhya: "Ask Vidhya",
+  vocabulary: "Vocabulary",
+  five_minute_challenge: "5-Minute Challenge",
 };
 
-const getPreviousDate = (dateString: string) => {
-  const date = new Date(`${dateString}T00:00:00`);
-  date.setDate(date.getDate() - 1);
+function formatDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
 
-  return getLocalDateString(date);
-};
+function getLastSevenDates() {
+  const dates: string[] = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() - i);
+    dates.push(formatDate(date));
+  }
+
+  return dates;
+}
+
+function calculateStreak(activity: ActivityRow[]) {
+  const activityDates = new Set(
+    activity.map((item) => item.activity_date)
+  );
+
+  let streak = 0;
+
+  const today = new Date();
+
+  for (let i = 0; i < 365; i++) {
+    const date = new Date(today);
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() - i);
+
+    const dateString = formatDate(date);
+
+    if (activityDates.has(dateString)) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  if (hour < 21) return "Good Evening";
+
+  return "Good Night";
+}
+
+function getInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!parts.length) return "RB";
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
 
 export function StudentDashboard() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { user, signOut } = useAuth();
+  const { isDark } = useTheme();
 
-  const {
-    user,
-    profile,
-    loading: authLoading,
-    signOut,
-  } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
 
-  const { theme } = useTheme();
+  const [activities, setActivities] = useState<ActivityRow[]>(
+    []
+  );
 
-  const isDark = theme === "dark";
+  const [attempts, setAttempts] = useState<PracticeAttempt[]>(
+    []
+  );
 
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [profileMenuOpen, setProfileMenuOpen] =
+    useState(false);
 
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [missionCompleted, setMissionCompleted] =
+    useState(false);
 
-  const dailyMindset = useMemo(() => getDailyMindset(), []);
+  const [refreshing, setRefreshing] = useState(false);
 
-  /* =====================================================
-     USER
-  ===================================================== */
-
-  const firstName =
-    profile?.full_name?.trim()?.split(" ")[0] ||
-    user?.email?.split("@")[0] ||
-    "Student";
-
-  /* =====================================================
-     STREAK
-  ===================================================== */
-
-  const [streakLoading, setStreakLoading] = useState(true);
-
-  const [currentStreak, setCurrentStreak] = useState(0);
-
-  const [activeDates, setActiveDates] = useState<string[]>([]);
-
-  /* =====================================================
-     PREPARATION STATS
-  ===================================================== */
-
-  const [preparationStats, setPreparationStats] =
-    useState<PreparationStats>({
-      attempted: 0,
-      correct: 0,
-      accuracy: 0,
-    });
-
-  const [preparationLoading, setPreparationLoading] =
-    useState(true);
-
-  /* =====================================================
-     WEAK TOPICS
-  ===================================================== */
-
-  const [weakTopics, setWeakTopics] = useState<WeakTopic[]>([]);
-
-  const [weakTopicsLoading, setWeakTopicsLoading] = useState(true);
-
-  /* =====================================================
-     DAILY PRACTICE
-  ===================================================== */
-
-  const [dailyPractice] = useState(0);
-
-  /* =====================================================
-     TODAY'S MISSION
-  ===================================================== */
-
-  const [missionCompleted, setMissionCompleted] = useState({
-    practice: false,
-    challenge: false,
-    currentAffairs: false,
-  });
-
-  const [missionLoading, setMissionLoading] = useState(true);
-
-  /* =====================================================
-     DOCUMENT TITLE
-  ===================================================== */
-
-  useEffect(() => {
-    document.title = "Student Dashboard | Ranker Bhaiya";
+  const dailyMindset = useMemo(() => {
+    return getDailyMindset();
   }, []);
 
-  /* =====================================================
-     LOGIN REDIRECT
-  ===================================================== */
+  const userName = useMemo(() => {
+    return (
+      profile?.fullName ||
+      profile?.full_name ||
+      user?.user_metadata?.full_name ||
+      user?.user_metadata?.name ||
+      user?.email?.split("@")[0] ||
+      "Student"
+    );
+  }, [profile, user]);
+
+  const displayName = userName.trim().split(/\s+/)[0];
+
+  const fullDisplayName = userName.trim();
+
+  const userInitials = getInitials(fullDisplayName);
+
+  const className =
+    profile?.className ||
+    profile?.class_name ||
+    "";
+
+  const examName = profile?.exam || "";
+
+  const today = formatDate(new Date());
+
+  const lastSevenDates = useMemo(
+    () => getLastSevenDates(),
+    []
+  );
+
+  const streak = useMemo(() => {
+    return calculateStreak(activities);
+  }, [activities]);
+
+  const preparationStats = useMemo(() => {
+    const total = attempts.length;
+
+    const correct = attempts.filter(
+      (attempt) => attempt.is_correct
+    ).length;
+
+    const accuracy =
+      total > 0 ? Math.round((correct / total) * 100) : 0;
+
+    return {
+      total,
+      correct,
+      accuracy,
+    };
+  }, [attempts]);
+
+  const weakTopics = useMemo<WeakTopic[]>(() => {
+    const topicMap = new Map<
+      string,
+      {
+        total: number;
+        wrong: number;
+      }
+    >();
+
+    attempts.forEach((attempt) => {
+      const category =
+        attempt.practice_questions?.category ||
+        "General Practice";
+
+      const current = topicMap.get(category) || {
+        total: 0,
+        wrong: 0,
+      };
+
+      current.total += 1;
+
+      if (!attempt.is_correct) {
+        current.wrong += 1;
+      }
+
+      topicMap.set(category, current);
+    });
+
+    return Array.from(topicMap.entries())
+      .map(([name, values]) => ({
+        name,
+        total: values.total,
+        wrong: values.wrong,
+        accuracy:
+          values.total > 0
+            ? Math.round(
+                ((values.total - values.wrong) /
+                  values.total) *
+                  100
+              )
+            : 0,
+      }))
+      .filter((topic) => topic.total >= 2)
+      .sort((a, b) => {
+        if (b.wrong !== a.wrong) {
+          return b.wrong - a.wrong;
+        }
+
+        return a.accuracy - b.accuracy;
+      })
+      .slice(0, 3);
+  }, [attempts]);
+
+  const todayActivities = useMemo(() => {
+    return activities.filter(
+      (activity) => activity.activity_date === today
+    );
+  }, [activities, today]);
+
+  const weeklyActiveDays = useMemo(() => {
+    const dates = new Set(
+      activities.map((item) => item.activity_date)
+    );
+
+    return lastSevenDates.filter((date) =>
+      dates.has(date)
+    ).length;
+  }, [activities, lastSevenDates]);
+
+  const missionText = missionCompleted
+    ? "Today's mission completed!"
+    : "Complete one focused learning activity today.";
+
+  const fetchDashboardData = useCallback(
+    async (showRefresh = false) => {
+      if (!user?.id) return;
+
+      if (showRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      try {
+        const [
+          profileResponse,
+          activityResponse,
+          attemptsResponse,
+        ] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select(`
+              full_name,
+              class_name,
+              board,
+              exam
+            `)
+            .eq("id", user.id)
+            .maybeSingle(),
+
+          supabase
+            .from("student_daily_activity")
+            .select(`
+              activity_date,
+              activity_type
+            `)
+            .eq("user_id", user.id)
+            .order("activity_date", {
+              ascending: false,
+            }),
+
+          supabase
+            .from("practice_attempts")
+            .select(`
+              id,
+              user_id,
+              question_id,
+              is_correct,
+              created_at,
+              practice_questions (
+                category
+              )
+            `)
+            .eq("user_id", user.id)
+            .order("created_at", {
+              ascending: false,
+            }),
+        ]);
+
+        if (profileResponse.error) {
+          console.error(
+            "Profile fetch error:",
+            profileResponse.error
+          );
+        } else if (profileResponse.data) {
+          setProfile(profileResponse.data as Profile);
+        }
+
+        if (activityResponse.error) {
+          console.error(
+            "Activity fetch error:",
+            activityResponse.error
+          );
+          setActivities([]);
+        } else {
+          setActivities(
+            (activityResponse.data ||
+              []) as ActivityRow[]
+          );
+        }
+
+        if (attemptsResponse.error) {
+          console.error(
+            "Practice attempts fetch error:",
+            attemptsResponse.error
+          );
+          setAttempts([]);
+        } else {
+          setAttempts(
+            (attemptsResponse.data ||
+              []) as PracticeAttempt[]
+          );
+        }
+
+        const hasTodayMission =
+          activityResponse.data?.some(
+            (activity) =>
+              activity.activity_date === today
+          ) ?? false;
+
+        setMissionCompleted(hasTodayMission);
+      } catch (error) {
+        console.error(
+          "Dashboard data error:",
+          error
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [today, user?.id]
+  );
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/student/login", {
-        replace: true,
-      });
-    }
-  }, [authLoading, user, navigate]);
-
-  /* =====================================================
-     CLOSE PROFILE MENU
-  ===================================================== */
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+
       if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
+        !target.closest(
+          "[data-profile-menu]"
+        )
       ) {
-        setShowProfileMenu(false);
+        setProfileMenuOpen(false);
       }
     }
 
-    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside
+    );
 
     return () => {
       document.removeEventListener(
         "mousedown",
-        handleOutsideClick,
+        handleClickOutside
       );
     };
   }, []);
 
-  /* =====================================================
-     LOGOUT
-  ===================================================== */
-
   async function handleLogout() {
-    setShowProfileMenu(false);
+    setProfileMenuOpen(false);
 
-    await signOut();
-
-    navigate("/student/login", {
-      replace: true,
-    });
+    try {
+      await signOut();
+      navigate("/student/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   }
 
-  /* =====================================================
-     LOAD STREAK
-  ===================================================== */
-
-  const loadStudentStreak = async () => {
-    if (!user?.id) {
-      return;
-    }
-
-    setStreakLoading(true);
-
-    const { data, error } = await supabase
-      .from("student_daily_activity")
-      .select("activity_date")
-      .eq("user_id", user.id)
-      .order("activity_date", {
-        ascending: false,
-      });
-
-    if (error) {
-      console.error(
-        "Failed to load student streak:",
-        error,
-      );
-
-      setCurrentStreak(0);
-      setActiveDates([]);
-      setStreakLoading(false);
-
-      return;
-    }
-
-    const uniqueDates = Array.from(
-      new Set(
-        (data ?? [])
-          .map((item) => item.activity_date)
-          .filter(Boolean),
-      ),
-    );
-
-    setActiveDates(uniqueDates);
-
-    const today = getLocalDateString(new Date());
-
-    if (!uniqueDates.includes(today)) {
-      setCurrentStreak(0);
-      setStreakLoading(false);
-
-      return;
-    }
-
-    let streak = 1;
-    let checkDate = today;
-
-    while (true) {
-      const previousDate = getPreviousDate(checkDate);
-
-      if (uniqueDates.includes(previousDate)) {
-        streak += 1;
-        checkDate = previousDate;
-      } else {
-        break;
-      }
-    }
-
-    setCurrentStreak(streak);
-    setStreakLoading(false);
-  };
-
-  /* =====================================================
-     LOAD PREPARATION STATS
-  ===================================================== */
-
-  const loadPreparationStats = async () => {
-    if (!user?.id) {
-      return;
-    }
-
-    setPreparationLoading(true);
-
-    const { data, error } = await supabase
-      .from("practice_attempts")
-      .select("question_id, is_correct")
-      .eq("user_id", user.id);
-
-    if (error) {
-      console.error(
-        "Failed to load preparation stats:",
-        error,
-      );
-
-      setPreparationStats({
-        attempted: 0,
-        correct: 0,
-        accuracy: 0,
-      });
-
-      setPreparationLoading(false);
-
-      return;
-    }
-
-    const attempts = data ?? [];
-
-    const attempted = attempts.length;
-
-    const correct = attempts.filter(
-      (attempt) => attempt.is_correct === true,
-    ).length;
-
-    const accuracy =
-      attempted === 0
-        ? 0
-        : Math.round((correct / attempted) * 100);
-
-    setPreparationStats({
-      attempted,
-      correct,
-      accuracy,
-    });
-
-    setPreparationLoading(false);
-  };
-
-  /* =====================================================
-     LOAD WEAK TOPICS
-  ===================================================== */
-
-  const loadWeakTopics = async () => {
-    if (!user?.id) {
-      return;
-    }
-
-    setWeakTopicsLoading(true);
-
-    const { data, error } = await supabase
-      .from("practice_attempts")
-      .select(
-        `
-          is_correct,
-          practice_questions (
-            category
-          )
-        `,
-      )
-      .eq("user_id", user.id);
-
-    if (error) {
-      console.error(
-        "Failed to load weak topics:",
-        error,
-      );
-
-      setWeakTopics([]);
-      setWeakTopicsLoading(false);
-
-      return;
-    }
-
-    const topicMap = new Map<
-      string,
-      {
-        attempted: number;
-        correct: number;
-      }
-    >();
-
-    (data ?? []).forEach((attempt) => {
-      const question = Array.isArray(
-        attempt.practice_questions,
-      )
-        ? attempt.practice_questions[0]
-        : attempt.practice_questions;
-
-      const category = question?.category?.trim();
-
-      if (!category) {
-        return;
-      }
-
-      const existing = topicMap.get(category) ?? {
-        attempted: 0,
-        correct: 0,
-      };
-
-      existing.attempted += 1;
-
-      if (attempt.is_correct === true) {
-        existing.correct += 1;
-      }
-
-      topicMap.set(category, existing);
-    });
-
-    const topics: WeakTopic[] = Array.from(
-      topicMap.entries(),
-    )
-      .map(([category, stats]) => ({
-        category,
-        attempted: stats.attempted,
-        correct: stats.correct,
-        accuracy:
-          stats.attempted === 0
-            ? 0
-            : Math.round(
-                (stats.correct / stats.attempted) * 100,
-              ),
-      }))
-      .filter((topic) => topic.attempted >= 2)
-      .sort((a, b) => a.accuracy - b.accuracy)
-      .slice(0, 3);
-
-    setWeakTopics(topics);
-    setWeakTopicsLoading(false);
-  };
-
-  /* =====================================================
-     LOAD TODAY'S MISSION
-  ===================================================== */
-
-  const loadTodayMission = async () => {
-    if (!user?.id) {
-      return;
-    }
-
-    setMissionLoading(true);
-
-    const today = getLocalDateString(new Date());
-
-    const { data, error } = await supabase
-      .from("student_daily_activity")
-      .select("activity_type")
-      .eq("user_id", user.id)
-      .eq("activity_date", today);
-
-    if (error) {
-      console.error(
-        "Failed to load today's mission:",
-        error,
-      );
-
-      setMissionCompleted({
-        practice: false,
-        challenge: false,
-        currentAffairs: false,
-      });
-
-      setMissionLoading(false);
-
-      return;
-    }
-
-    const activityTypes = new Set(
-      (data ?? []).map((item) => item.activity_type),
-    );
-
-    setMissionCompleted({
-      practice: activityTypes.has("practice_questions"),
-      challenge: activityTypes.has("daily_challenge"),
-      currentAffairs: activityTypes.has("current_affairs"),
-    });
-
-    setMissionLoading(false);
-  };
-
-  /* =====================================================
-     LOAD DASHBOARD DATA
-  ===================================================== */
-
-  useEffect(() => {
-    if (!user?.id) {
-      return;
-    }
-
-    void loadStudentStreak();
-    void loadPreparationStats();
-    void loadWeakTopics();
-    void loadTodayMission();
-  }, [user?.id]);
-
-  /* =====================================================
-     MISSION COUNT
-  ===================================================== */
-
-  const missionCount =
-    Number(missionCompleted.practice) +
-    Number(missionCompleted.challenge) +
-    Number(missionCompleted.currentAffairs);
-
-  /* =====================================================
-     STREAK DAYS
-  ===================================================== */
-
-  const streakDays = Array.from(
-    { length: 7 },
-    (_, index) => {
-      const date = new Date();
-
-      date.setDate(date.getDate() - (6 - index));
-
-      const dateString = getLocalDateString(date);
-
-      return {
-        date: dateString,
-        active: activeDates.includes(dateString),
-      };
-    },
-  );
-
-  /* =====================================================
-     DAILY PRACTICE
-  ===================================================== */
-
-  const dailyPracticePercent = Math.min(
-    100,
-    Math.round((dailyPractice / DAILY_TARGET) * 100),
-  );
-
-  /* =====================================================
-     NAVIGATION HANDLERS
-  ===================================================== */
-
-  const handleDailyPractice = () => {
-    navigate("/student/practice-questions");
-  };
-
-  const handleStudyPlanner = () => {
-    navigate("/student/study-planner");
-  };
-
-  const handlePracticeQuestions = () => {
-    navigate("/student/practice-questions");
-  };
-
-  const handleShortVideos = () => {
-    navigate("/student/short-videos");
-  };
-
-  const handleDailyChallenge = () => {
-    navigate("/student/daily-challenge");
-  };
-
-  const handleAskVidhya = () => {
-    navigate("/student/ask");
-  };
-
-  const handleCurrentAffairs = () => {
-    navigate("/student/current-affairs");
-  };
-
-  const handleDailyNewspaper = () => {
-    navigate("/student/daily-newspaper");
-  };
-
-  const handleVocabulary = () => {
-    navigate("/student/vocabulary");
-  };
-
-  const handleExamTips = () => {
-    navigate("/student/exam-tips");
-  };
-
-  const handleProgress = () => {
-    navigate("/student/progress");
-  };
-
-  const handleNCERTBooks = () => {
+  function handleActivity(path: string) {
+    navigate(path);
+  }
+
+  function handleNCERTBooks() {
     navigate("/student/ncert-books");
-  };
+  }
 
-  const handlePreviousYearPapers = () => {
+  function handlePreviousYearPapers() {
     navigate("/student/previous-year-papers");
-  };
-
-  const handleWeakTopic = (topic: WeakTopic) => {
-    navigate("/student/practice-questions", {
-      state: {
-        category: topic.category,
-      },
-    });
-  };
-
-  /* =====================================================
-     LOADING
-  ===================================================== */
-
-  if (authLoading) {
-    return (
-      <div
-        className={`flex min-h-screen items-center justify-center ${
-          isDark
-            ? "bg-slate-950 text-white"
-            : "bg-slate-50 text-slate-900"
-        }`}
-      >
-        <div className="text-center">
-          <div className="mb-4 animate-pulse text-5xl">
-            📚
-          </div>
-
-          <p className="font-semibold">
-            Loading Ranker Bhaiya...
-          </p>
-        </div>
-      </div>
-    );
   }
 
-  if (!user) {
-    return null;
+  function handleAskVidhya() {
+    navigate("/student/ask");
   }
 
-  const profileIncomplete =
-    !profile?.full_name ||
-    !profile?.class_name ||
-    !profile?.board ||
-    !profile?.exam;
+  function handlePracticeQuestions() {
+    navigate("/student/practice-questions");
+  }
 
-  /* =====================================================
-     UI
-  ===================================================== */
+  function handleStudyPlanner() {
+    navigate("/student/study-planner");
+  }
+
+  function handleDailyChallenge() {
+    navigate("/student/daily-challenge");
+  }
+
+  function handleShortVideos() {
+    navigate("/student/short-videos");
+  }
+
+  function handleCurrentAffairs() {
+    navigate("/student/current-affairs");
+  }
+
+  function handleDailyNewspaper() {
+    navigate("/student/daily-newspaper");
+  }
+
+  function handleVocabulary() {
+    navigate("/student/vocabulary");
+  }
+
+  function handleExamTips() {
+    navigate("/student/exam-tips");
+  }
+
+  function handleQuickRevision() {
+    navigate("/student/quick-revision");
+  }
+
+  function handleHandwrittenNotes() {
+    navigate("/student/handwritten-notes");
+  }
+
+  function handleProgress() {
+    navigate("/student/progress");
+  }
+
+  function handleProfile() {
+    setProfileMenuOpen(false);
+    navigate("/student/profile");
+  }
+
+  function handleSettings() {
+    setProfileMenuOpen(false);
+    navigate("/student/settings");
+  }
+
+  function handleAbout() {
+    setProfileMenuOpen(false);
+    navigate("/about");
+  }
+
+  function handleContact() {
+    setProfileMenuOpen(false);
+    navigate("/contact");
+  }
+
+  function handlePrivacy() {
+    setProfileMenuOpen(false);
+    navigate("/privacy-policy");
+  }
 
   return (
     <div
@@ -608,1263 +534,1521 @@ export function StudentDashboard() {
           : "bg-slate-50 text-slate-900"
       }`}
     >
-      {/* =================================================
+      {/* =========================================================
           HEADER
-      ================================================= */}
+      ========================================================= */}
 
       <header
         className={`sticky top-0 z-40 border-b backdrop-blur-xl ${
           isDark
-            ? "border-slate-800 bg-slate-950/90"
-            : "border-slate-200 bg-white/90"
+            ? "border-slate-800 bg-slate-950/85"
+            : "border-slate-200 bg-white/85"
         }`}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400">
-              Ranker Bhaiya
-            </p>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          {/* Logo */}
+          <button
+            type="button"
+            onClick={() => navigate("/student/dashboard")}
+            className="flex items-center gap-3"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-sm font-black text-white shadow-lg shadow-blue-600/20">
+              RB
+            </div>
 
-            <h1 className="mt-1 text-lg font-black sm:text-xl">
-              Hello, {firstName}! 👋
-            </h1>
-          </div>
+            <div className="hidden sm:block">
+              <p className="text-sm font-black tracking-tight">
+                Ranker Bhaiya
+              </p>
 
-          <div ref={menuRef} className="relative">
+              <p
+                className={`text-[11px] font-semibold ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Aapki Mehnat, Hamari Strategy.
+              </p>
+            </div>
+          </button>
+
+          {/* Right */}
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() =>
-                setShowProfileMenu((value) => !value)
+                fetchDashboardData(true)
               }
-              className={`flex items-center gap-2 rounded-full border px-2 py-2 transition ${
+              disabled={refreshing}
+              className={`rounded-xl p-2.5 transition ${
                 isDark
-                  ? "border-slate-700 bg-slate-900 hover:bg-slate-800"
-                  : "border-slate-200 bg-white hover:bg-slate-100"
+                  ? "hover:bg-slate-800"
+                  : "hover:bg-slate-100"
               }`}
-              aria-label="Open profile menu"
+              title="Refresh"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-pink-500 text-sm font-black text-white">
-                {firstName.charAt(0).toUpperCase()}
-              </span>
-
-              <span className="hidden max-w-[120px] truncate text-sm font-bold sm:block">
-                {firstName}
-              </span>
-
-              <span className="px-1 text-xs opacity-60">
-                ⌄
+              <span
+                className={
+                  refreshing
+                    ? "inline-block animate-spin"
+                    : ""
+                }
+              >
+                ↻
               </span>
             </button>
 
-            {showProfileMenu && (
-              <div
-                className={`absolute right-0 mt-2 w-60 overflow-hidden rounded-2xl border shadow-2xl ${
+            {/* Profile */}
+            <div
+              className="relative"
+              data-profile-menu
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setProfileMenuOpen(
+                    (value) => !value
+                  )
+                }
+                className={`flex items-center gap-2 rounded-2xl border px-2 py-1.5 transition ${
                   isDark
-                    ? "border-slate-700 bg-slate-900"
-                    : "border-slate-200 bg-white"
+                    ? "border-slate-800 hover:bg-slate-900"
+                    : "border-slate-200 hover:bg-slate-50"
                 }`}
               >
-                <div className="border-b border-inherit px-4 py-3">
-                  <p className="truncate text-sm font-bold">
-                    {profile?.full_name || firstName}
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-black text-white">
+                  {userInitials}
+                </div>
+
+                <div className="hidden text-left sm:block">
+                  <p className="max-w-28 truncate text-xs font-black">
+                    {displayName}
                   </p>
 
-                  <p className="truncate text-xs opacity-60">
-                    {user.email}
+                  <p
+                    className={`text-[10px] ${
+                      isDark
+                        ? "text-slate-500"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    Student
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    navigate("/student/profile");
-                  }}
-                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
+                <span className="hidden text-xs sm:block">
+                  ▾
+                </span>
+              </button>
+
+              {profileMenuOpen && (
+                <div
+                  className={`absolute right-0 top-full mt-2 w-64 overflow-hidden rounded-2xl border shadow-2xl ${
+                    isDark
+                      ? "border-slate-800 bg-slate-900"
+                      : "border-slate-200 bg-white"
+                  }`}
                 >
-                  👤 My Profile
-                </button>
+                  <div
+                    className={`border-b px-4 py-4 ${
+                      isDark
+                        ? "border-slate-800"
+                        : "border-slate-100"
+                    }`}
+                  >
+                    <p className="truncate text-sm font-black">
+                      {fullDisplayName}
+                    </p>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    navigate("/student/settings");
-                  }}
-                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  ⚙️ Settings
-                </button>
+                    <p
+                      className={`mt-1 truncate text-xs ${
+                        isDark
+                          ? "text-slate-500"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      {user?.email}
+                    </p>
+                  </div>
 
-                <div className="my-1 border-t border-inherit" />
+                  <div className="p-2">
+                    <button
+                      type="button"
+                      onClick={handleProfile}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      👤
+                      <span>Profile</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    navigate("/about");
-                  }}
-                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  ℹ️ About Us
-                </button>
+                    <button
+                      type="button"
+                      onClick={handleSettings}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      ⚙️
+                      <span>Settings</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    navigate("/contact");
-                  }}
-                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  📩 Contact Us
-                </button>
+                    <button
+                      type="button"
+                      onClick={handleAbout}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      ℹ️
+                      <span>About Ranker Bhaiya</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    navigate("/privacy-policy");
-                  }}
-                  className="block w-full px-4 py-3 text-left text-sm font-semibold transition hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  🔒 Privacy Policy
-                </button>
+                    <button
+                      type="button"
+                      onClick={handleContact}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      ✉️
+                      <span>Contact Us</span>
+                    </button>
 
-                <div className="my-1 border-t border-inherit" />
+                    <button
+                      type="button"
+                      onClick={handlePrivacy}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      🔒
+                      <span>Privacy Policy</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    void handleLogout();
-                  }}
-                  className="block w-full px-4 py-3 text-left text-sm font-bold text-red-500 transition hover:bg-red-500/5"
-                >
-                  🚪 Logout
-                </button>
-              </div>
-            )}
+                    <div
+                      className={`my-2 border-t ${
+                        isDark
+                          ? "border-slate-800"
+                          : "border-slate-100"
+                      }`}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-bold text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      🚪
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
-      {/* =================================================
-          MAIN
-      ================================================= */}
-
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-        {/* =================================================
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 sm:py-8">
+        {/* =========================================================
             HERO
-        ================================================= */}
+        ========================================================= */}
 
-        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white shadow-2xl shadow-purple-600/20 sm:p-8 lg:p-10">
-          <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-700 p-6 shadow-2xl shadow-indigo-700/20 sm:p-8 lg:p-10">
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+          <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-cyan-300/10 blur-3xl" />
 
-          <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-pink-400/20 blur-3xl" />
+          <div className="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold text-blue-50 backdrop-blur">
+                <span>🎓</span>
+                <span>Ranker Bhaiya Student Zone</span>
+              </div>
 
-          <div className="relative z-10 max-w-3xl">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-100">
-              Welcome back
-            </p>
+              <p className="text-sm font-semibold text-blue-100">
+                {getGreeting()}, {displayName}!
+              </p>
 
-            <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
-              Hello, {firstName}! 🚀
-            </h2>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
+                Ready to learn smarter?
+              </h1>
 
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-purple-50 sm:text-base">
-              Ranker Bhaiya brings learning
-              resources, current affairs, and
-              AI-powered guidance together in one
-              place — helping you learn smarter,
-              stay ahead, and prepare with
-              confidence.
-            </p>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-blue-100 sm:text-base">
+                Ranker Bhaiya brings learning resources,
+                current affairs, and AI-powered guidance
+                together in one place — helping you learn
+                smarter, stay ahead, and prepare with
+                confidence.
+              </p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={handleAskVidhya}
-                className="rounded-xl bg-white px-5 py-3 text-sm font-black text-purple-700 shadow-xl transition hover:bg-purple-50 active:scale-95"
-              >
-                🤖 Ask Vidhya →
-              </button>
+              {(className || examName) && (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {className && (
+                    <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white">
+                      Class {className}
+                    </span>
+                  )}
 
-              <button
-                type="button"
-                onClick={handlePracticeQuestions}
-                className="rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/20 active:scale-95"
-              >
-                📝 Practice Now
-              </button>
+                  {examName && (
+                    <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white">
+                      🎯 {examName}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-7 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleAskVidhya}
+                  className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-50"
+                >
+                  🤖 Ask Vidhya
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePracticeQuestions}
+                  className="rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:bg-white/20"
+                >
+                  Practice Now →
+                </button>
+              </div>
             </div>
+
+            {/* Ask Vidhya feature */}
+            <button
+              type="button"
+              onClick={handleAskVidhya}
+              className="group relative overflow-hidden rounded-3xl border border-white/15 bg-white/10 p-5 text-left backdrop-blur transition hover:bg-white/15 lg:w-72"
+            >
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-cyan-300/20 blur-xl" />
+
+              <div className="relative">
+                <div className="flex items-center justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-2xl">
+                    🤖
+                  </div>
+
+                  <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-100">
+                    AI Assistant
+                  </span>
+                </div>
+
+                <h2 className="mt-5 text-xl font-black text-white">
+                  Ask Vidhya
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-blue-100">
+                  Doubt hai? Concepts samjho, questions solve
+                  karo aur AI-powered learning support lo.
+                </p>
+
+                <div className="mt-5 text-sm font-black text-white">
+                  Start Learning →
+                </div>
+              </div>
+            </button>
           </div>
         </section>
 
-        {/* =================================================
-            PROFILE COMPLETION
-        ================================================= */}
+        {/* =========================================================
+            DAILY MINDSET
+        ========================================================= */}
 
-        {profileIncomplete && (
-          <section
-            className={`mt-6 rounded-2xl border p-5 ${
+        <section className="mt-6">
+          <div
+            className={`relative overflow-hidden rounded-3xl border p-5 sm:p-6 ${
               isDark
-                ? "border-amber-500/20 bg-amber-500/5"
-                : "border-amber-200 bg-amber-50"
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
             }`}
           >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-2xl dark:bg-amber-950/40">
+                🧠
+              </div>
+
               <div>
-                <h2 className="font-black">
-                  Complete your profile
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400">
+                  Daily Mindset
+                </p>
+
+                <h2 className="mt-1 text-lg font-black">
+                  {dailyMindset?.title ||
+                    "Consistency beats intensity."}
                 </h2>
 
                 <p
-                  className={`mt-1 text-sm ${
+                  className={`mt-1 text-sm leading-6 ${
                     isDark
                       ? "text-slate-400"
                       : "text-slate-600"
                   }`}
                 >
-                  Add your class, board and exam
-                  details for a better Ranker Bhaiya
-                  experience.
+                  {dailyMindset?.message ||
+                    "Aaj thoda progress karo. Kal usi progress ko build karo."}
                 </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  navigate("/student/profile")
-                }
-                className="rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-black text-white transition hover:bg-amber-600"
-              >
-                Complete Profile
-              </button>
-            </div>
-          </section>
-        )}
-
-        {/* =================================================
-            DAILY MINDSET
-        ================================================= */}
-
-        <section
-          className={`mt-6 rounded-3xl border p-5 shadow-sm sm:p-6 ${
-            isDark
-              ? "border-slate-800 bg-slate-900"
-              : "border-slate-200 bg-white"
-          }`}
-        >
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-2xl dark:bg-purple-950/50">
-              🧠
-            </div>
-
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-purple-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
-                  Daily Mindset
-                </span>
-
-                <span className="rounded-full bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-                  ☀️ Today's Thought
-                </span>
-              </div>
-
-              <p className="mt-3 text-lg font-black leading-7 sm:text-xl">
-                {dailyMindset.en}
-              </p>
-
-              <p className="mt-1 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                {dailyMindset.hi}
-              </p>
             </div>
           </div>
         </section>
 
-        {/* =================================================
+        {/* =========================================================
             TOP STATS
-        ================================================= */}
+        ========================================================= */}
 
-        <section className="mt-6 grid gap-4 lg:grid-cols-3">
-          {/* STREAK */}
-
+        <section className="mt-6 grid gap-4 sm:grid-cols-3">
+          {/* Streak */}
           <div
-            className={`rounded-3xl border p-5 shadow-sm ${
-              isDark
-                ? "border-slate-800 bg-slate-900"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">🔥</span>
-
-                  <h3 className="font-black">
-                    7 Day Streak
-                  </h3>
-                </div>
-
-                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {currentStreak === 0
-                    ? "Start your streak today!"
-                    : currentStreak >= 7
-                      ? "Amazing! Keep the streak alive."
-                      : `${7 - currentStreak} more days to reach 7.`}
-                </p>
-              </div>
-
-              <span className="rounded-xl bg-orange-50 px-3 py-1.5 text-xs font-black text-orange-600 dark:bg-orange-950/30 dark:text-orange-300">
-                {streakLoading
-                  ? "..."
-                  : `${currentStreak} DAYS`}
-              </span>
-            </div>
-
-            <div className="mt-5 flex justify-between gap-1">
-              {streakDays.map((day, index) => (
-                <div
-                  key={day.date}
-                  className="flex flex-1 flex-col items-center gap-2"
-                >
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${
-                      day.active
-                        ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
-                        : isDark
-                          ? "bg-slate-800 text-slate-500"
-                          : "bg-slate-100 text-slate-400"
-                    }`}
-                  >
-                    {day.active ? "✓" : "•"}
-                  </div>
-
-                  <span className="text-[10px] font-bold text-slate-400">
-                    {index === 6 ? "Today" : `D${index + 1}`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* MISSION */}
-
-          <div
-            className={`rounded-3xl border p-5 shadow-sm ${
-              isDark
-                ? "border-slate-800 bg-slate-900"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🎯</span>
-
-                <div>
-                  <h3 className="font-black">
-                    Today's Mission
-                  </h3>
-
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    Complete your daily targets
-                  </p>
-                </div>
-              </div>
-
-              <span className="rounded-xl bg-purple-50 px-3 py-1.5 text-xs font-black text-purple-600 dark:bg-purple-950/30 dark:text-purple-300">
-                {missionLoading ? "..." : `${missionCount}/3`}
-              </span>
-            </div>
-
-            <div className="mt-4 space-y-2.5">
-              {[
-                {
-                  label: "Complete Practice Questions",
-                  done: missionCompleted.practice,
-                  onClick: handlePracticeQuestions,
-                },
-                {
-                  label: "Complete Daily Challenge",
-                  done: missionCompleted.challenge,
-                  onClick: handleDailyChallenge,
-                },
-                {
-                  label: "Read Today's Current Affairs",
-                  done: missionCompleted.currentAffairs,
-                  onClick: handleCurrentAffairs,
-                },
-              ].map((mission) => (
-                <button
-                  key={mission.label}
-                  type="button"
-                  onClick={mission.onClick}
-                  className="flex w-full items-center gap-3 text-left"
-                >
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
-                      mission.done
-                        ? "bg-emerald-500 text-white"
-                        : isDark
-                          ? "border border-slate-700 bg-slate-800 text-slate-500"
-                          : "border border-slate-200 bg-slate-50 text-slate-400"
-                    }`}
-                  >
-                    {mission.done ? "✓" : "○"}
-                  </span>
-
-                  <span
-                    className={`text-xs font-bold ${
-                      mission.done
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-slate-600 dark:text-slate-300"
-                    }`}
-                  >
-                    {mission.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* PREPARATION */}
-
-          <div
-            className={`rounded-3xl border p-5 shadow-sm ${
+            className={`rounded-3xl border p-5 ${
               isDark
                 ? "border-slate-800 bg-slate-900"
                 : "border-slate-200 bg-white"
             }`}
           >
             <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">📊</span>
-
-                  <h3 className="font-black">
-                    Your Preparation
-                  </h3>
-                </div>
-
-                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  Based on your practice
-                </p>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-100 text-xl dark:bg-orange-950/40">
+                🔥
               </div>
 
-              <button
-                type="button"
-                onClick={handleProgress}
-                className="text-xs font-black text-purple-600 hover:text-purple-700 dark:text-purple-400"
-              >
-                View →
-              </button>
+              <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                {weeklyActiveDays}/7 days
+              </span>
             </div>
 
-            <div className="mt-5 flex items-center gap-5">
-              <div className="relative flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                <div
-                  className="absolute inset-1 rounded-full"
-                  style={{
-                    background: `conic-gradient(#8b5cf6 ${preparationStats.accuracy}%, ${
-                      isDark ? "#1e293b" : "#e2e8f0"
-                    } ${preparationStats.accuracy}% 100%)`,
-                  }}
-                />
+            <p className="mt-5 text-3xl font-black">
+              {loading ? "—" : streak}
+            </p>
 
-                <div
-                  className={`relative flex h-20 w-20 items-center justify-center rounded-full text-lg font-black ${
-                    isDark ? "bg-slate-900" : "bg-white"
-                  }`}
-                >
-                  {preparationLoading
-                    ? "—"
-                    : `${preparationStats.accuracy}%`}
-                </div>
-              </div>
-
-              <div className="min-w-0 flex-1 space-y-3">
-                <div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold">
-                      Questions
-                    </span>
-
-                    <span className="font-black text-purple-600 dark:text-purple-400">
-                      {preparationLoading
-                        ? "—"
-                        : preparationStats.attempted}
-                    </span>
-                  </div>
-
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div
-                      className="h-full rounded-full bg-purple-500 transition-all"
-                      style={{
-                        width: `${
-                          preparationStats.attempted > 0
-                            ? Math.min(
-                                100,
-                                preparationStats.attempted * 2,
-                              )
-                            : 0
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold">
-                      Accuracy
-                    </span>
-
-                    <span className="font-black text-emerald-600 dark:text-emerald-400">
-                      {preparationLoading
-                        ? "—"
-                        : `${preparationStats.accuracy}%`}
-                    </span>
-                  </div>
-
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div
-                      className="h-full rounded-full bg-emerald-500 transition-all"
-                      style={{
-                        width: `${preparationStats.accuracy}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* =================================================
-            PREPARATION TOOLS
-        ================================================= */}
-
-        <section className="mt-10">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight">
-              Your Preparation Tools
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Tools designed to keep your preparation
-              organized and consistent.
+            <p
+              className={`mt-1 text-sm font-semibold ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Day Streak
             </p>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {[
-              {
-                icon: "📅",
-                title: "Study Planner",
-                description:
-                  "Plan your study sessions and stay consistent.",
-                action: handleStudyPlanner,
-              },
-              {
-                icon: "📝",
-                title: "Practice Questions",
-                description:
-                  "Practice exam-style questions and improve accuracy.",
-                action: handlePracticeQuestions,
-              },
-              {
-                icon: "🎬",
-                title: "Short Videos",
-                description:
-                  "Learn important topics through short focused videos.",
-                action: handleShortVideos,
-              },
-              {
-                icon: "⚡",
-                title: "Daily Challenge",
-                description:
-                  "Challenge yourself with quick daily practice.",
-                action: handleDailyChallenge,
-              },
-            ].map((tool) => (
-              <button
-                key={tool.title}
-                type="button"
-                onClick={tool.action}
-                className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
-                  isDark
-                    ? "border-slate-800 bg-slate-900 hover:border-purple-800"
-                    : "border-slate-200 bg-white hover:border-purple-200"
+          {/* Mission */}
+          <div
+            className={`rounded-3xl border p-5 ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-xl dark:bg-emerald-950/40">
+                🎯
+              </div>
+
+              <span
+                className={`text-xs font-bold ${
+                  missionCompleted
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-amber-600 dark:text-amber-400"
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-2xl dark:bg-purple-950/40">
-                    {tool.icon}
+                {missionCompleted
+                  ? "Completed"
+                  : "Pending"}
+              </span>
+            </div>
+
+            <p className="mt-5 text-xl font-black">
+              Today's Mission
+            </p>
+
+            <p
+              className={`mt-1 line-clamp-2 text-sm ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              {missionText}
+            </p>
+          </div>
+
+          {/* Preparation */}
+          <div
+            className={`rounded-3xl border p-5 ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-xl dark:bg-blue-950/40">
+                📊
+              </div>
+
+              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                {preparationStats.accuracy}% accuracy
+              </span>
+            </div>
+
+            <p className="mt-5 text-3xl font-black">
+              {loading
+                ? "—"
+                : preparationStats.total}
+            </p>
+
+            <p
+              className={`mt-1 text-sm font-semibold ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              Questions Practiced
+            </p>
+          </div>
+        </section>
+
+        {/* =========================================================
+            PREPARATION TOOLS
+        ========================================================= */}
+
+        <section className="mt-10">
+          <div className="mb-5 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
+                Prepare Better
+              </p>
+
+              <h2 className="mt-1 text-2xl font-black">
+                Preparation Tools
+              </h2>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Study Planner */}
+            <button
+              type="button"
+              onClick={handleStudyPlanner}
+              className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
+                isDark
+                  ? "border-slate-800 bg-slate-900 hover:border-blue-800"
+                  : "border-slate-200 bg-white hover:border-blue-200"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-2xl dark:bg-indigo-950/40">
+                📅
+              </div>
+
+              <h3 className="mt-5 text-lg font-black">
+                Study Planner
+              </h3>
+
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Apni daily aur weekly study planning ko
+                organized rakho.
+              </p>
+
+              <span className="mt-4 inline-block text-sm font-black text-indigo-600 dark:text-indigo-400">
+                Open Planner →
+              </span>
+            </button>
+
+            {/* Practice */}
+            <button
+              type="button"
+              onClick={handlePracticeQuestions}
+              className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
+                isDark
+                  ? "border-slate-800 bg-slate-900 hover:border-emerald-800"
+                  : "border-slate-200 bg-white hover:border-emerald-200"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-2xl dark:bg-emerald-950/40">
+                📝
+              </div>
+
+              <h3 className="mt-5 text-lg font-black">
+                Practice Questions
+              </h3>
+
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Concepts ko questions ke through test karo.
+              </p>
+
+              <span className="mt-4 inline-block text-sm font-black text-emerald-600 dark:text-emerald-400">
+                Start Practice →
+              </span>
+            </button>
+
+            {/* Short Videos */}
+            <button
+              type="button"
+              onClick={handleShortVideos}
+              className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
+                isDark
+                  ? "border-slate-800 bg-slate-900 hover:border-rose-800"
+                  : "border-slate-200 bg-white hover:border-rose-200"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-2xl dark:bg-rose-950/40">
+                🎬
+              </div>
+
+              <h3 className="mt-5 text-lg font-black">
+                Short Videos
+              </h3>
+
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Quick learning ke liye short educational
+                videos dekho.
+              </p>
+
+              <span className="mt-4 inline-block text-sm font-black text-rose-600 dark:text-rose-400">
+                Watch Videos →
+              </span>
+            </button>
+
+            {/* Daily Challenge */}
+            <button
+              type="button"
+              onClick={handleDailyChallenge}
+              className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
+                isDark
+                  ? "border-slate-800 bg-slate-900 hover:border-amber-800"
+                  : "border-slate-200 bg-white hover:border-amber-200"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-2xl dark:bg-amber-950/40">
+                ⚡
+              </div>
+
+              <h3 className="mt-5 text-lg font-black">
+                Daily Challenge
+              </h3>
+
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Har din ek focused challenge complete karo.
+              </p>
+
+              <span className="mt-4 inline-block text-sm font-black text-amber-600 dark:text-amber-400">
+                Take Challenge →
+              </span>
+            </button>
+          </div>
+        </section>
+
+        {/* =========================================================
+            EXAM RESOURCES — NEW
+        ========================================================= */}
+
+        <section className="mt-10">
+          <div className="mb-5">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400">
+              Exam Resources
+            </p>
+
+            <h2 className="mt-1 text-2xl font-black">
+              Study Material
+            </h2>
+
+            <p
+              className={`mt-2 max-w-2xl text-sm ${
+                isDark
+                  ? "text-slate-400"
+                  : "text-slate-500"
+              }`}
+            >
+              NCERT books aur Previous Year Papers ko ek
+              hi jagah access karo.
+            </p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            {/* NCERT */}
+            <button
+              type="button"
+              onClick={handleNCERTBooks}
+              className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 p-6 text-left shadow-lg shadow-emerald-600/10 transition hover:-translate-y-1 hover:shadow-2xl"
+            >
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white/10" />
+
+              <div className="relative">
+                <div className="flex items-center justify-between">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-3xl backdrop-blur">
+                    📚
                   </div>
 
-                  <span className="text-purple-600 transition group-hover:translate-x-1 dark:text-purple-400">
-                    →
+                  <span className="rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-white backdrop-blur">
+                    Complete Books
                   </span>
                 </div>
 
-                <h3 className="mt-5 font-black">
-                  {tool.title}
+                <h3 className="mt-6 text-2xl font-black text-white">
+                  NCERT Books
                 </h3>
 
-                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  {tool.description}
+                <p className="mt-2 max-w-md text-sm leading-6 text-emerald-50">
+                  Class-wise aur subject-wise complete NCERT
+                  books ko PDF format mein access karo.
                 </p>
 
-                <p className="mt-4 text-xs font-black text-purple-600 dark:text-purple-400">
-                  Open →
+                <div className="mt-6 inline-flex items-center rounded-2xl bg-white px-5 py-3 text-sm font-black text-emerald-700 transition group-hover:bg-emerald-50">
+                  Open NCERT Books →
+                </div>
+              </div>
+            </button>
+
+            {/* PYQ */}
+            <button
+              type="button"
+              onClick={handlePreviousYearPapers}
+              className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-600 via-rose-600 to-pink-600 p-6 text-left shadow-lg shadow-rose-600/10 transition hover:-translate-y-1 hover:shadow-2xl"
+            >
+              <div className="absolute -bottom-20 -right-10 h-48 w-48 rounded-full bg-white/10" />
+
+              <div className="relative">
+                <div className="flex items-center justify-between">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-3xl backdrop-blur">
+                    📄
+                  </div>
+
+                  <span className="rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-white backdrop-blur">
+                    Practice Sets
+                  </span>
+                </div>
+
+                <h3 className="mt-6 text-2xl font-black text-white">
+                  Previous Year Papers
+                </h3>
+
+                <p className="mt-2 max-w-md text-sm leading-6 text-rose-50">
+                  Previous year question paper sets ko solve
+                  karo aur exam pattern ko better samjho.
                 </p>
-              </button>
-            ))}
+
+                <div className="mt-6 inline-flex items-center rounded-2xl bg-white px-5 py-3 text-sm font-black text-rose-700 transition group-hover:bg-rose-50">
+                  Open Question Papers →
+                </div>
+              </div>
+            </button>
           </div>
         </section>
 
-        {/* =================================================
+        {/* =========================================================
             LEARNING HUB
-        ================================================= */}
+        ========================================================= */}
 
         <section className="mt-10">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight">
+          <div className="mb-5">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-600 dark:text-cyan-400">
               Learning Hub
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Learn, revise and stay updated, every day.
             </p>
+
+            <h2 className="mt-1 text-2xl font-black">
+              Learn Every Day
+            </h2>
           </div>
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            {/* ASK VIDHYA */}
-
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {/* Ask Vidhya */}
             <button
               type="button"
               onClick={handleAskVidhya}
-              className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-left text-white shadow-xl shadow-purple-600/20 lg:row-span-2"
+              className={`group rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl lg:col-span-2 ${
+                isDark
+                  ? "border-violet-900/60 bg-gradient-to-br from-violet-950/70 to-slate-900"
+                  : "border-violet-100 bg-gradient-to-br from-violet-50 to-white"
+              }`}
             >
-              <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
-
-              <div className="relative z-10 flex h-full flex-col">
-                <div className="flex items-start justify-between">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-3xl backdrop-blur">
-                    🤖
-                  </div>
-
-                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-black tracking-wider">
-                    AI ASSISTANT
-                  </span>
+              <div className="flex items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600 text-2xl text-white">
+                  🤖
                 </div>
 
-                <div className="mt-8">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-purple-100">
-                    Ask Vidhya
-                  </p>
-
-                  <h3 className="mt-2 text-3xl font-black">
-                    Your personal AI learning assistant.
-                  </h3>
-
-                  <p className="mt-4 text-sm leading-6 text-purple-50">
-                    Ask questions, understand concepts,
-                    create learning support and learn
-                    smarter.
-                  </p>
-                </div>
-
-                <div className="mt-auto pt-8">
-                  <span className="inline-flex rounded-xl bg-white px-5 py-3 text-sm font-black text-purple-700 transition group-hover:bg-purple-50">
-                    Ask Vidhya →
-                  </span>
-                </div>
+                <span className="rounded-full bg-violet-600/10 px-3 py-1 text-[10px] font-black uppercase text-violet-600 dark:text-violet-300">
+                  Featured
+                </span>
               </div>
+
+              <h3 className="mt-5 text-xl font-black">
+                Ask Vidhya
+              </h3>
+
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-600"
+                }`}
+              >
+                AI-powered learning assistant for doubts,
+                concepts and study support.
+              </p>
+
+              <span className="mt-4 inline-block text-sm font-black text-violet-600 dark:text-violet-400">
+                Ask Now →
+              </span>
             </button>
 
-            {/* CURRENT AFFAIRS */}
-
+            {/* Current Affairs */}
             <button
               type="button"
               onClick={handleCurrentAffairs}
-              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+              className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
                   : "border-slate-200 bg-white"
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-2xl dark:bg-blue-950/40">
-                  📰
-                </div>
-
-                <span className="text-blue-600 transition group-hover:translate-x-1 dark:text-blue-400">
-                  →
-                </span>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-xl dark:bg-red-950/40">
+                📰
               </div>
 
               <h3 className="mt-5 font-black">
-                Daily Current Affairs
+                Current Affairs
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Stay updated with important national
-                and international news.
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Daily exam-focused current affairs.
               </p>
 
-              <p className="mt-4 text-xs font-black text-blue-600 dark:text-blue-400">
-                Explore →
-              </p>
+              <span className="mt-4 inline-block text-xs font-black text-red-600 dark:text-red-400">
+                Read →
+              </span>
             </button>
 
-            {/* NEWSPAPER */}
-
+            {/* Newspaper */}
             <button
               type="button"
               onClick={handleDailyNewspaper}
-              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+              className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
                   : "border-slate-200 bg-white"
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-50 text-2xl dark:bg-pink-950/40">
-                  🗞️
-                </div>
-
-                <span className="text-pink-600 transition group-hover:translate-x-1 dark:text-pink-400">
-                  →
-                </span>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-xl dark:bg-blue-950/40">
+                🗞️
               </div>
 
               <h3 className="mt-5 font-black">
                 Daily Newspaper
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Read daily newspapers and stay informed.
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Daily newspaper reading in one place.
               </p>
 
-              <p className="mt-4 text-xs font-black text-pink-600 dark:text-pink-400">
-                Explore →
-              </p>
+              <span className="mt-4 inline-block text-xs font-black text-blue-600 dark:text-blue-400">
+                Read →
+              </span>
             </button>
 
-            {/* VOCABULARY */}
-
+            {/* Vocabulary */}
             <button
               type="button"
               onClick={handleVocabulary}
-              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+              className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
                   : "border-slate-200 bg-white"
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-2xl dark:bg-cyan-950/40">
-                  🔤
-                </div>
-
-                <span className="text-cyan-600 transition group-hover:translate-x-1 dark:text-cyan-400">
-                  →
-                </span>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-fuchsia-100 text-xl dark:bg-fuchsia-950/40">
+                🔤
               </div>
 
               <h3 className="mt-5 font-black">
-                English Vocabulary
+                Vocabulary
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Build vocabulary with words, idioms and
-                more.
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Build your English vocabulary every day.
               </p>
 
-              <p className="mt-4 text-xs font-black text-cyan-600 dark:text-cyan-400">
-                Explore →
-              </p>
+              <span className="mt-4 inline-block text-xs font-black text-fuchsia-600 dark:text-fuchsia-400">
+                Learn →
+              </span>
             </button>
 
-            {/* EXAM TIPS */}
-
+            {/* Exam Tips */}
             <button
               type="button"
               onClick={handleExamTips}
-              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+              className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
                 isDark
                   ? "border-slate-800 bg-slate-900"
                   : "border-slate-200 bg-white"
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-2xl dark:bg-emerald-950/40">
-                  🎯
-                </div>
-
-                <span className="text-emerald-600 transition group-hover:translate-x-1 dark:text-emerald-400">
-                  →
-                </span>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-xl dark:bg-amber-950/40">
+                💡
               </div>
 
               <h3 className="mt-5 font-black">
                 Exam Tips
               </h3>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Practical strategies for smarter exam
-                preparation.
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Strategy, revision and exam preparation tips.
               </p>
 
-              <p className="mt-4 text-xs font-black text-emerald-600 dark:text-emerald-400">
+              <span className="mt-4 inline-block text-xs font-black text-amber-600 dark:text-amber-400">
                 Explore →
-              </p>
-            </button>
-
-            {/* NCERT BOOKS */}
-
-            <button
-              type="button"
-              onClick={handleNCERTBooks}
-              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
-                isDark
-                  ? "border-slate-800 bg-slate-900"
-                  : "border-slate-200 bg-white"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-2xl dark:bg-amber-950/40">
-                  📚
-                </div>
-
-                <span className="text-amber-600 transition group-hover:translate-x-1 dark:text-amber-400">
-                  →
-                </span>
-              </div>
-
-              <h3 className="mt-5 font-black">
-                NCERT Books
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Read complete NCERT books in PDF format
-                for your preparation.
-              </p>
-
-              <p className="mt-4 text-xs font-black text-amber-600 dark:text-amber-400">
-                Read Books →
-              </p>
-            </button>
-
-            {/* PREVIOUS YEAR PAPERS */}
-
-            <button
-              type="button"
-              onClick={handlePreviousYearPapers}
-              className={`group rounded-3xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
-                isDark
-                  ? "border-slate-800 bg-slate-900"
-                  : "border-slate-200 bg-white"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-2xl dark:bg-indigo-950/40">
-                  📄
-                </div>
-
-                <span className="text-indigo-600 transition group-hover:translate-x-1 dark:text-indigo-400">
-                  →
-                </span>
-              </div>
-
-              <h3 className="mt-5 font-black">
-                Previous Year Papers
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Practice mixed previous year question
-                paper sets.
-              </p>
-
-              <p className="mt-4 text-xs font-black text-indigo-600 dark:text-indigo-400">
-                Practice Papers →
-              </p>
+              </span>
             </button>
           </div>
         </section>
 
-        {/* =================================================
-            RECOMMENDATION + WEAK TOPICS
-        ================================================= */}
+        {/* =========================================================
+            RECOMMENDATION
+        ========================================================= */}
 
-        <section className="mt-10 grid gap-5 lg:grid-cols-5">
-          {/* RECOMMENDATION */}
-
-          <div className="relative overflow-hidden rounded-3xl border border-purple-200 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-pink-50 p-6 dark:border-purple-900/40 dark:from-purple-950/30 dark:via-fuchsia-950/20 dark:to-pink-950/20 lg:col-span-3">
-            <div className="relative z-10 max-w-xl">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-slate-900">
-                💡
-              </span>
-
-              <h3 className="mt-5 text-xl font-black">
-                Bhaiya's Recommendation
-              </h3>
-
-              {weakTopicsLoading ? (
-                <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Analysing your practice performance...
+        <section className="mt-10">
+          <div
+            className={`overflow-hidden rounded-3xl border ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="grid lg:grid-cols-[1fr_auto]">
+              <div className="p-6 sm:p-8">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+                  Recommended For You
                 </p>
-              ) : weakTopics.length > 0 ? (
-                <>
-                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Today, focus on{" "}
-                    <span className="font-black text-purple-700 dark:text-purple-300">
-                      {weakTopics[0].category}
-                    </span>
-                    . Your current accuracy in this
-                    topic is{" "}
-                    <span className="font-black">
-                      {weakTopics[0].accuracy}%
-                    </span>
-                    . Practice more questions from this
-                    topic to improve.
+
+                <h2 className="mt-2 text-2xl font-black">
+                  {weakTopics.length > 0
+                    ? `Work on ${weakTopics[0].name}`
+                    : "Build Your Preparation"}
+                </h2>
+
+                <p
+                  className={`mt-3 max-w-2xl text-sm leading-7 ${
+                    isDark
+                      ? "text-slate-400"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {weakTopics.length > 0
+                    ? `You have attempted ${weakTopics[0].total} questions in this area and ${weakTopics[0].wrong} were incorrect. Focused practice can improve your accuracy.`
+                    : "Start with practice questions, current affairs and daily revision. Your dashboard will become more personalized as you practice."}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handlePracticeQuestions}
+                  className="mt-6 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+                >
+                  Practice Now →
+                </button>
+              </div>
+
+              <div className="flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600 p-8 lg:w-64">
+                <div className="text-center">
+                  <div className="text-5xl">🚀</div>
+
+                  <p className="mt-3 text-sm font-black text-white">
+                    Keep Going!
                   </p>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleWeakTopic(weakTopics[0])
-                    }
-                    className="mt-6 rounded-xl bg-purple-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700"
-                  >
-                    Start Recommended Session →
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    Start solving practice questions and
-                    Ranker Bhaiya will identify the topics
-                    that need more attention.
+                  <p className="mt-1 text-xs text-emerald-50">
+                    Small progress every day.
                   </p>
-
-                  <button
-                    type="button"
-                    onClick={handlePracticeQuestions}
-                    className="mt-6 rounded-xl bg-purple-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-purple-600/20 transition hover:bg-purple-700"
-                  >
-                    Start Practicing →
-                  </button>
-                </>
-              )}
-            </div>
-
-            <div className="pointer-events-none absolute -bottom-12 -right-8 text-8xl opacity-20">
-              🚀
+                </div>
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* WEAK TOPICS */}
+        {/* =========================================================
+            WEAK TOPICS
+        ========================================================= */}
 
+        <section className="mt-10">
+          <div className="mb-5 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-rose-600 dark:text-rose-400">
+                Smart Analysis
+              </p>
+
+              <h2 className="mt-1 text-2xl font-black">
+                Weak Topics
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleProgress}
+              className="text-sm font-black text-blue-600 dark:text-blue-400"
+            >
+              View Progress →
+            </button>
+          </div>
+
+          {weakTopics.length === 0 ? (
+            <div
+              className={`rounded-3xl border border-dashed p-8 text-center ${
+                isDark
+                  ? "border-slate-700 bg-slate-900"
+                  : "border-slate-300 bg-white"
+              }`}
+            >
+              <div className="text-4xl">🧠</div>
+
+              <h3 className="mt-4 text-lg font-black">
+                Weak topics will appear here
+              </h3>
+
+              <p
+                className={`mx-auto mt-2 max-w-lg text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Practice more questions to let Ranker
+                Bhaiya identify the topics where you need
+                extra revision.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              {weakTopics.map((topic) => (
+                <div
+                  key={topic.name}
+                  className={`rounded-3xl border p-5 ${
+                    isDark
+                      ? "border-slate-800 bg-slate-900"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-black">
+                        {topic.name}
+                      </h3>
+
+                      <p
+                        className={`mt-1 text-xs ${
+                          isDark
+                            ? "text-slate-500"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {topic.total} questions attempted
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                      {topic.accuracy}%
+                    </span>
+                  </div>
+
+                  <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-rose-500 to-orange-500"
+                      style={{
+                        width: `${Math.max(
+                          5,
+                          topic.accuracy
+                        )}%`,
+                      }}
+                    />
+                  </div>
+
+                  <p className="mt-3 text-xs font-semibold text-rose-600 dark:text-rose-400">
+                    {topic.wrong} incorrect answers
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* =========================================================
+            5-MINUTE CHALLENGE
+        ========================================================= */}
+
+        <section className="mt-10">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-rose-500 to-pink-600 p-6 sm:p-8">
+            <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-white/10" />
+            <div className="absolute -bottom-24 left-20 h-56 w-56 rounded-full bg-white/10" />
+
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-black text-white">
+                  ⚡ 5-Minute Challenge
+                </div>
+
+                <h2 className="mt-4 text-2xl font-black text-white sm:text-3xl">
+                  Can you improve in 5 minutes?
+                </h2>
+
+                <p className="mt-2 max-w-xl text-sm leading-6 text-rose-50">
+                  Ek short focused challenge complete karo
+                  aur apni preparation ko daily momentum do.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleActivity(
+                    "/student/daily-challenge"
+                  )
+                }
+                className="shrink-0 rounded-2xl bg-white px-6 py-3.5 text-sm font-black text-rose-600 shadow-lg transition hover:bg-rose-50"
+              >
+                Start Challenge →
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+            DAILY PRACTICE
+        ========================================================= */}
+
+        <section className="mt-10">
+          <div className="mb-5">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600 dark:text-orange-400">
+              Daily Practice
+            </p>
+
+            <h2 className="mt-1 text-2xl font-black">
+              Keep Your Momentum
+            </h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <button
+              type="button"
+              onClick={handleQuickRevision}
+              className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-2xl dark:bg-blue-950/40">
+                ⚡
+              </div>
+
+              <h3 className="mt-5 text-lg font-black">
+                Quick Revision
+              </h3>
+
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Important concepts ko quickly revise karo.
+              </p>
+
+              <span className="mt-4 inline-block text-sm font-black text-blue-600 dark:text-blue-400">
+                Revise →
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleHandwrittenNotes}
+              className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-100 text-2xl dark:bg-purple-950/40">
+                ✍️
+              </div>
+
+              <h3 className="mt-5 text-lg font-black">
+                Handwritten Notes
+              </h3>
+
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Quick revision ke liye visual handwritten
+                notes dekho.
+              </p>
+
+              <span className="mt-4 inline-block text-sm font-black text-purple-600 dark:text-purple-400">
+                Open Notes →
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePracticeQuestions}
+              className={`rounded-3xl border p-5 text-left transition hover:-translate-y-1 hover:shadow-xl ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-2xl dark:bg-emerald-950/40">
+                🔥
+              </div>
+
+              <h3 className="mt-5 text-lg font-black">
+                Daily Practice
+              </h3>
+
+              <p
+                className={`mt-2 text-sm leading-6 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Daily questions solve karke preparation
+                consistent rakho.
+              </p>
+
+              <span className="mt-4 inline-block text-sm font-black text-emerald-600 dark:text-emerald-400">
+                Practice →
+              </span>
+            </button>
+          </div>
+        </section>
+
+        {/* =========================================================
+            WEEKLY ACHIEVEMENTS
+        ========================================================= */}
+
+        <section className="mt-10">
+          <div className="mb-5">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-600 dark:text-yellow-400">
+              Your Progress
+            </p>
+
+            <h2 className="mt-1 text-2xl font-black">
+              Weekly Achievements
+            </h2>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Active Days */}
+            <div
+              className={`rounded-3xl border p-5 ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="text-2xl">📅</div>
+
+              <p className="mt-4 text-2xl font-black">
+                {weeklyActiveDays}/7
+              </p>
+
+              <p
+                className={`mt-1 text-sm font-semibold ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Active Days
+              </p>
+            </div>
+
+            {/* Questions */}
+            <div
+              className={`rounded-3xl border p-5 ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="text-2xl">📝</div>
+
+              <p className="mt-4 text-2xl font-black">
+                {preparationStats.total}
+              </p>
+
+              <p
+                className={`mt-1 text-sm font-semibold ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Questions Practiced
+              </p>
+            </div>
+
+            {/* Correct */}
+            <div
+              className={`rounded-3xl border p-5 ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="text-2xl">🎯</div>
+
+              <p className="mt-4 text-2xl font-black">
+                {preparationStats.correct}
+              </p>
+
+              <p
+                className={`mt-1 text-sm font-semibold ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Correct Answers
+              </p>
+            </div>
+
+            {/* Accuracy */}
+            <div
+              className={`rounded-3xl border p-5 ${
+                isDark
+                  ? "border-slate-800 bg-slate-900"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              <div className="text-2xl">🏆</div>
+
+              <p className="mt-4 text-2xl font-black">
+                {preparationStats.accuracy}%
+              </p>
+
+              <p
+                className={`mt-1 text-sm font-semibold ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-500"
+                }`}
+              >
+                Overall Accuracy
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+            WEEKLY ACTIVITY
+        ========================================================= */}
+
+        <section className="mt-10">
           <div
-            className={`rounded-3xl border p-6 shadow-sm lg:col-span-2 ${
+            className={`rounded-3xl border p-6 ${
               isDark
                 ? "border-slate-800 bg-slate-900"
                 : "border-slate-200 bg-white"
             }`}
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🧠</span>
-
-                <h3 className="font-black">
-                  Your Weak Topics
-                </h3>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleProgress}
-                className="text-xs font-black text-purple-600 dark:text-purple-400"
-              >
-                View All →
-              </button>
-            </div>
-
-            {weakTopicsLoading ? (
-              <div className="mt-6 space-y-4">
-                {[1, 2, 3].map((item) => (
-                  <div
-                    key={item}
-                    className="animate-pulse"
-                  >
-                    <div className="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800" />
-
-                    <div className="mt-2 h-2 rounded bg-slate-200 dark:bg-slate-800" />
-                  </div>
-                ))}
-              </div>
-            ) : weakTopics.length === 0 ? (
-              <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-center dark:bg-slate-950">
-                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
-                  Not enough practice data yet.
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
+                  Consistency
                 </p>
 
-                <button
-                  type="button"
-                  onClick={handlePracticeQuestions}
-                  className="mt-3 text-xs font-black text-purple-600 dark:text-purple-400"
-                >
-                  Practice Questions →
-                </button>
+                <h2 className="mt-1 text-xl font-black">
+                  Last 7 Days
+                </h2>
               </div>
-            ) : (
-              <div className="mt-6 space-y-5">
-                {weakTopics.map((topic) => (
-                  <button
-                    key={topic.category}
-                    type="button"
-                    onClick={() => handleWeakTopic(topic)}
-                    className="w-full text-left"
+
+              <div className="text-2xl">📈</div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-7 gap-2 sm:gap-3">
+              {lastSevenDates.map((date) => {
+                const active = activities.some(
+                  (activity) =>
+                    activity.activity_date === date
+                );
+
+                const day = new Date(
+                  `${date}T12:00:00`
+                ).toLocaleDateString("en-US", {
+                  weekday: "short",
+                });
+
+                return (
+                  <div
+                    key={date}
+                    className="text-center"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="truncate text-sm font-bold">
-                        {topic.category}
-                      </span>
-
-                      <span className="shrink-0 text-xs font-black text-red-500">
-                        {topic.accuracy}%
-                      </span>
+                    <div
+                      className={`mx-auto flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-black transition sm:h-12 sm:w-12 ${
+                        active
+                          ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/20"
+                          : isDark
+                            ? "bg-slate-800 text-slate-500"
+                            : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      {active ? "✓" : "·"}
                     </div>
 
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          topic.accuracy < 50
-                            ? "bg-red-500"
-                            : topic.accuracy < 70
-                              ? "bg-amber-500"
-                              : "bg-emerald-500"
-                        }`}
-                        style={{
-                          width: `${topic.accuracy}%`,
-                        }}
-                      />
-                    </div>
-
-                    <p className="mt-1 text-[10px] font-semibold text-slate-400">
-                      {topic.attempted} questions attempted
+                    <p
+                      className={`mt-2 text-[10px] font-bold sm:text-xs ${
+                        isDark
+                          ? "text-slate-500"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      {day}
                     </p>
-                  </button>
-                ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            {todayActivities.length > 0 && (
+              <div className="mt-6 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-950/20">
+                <p className="text-sm font-black text-emerald-700 dark:text-emerald-300">
+                  🎉 Today's activity
+                </p>
+
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {Array.from(
+                    new Set(
+                      todayActivities.map(
+                        (activity) =>
+                          ACTIVITY_LABELS[
+                            activity.activity_type
+                          ] ||
+                          activity.activity_type
+                      )
+                    )
+                  ).map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-slate-900 dark:text-emerald-300"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
         </section>
 
-        {/* =================================================
-            DAILY PRACTICE
-        ================================================= */}
-
-        <section className="mt-10 overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-pink-500 to-fuchsia-600 p-6 text-white shadow-xl shadow-pink-500/20 sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl">
-              <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider">
-                ⚡ Daily Practice
-              </span>
-
-              <h2 className="mt-4 text-2xl font-black sm:text-3xl">
-                Challenge Yourself.
-                <br />
-                Improve Every Day.
-              </h2>
-
-              <p className="mt-3 text-sm leading-6 text-pink-50">
-                Practice questions, check your accuracy
-                and build a consistent study habit.
-              </p>
-
-              <div className="mt-5 max-w-md">
-                <div className="flex items-center justify-between text-xs font-black">
-                  <span>Today's progress</span>
-
-                  <span>
-                    {dailyPractice}/{DAILY_TARGET}
-                  </span>
-                </div>
-
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20">
-                  <div
-                    className="h-full rounded-full bg-white transition-all duration-500"
-                    style={{
-                      width: `${dailyPracticePercent}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleDailyPractice}
-              className="shrink-0 rounded-2xl bg-white px-6 py-4 text-sm font-black text-pink-600 shadow-xl transition hover:bg-pink-50 active:scale-95"
-            >
-              Start Practice →
-            </button>
-          </div>
-        </section>
-
-        {/* =================================================
-            WEEKLY ACHIEVEMENTS
-        ================================================= */}
+        {/* =========================================================
+            ABOUT
+        ========================================================= */}
 
         <section className="mt-10">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight">
-              Weekly Achievements
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Small wins build big results.
-            </p>
-          </div>
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                icon: "🔥",
-                title: "7 Day Streak",
-                unlocked: currentStreak >= 7,
-                value:
-                  currentStreak >= 7
-                    ? "UNLOCKED"
-                    : `${Math.min(currentStreak, 7)}/7 DAYS`,
-              },
-              {
-                icon: "📝",
-                title: "100 Questions",
-                unlocked: preparationStats.attempted >= 100,
-                value:
-                  preparationStats.attempted >= 100
-                    ? "UNLOCKED"
-                    : `${Math.min(
-                        preparationStats.attempted,
-                        100,
-                      )}/100`,
-              },
-              {
-                icon: "🎯",
-                title: "80% Accuracy",
-                unlocked: preparationStats.accuracy >= 80,
-                value:
-                  preparationStats.attempted === 0
-                    ? "START"
-                    : preparationStats.accuracy >= 80
-                      ? "UNLOCKED"
-                      : `${preparationStats.accuracy}%`,
-              },
-              {
-                icon: "🚀",
-                title: "Keep Learning",
-                unlocked: preparationStats.attempted >= 20,
-                value:
-                  preparationStats.attempted >= 20
-                    ? "UNLOCKED"
-                    : `${Math.min(
-                        preparationStats.attempted,
-                        20,
-                      )}/20`,
-              },
-            ].map((achievement) => (
-              <div
-                key={achievement.title}
-                className={`rounded-3xl border p-5 ${
-                  achievement.unlocked
-                    ? isDark
-                      ? "border-emerald-900/50 bg-emerald-950/20"
-                      : "border-emerald-200 bg-emerald-50"
-                    : isDark
-                      ? "border-slate-800 bg-slate-900"
-                      : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <span className="text-3xl">
-                    {achievement.icon}
-                  </span>
-
-                  <span
-                    className={`rounded-lg px-2 py-1 text-[9px] font-black ${
-                      achievement.unlocked
-                        ? "bg-emerald-500 text-white"
-                        : isDark
-                          ? "bg-slate-800 text-slate-500"
-                          : "bg-slate-100 text-slate-400"
-                    }`}
-                  >
-                    {achievement.value}
-                  </span>
-                </div>
-
-                <h3 className="mt-5 font-black">
-                  {achievement.title}
-                </h3>
-
-                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {achievement.unlocked
-                    ? "Achievement unlocked"
-                    : "Keep going"}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* =================================================
-            ABOUT
-        ================================================= */}
-
-        <section
-          className={`mt-10 rounded-3xl border p-6 sm:p-8 ${
-            isDark
-              ? "border-slate-800 bg-slate-900"
-              : "border-slate-200 bg-white"
-          }`}
-        >
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-2xl dark:bg-purple-950/40">
-              🚀
-            </div>
-
-            <div>
-              <h2 className="text-xl font-black">
+          <div
+            className={`rounded-3xl border p-6 sm:p-8 ${
+              isDark
+                ? "border-slate-800 bg-slate-900"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="max-w-4xl">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
                 About Ranker Bhaiya
+              </p>
+
+              <h2 className="mt-2 text-2xl font-black">
+                Your preparation, all in one place.
               </h2>
 
-              <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600 dark:text-slate-300">
-                Ranker Bhaiya is a student-focused
-                learning platform built to make exam
-                preparation simpler, smarter, and more
-                effective. From daily current affairs and
-                newspaper reading to fast revision,
-                vocabulary building, and AI-powered
-                learning support, everything is designed
-                to help students stay consistent, learn
-                with clarity, and prepare with confidence.
+              <p
+                className={`mt-4 text-sm leading-7 ${
+                  isDark
+                    ? "text-slate-400"
+                    : "text-slate-600"
+                }`}
+              >
+                Ranker Bhaiya is a student-focused learning
+                platform built to make exam preparation
+                simpler, smarter, and more effective. From
+                daily current affairs and newspaper reading
+                to fast revision, vocabulary building, and
+                AI-powered learning support, everything is
+                designed to help students stay consistent,
+                learn with clarity, and prepare with
+                confidence.
               </p>
             </div>
           </div>
         </section>
 
-        {/* =================================================
+        {/* =========================================================
             FOOTER
-        ================================================= */}
+        ========================================================= */}
 
-        <footer className="py-8 text-center">
-          <p className="text-xs font-semibold text-slate-400">
-            © {new Date().getFullYear()} Ranker Bhaiya ·
+        <footer className="py-10 text-center">
+          <p
+            className={`text-xs font-semibold ${
+              isDark
+                ? "text-slate-600"
+                : "text-slate-400"
+            }`}
+          >
+            © {new Date().getFullYear()} Ranker Bhaiya
+          </p>
+
+          <p
+            className={`mt-1 text-[11px] ${
+              isDark
+                ? "text-slate-700"
+                : "text-slate-400"
+            }`}
+          >
             Aapki Mehnat, Hamari Strategy.
           </p>
         </footer>
