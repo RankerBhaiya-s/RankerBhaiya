@@ -19,16 +19,20 @@ export function AdminDashboard() {
 
       <header className="border-b border-slate-200 bg-white">
         <div className="px-8 py-3">
-          <div className="text-xl font-bold text-blue-600">
-            PadhAI
+          <div className="text-xl font-black text-blue-600">
+            RANKER BHAIYA
           </div>
+
+          <p className="mt-0.5 text-[10px] font-medium text-slate-400">
+            Aapki Mehnat, Hamari Strategy.
+          </p>
         </div>
 
         <div className="border-t border-slate-200">
           <div className="flex items-center justify-between px-8 py-4">
             <div>
               <h1 className="text-lg font-bold text-slate-900">
-                PadhAI Admin
+                Ranker Bhaiya Admin
               </h1>
 
               <p className="text-xs text-slate-500">
@@ -39,7 +43,7 @@ export function AdminDashboard() {
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-xl bg-red-500 px-4 py-2 text-xs font-semibold text-white hover:bg-red-600"
+              className="rounded-xl bg-red-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-red-600"
             >
               Logout
             </button>
@@ -53,7 +57,9 @@ export function AdminDashboard() {
 
       <main className="px-8 py-6">
 
-        {/* WELCOME */}
+        {/* =====================================================
+            WELCOME
+        ===================================================== */}
 
         <section className="rounded-2xl bg-slate-900 p-6 text-white">
           <p className="text-xs text-blue-200">
@@ -65,7 +71,7 @@ export function AdminDashboard() {
           </h2>
 
           <p className="mt-2 text-xs text-slate-400">
-            You have administrator access to PadhAI.
+            You have administrator access to Ranker Bhaiya.
           </p>
         </section>
 
@@ -74,6 +80,8 @@ export function AdminDashboard() {
         ===================================================== */}
 
         <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+
+          {/* STUDENTS */}
 
           <div className="rounded-2xl bg-white p-5 shadow-sm">
             <p className="text-xs text-slate-500">
@@ -85,15 +93,19 @@ export function AdminDashboard() {
             </p>
           </div>
 
+          {/* NCERT */}
+
           <div className="rounded-2xl bg-white p-5 shadow-sm">
             <p className="text-xs text-slate-500">
-              Syllabus
+              NCERT Books
             </p>
 
             <p className="mt-2 text-2xl font-bold text-slate-900">
               —
             </p>
           </div>
+
+          {/* CURRENT AFFAIRS */}
 
           <div className="rounded-2xl bg-white p-5 shadow-sm">
             <p className="text-xs text-slate-500">
@@ -104,6 +116,8 @@ export function AdminDashboard() {
               —
             </p>
           </div>
+
+          {/* AI */}
 
           <div className="rounded-2xl bg-white p-5 shadow-sm">
             <p className="text-xs text-slate-500">
@@ -125,9 +139,11 @@ export function AdminDashboard() {
           Management
         </h2>
 
-        <section className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <section className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 
-          {/* SYLLABUS */}
+          {/* =================================================
+              SYLLABUS
+          ================================================= */}
 
           <div className="rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md">
 
@@ -146,14 +162,44 @@ export function AdminDashboard() {
             <button
               type="button"
               onClick={() => navigate("/admin/syllabus")}
-              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
             >
               Manage Syllabus
             </button>
 
           </div>
 
-          {/* CURRENT AFFAIRS */}
+          {/* =================================================
+              NCERT BOOKS
+          ================================================= */}
+
+          <div className="rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md">
+
+            <div className="text-3xl">
+              📖
+            </div>
+
+            <h3 className="mt-4 font-bold text-slate-900">
+              NCERT Books
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Upload and manage complete NCERT books as PDF files.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => navigate("/admin/ncert")}
+              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
+            >
+              Manage NCERT Books
+            </button>
+
+          </div>
+
+          {/* =================================================
+              CURRENT AFFAIRS
+          ================================================= */}
 
           <div className="rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md">
 
@@ -172,7 +218,7 @@ export function AdminDashboard() {
             <button
               type="button"
               onClick={() => navigate("/admin/current-affairs")}
-              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
             >
               Manage Current Affairs
             </button>
@@ -201,14 +247,16 @@ export function AdminDashboard() {
             <button
               type="button"
               onClick={() => navigate("/admin/newspaper")}
-              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
             >
               Manage Newspaper
             </button>
 
           </div>
 
-          {/* STUDENTS */}
+          {/* =================================================
+              STUDENTS
+          ================================================= */}
 
           <div className="rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md">
 
@@ -226,14 +274,16 @@ export function AdminDashboard() {
 
             <button
               type="button"
-              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
             >
               Manage
             </button>
 
           </div>
 
-          {/* AI SETTINGS */}
+          {/* =================================================
+              AI SETTINGS
+          ================================================= */}
 
           <div className="rounded-2xl bg-white p-5 shadow-sm transition hover:shadow-md">
 
@@ -246,12 +296,12 @@ export function AdminDashboard() {
             </h3>
 
             <p className="mt-2 text-sm text-slate-500">
-              Configure PadhAI AI features.
+              Configure Ranker Bhaiya AI learning features.
             </p>
 
             <button
               type="button"
-              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+              className="mt-5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
             >
               Configure
             </button>
