@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -12,12 +13,12 @@ import { useTheme } from "../../context/ThemeContext";
 import { supabase } from "../../lib/supabase";
 import { getMindsetText } from "../../data/dailyMindsets";
 
-type Activity = {
+type ActivityRow = {
   activity_date: string;
   activity_type: string;
 };
 
-type Attempt = {
+type PracticeAttempt = {
   id: string;
   user_id: string;
   question_id: string;
@@ -25,9 +26,7 @@ type Attempt = {
   created_at: string;
   practice_questions?: {
     category: string | null;
-  } | {
-    category: string | null;
-  }[] | null;
+  } | null;
 };
 
 type Profile = {
@@ -37,12 +36,42 @@ type Profile = {
   exam?: string | null;
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+type WeakTopic = {
+  name: string;
+  total: number;
+  wrong: number;
+  accuracy: number;
+};
 
-const dateKey = (date: Date) =>
-  date.toISOString().slice(0, 10);
+const todayKey = () => new Date().toISOString().slice(0, 10);
 
-function getStreak(activities: Activity[]) {
+function getGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  if (hour < 21) return "Good Evening";
+
+  return "Good Night";
+}
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+
+  if (!parts.length) return "RB";
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function dateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getStreak(activities: ActivityRow[]) {
   const dates = new Set(
     activities.map((item) => item.activity_date),
   );
@@ -51,35 +80,25 @@ function getStreak(activities: Activity[]) {
 
   for (let i = 0; i < 365; i++) {
     const date = new Date();
+
     date.setHours(12, 0, 0, 0);
     date.setDate(date.getDate() - i);
 
-    if (dates.has(dateKey(date))) streak++;
-    else break;
+    if (dates.has(dateKey(date))) {
+      streak += 1;
+    } else {
+      break;
+    }
   }
 
   return streak;
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-
-  if (!parts.length) return "RB";
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
-function getCategory(attempt: Attempt) {
-  const relation = attempt.practice_questions;
-
-  if (Array.isArray(relation)) {
-    return relation[0]?.category || "General";
-  }
-
-  return relation?.category || "General";
+function getAttemptCategory(attempt: PracticeAttempt) {
+  return (
+    attempt.practice_questions?.category ||
+    "General Practice"
+  );
 }
 
 function Card({
@@ -88,7 +107,7 @@ function Card({
   className = "",
 }: {
   dark: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
@@ -141,62 +160,114 @@ export function StudentDashboard() {
   const dark = theme === "dark";
 
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [attempts, setAttempts] = useState<PracticeAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [menu, setMenu] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
-  const loadDashboard = useCallback(
+  const fetchDashboardData = useCallback(
     async (refresh = false) => {
       if (!user?.id) {
         setLoading(false);
         return;
       }
 
-      refresh ? setRefreshing(true) : setLoading(true);
+      if (refresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
 
       try {
-        const [profileRes, activityRes, attemptRes] =
-          await Promise.all([
-            supabase
-              .from("profiles")
-              .select("full_name,class_name,board,exam")
-              .eq("id", user.id)
-              .maybeSingle(),
+        const [
+          profileResponse,
+          activityResponse,
+          attemptsResponse,
+        ] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("full_name,class_name,board,exam")
+            .eq("id", user.id)
+            .maybeSingle(),
 
-            supabase
-              .from("student_daily_activity")
-              .select("activity_date,activity_type")
-              .eq("user_id", user.id)
-              .order("activity_date", { ascending: false }),
+          supabase
+            .from("student_daily_activity")
+            .select("activity_date,activity_type")
+            .eq("user_id", user.id)
+            .order("activity_date", {
+              ascending: false,
+            }),
 
-            supabase
-              .from("practice_attempts")
-              .select(`
-                id,
-                user_id,
-                question_id,
-                is_correct,
-                created_at,
-                practice_questions(category)
-              `)
-              .eq("user_id", user.id)
-              .order("created_at", { ascending: false }),
-          ]);
+          supabase
+            .from("practice_attempts")
+            .select(`
+              id,
+              user_id,
+              question_id,
+              is_correct,
+              created_at,
+              practice_questions(category)
+            `)
+            .eq("user_id", user.id)
+            .order("created_at", {
+              ascending: false,
+            }),
+        ]);
 
-        if (!profileRes.error) {
-          setProfile(profileRes.data);
-        }
-
-        if (!activityRes.error) {
-          setActivities(activityRes.data || []);
-        }
-
-        if (!attemptRes.error) {
-          setAttempts(
-            (attemptRes.data || []) as Attempt[],
+        if (profileResponse.error) {
+          console.error(
+            "Profile fetch error:",
+            profileResponse.error,
           );
+        } else {
+          setProfile(profileResponse.data);
+        }
+
+        if (activityResponse.error) {
+          console.error(
+            "Activity fetch error:",
+            activityResponse.error,
+          );
+          setActivities([]);
+        } else {
+          setActivities(activityResponse.data || []);
+        }
+
+        if (attemptsResponse.error) {
+          console.error(
+            "Practice attempts fetch error:",
+            attemptsResponse.error,
+          );
+          setAttempts([]);
+        } else {
+          const rows = attemptsResponse.data || [];
+
+          const normalized: PracticeAttempt[] = rows.map(
+            (row) => {
+              const relation = row.practice_questions;
+
+              const question = Array.isArray(relation)
+                ? relation[0]
+                : relation;
+
+              return {
+                id: String(row.id),
+                user_id: String(row.user_id),
+                question_id: String(row.question_id),
+                is_correct: Boolean(row.is_correct),
+                created_at: String(row.created_at),
+                practice_questions: question
+                  ? {
+                      category:
+                        question.category ?? null,
+                    }
+                  : null,
+              };
+            },
+          );
+
+          setAttempts(normalized);
         }
       } catch (error) {
         console.error("Dashboard error:", error);
@@ -209,44 +280,51 @@ export function StudentDashboard() {
   );
 
   useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   useEffect(() => {
-    const close = (event: MouseEvent) => {
+    const handleOutsideClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
 
-      if (!target.closest("[data-profile]")) {
-        setMenu(false);
+      if (!target.closest("[data-profile-menu]")) {
+        setProfileMenuOpen(false);
       }
     };
 
-    document.addEventListener("mousedown", close);
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick,
+    );
 
-    return () =>
-      document.removeEventListener("mousedown", close);
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick,
+      );
+    };
   }, []);
 
-  const language = i18n.language?.toLowerCase() || "en";
+  const language =
+    i18n.language?.toLowerCase() || "en";
 
-  const mindset = useMemo(() => {
+  const dailyMindset = useMemo(() => {
+    if (language.startsWith("hinglish")) {
+      return getMindsetText("hinglish");
+    }
+
     if (
       language === "hi" ||
       language.startsWith("hindi") ||
-      (language.startsWith("hi-") &&
-        !language.startsWith("hinglish"))
+      language.startsWith("hi-")
     ) {
       return getMindsetText("hi");
-    }
-
-    if (language.startsWith("hinglish")) {
-      return getMindsetText("hinglish");
     }
 
     return getMindsetText("en");
   }, [language]);
 
-  const name =
+  const userName =
     profile?.full_name ||
     user?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
@@ -254,73 +332,90 @@ export function StudentDashboard() {
     "Student";
 
   const firstName =
-    name.trim().split(/\s+/)[0] || "Student";
+    userName.trim().split(/\s+/)[0] || "Student";
 
   const streak = useMemo(
     () => getStreak(activities),
     [activities],
   );
 
-  const stats = useMemo(() => {
+  const preparationStats = useMemo(() => {
     const total = attempts.length;
+
     const correct = attempts.filter(
       (item) => item.is_correct,
     ).length;
 
+    const accuracy =
+      total > 0
+        ? Math.round((correct / total) * 100)
+        : 0;
+
     return {
       total,
       correct,
-      accuracy: total
-        ? Math.round((correct / total) * 100)
-        : 0,
+      wrong: total - correct,
+      accuracy,
     };
   }, [attempts]);
+
+  const weeklyActiveDays = useMemo(() => {
+    const activeDates = new Set(
+      activities.map((item) => item.activity_date),
+    );
+
+    let count = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+
+      date.setHours(12, 0, 0, 0);
+      date.setDate(date.getDate() - i);
+
+      if (activeDates.has(dateKey(date))) {
+        count++;
+      }
+    }
+
+    return count;
+  }, [activities]);
 
   const todayActivities = useMemo(
     () =>
       activities.filter(
-        (item) => item.activity_date === today(),
+        (item) =>
+          item.activity_date === todayKey(),
       ),
     [activities],
   );
 
-  const weeklyDays = useMemo(() => {
-    const dates = new Set(
-      activities.map((item) => item.activity_date),
-    );
-
-    return Array.from({ length: 7 }).filter((_, index) => {
-      const date = new Date();
-      date.setHours(12, 0, 0, 0);
-      date.setDate(date.getDate() - (6 - index));
-
-      return dates.has(dateKey(date));
-    }).length;
-  }, [activities]);
-
-  const weakTopics = useMemo(() => {
+  const weakTopics = useMemo<WeakTopic[]>(() => {
     const map = new Map<
       string,
-      { total: number; wrong: number }
+      {
+        total: number;
+        wrong: number;
+      }
     >();
 
     attempts.forEach((attempt) => {
-      const category = getCategory(attempt);
+      const category = getAttemptCategory(attempt);
+
       const current = map.get(category) || {
         total: 0,
         wrong: 0,
       };
 
-      current.total++;
+      current.total += 1;
 
       if (!attempt.is_correct) {
-        current.wrong++;
+        current.wrong += 1;
       }
 
       map.set(category, current);
     });
 
-    return [...map.entries()]
+    return Array.from(map.entries())
       .map(([name, value]) => ({
         name,
         total: value.total,
@@ -331,15 +426,23 @@ export function StudentDashboard() {
             100,
         ),
       }))
-      .filter((item) => item.total >= 2)
-      .sort((a, b) => b.wrong - a.wrong)
+      .filter((topic) => topic.total >= 2)
+      .sort((a, b) => {
+        if (b.wrong !== a.wrong) {
+          return b.wrong - a.wrong;
+        }
+
+        return a.accuracy - b.accuracy;
+      })
       .slice(0, 3);
   }, [attempts]);
 
-  const go = (path: string) => navigate(path);
+  const go = (path: string) => {
+    navigate(path);
+  };
 
-  const logout = async () => {
-    setMenu(false);
+  const handleLogout = async () => {
+    setProfileMenuOpen(false);
 
     try {
       await signOut();
@@ -349,7 +452,7 @@ export function StudentDashboard() {
     }
   };
 
-  const tools = [
+  const preparationTools = [
     {
       icon: "📚",
       title: "Study Planner",
@@ -358,7 +461,7 @@ export function StudentDashboard() {
     },
     {
       icon: "🎯",
-      title: "Practice",
+      title: "Practice Questions",
       text: "Test your concepts",
       path: "/student/practice-questions",
     },
@@ -369,29 +472,14 @@ export function StudentDashboard() {
       path: "/student/daily-challenge",
     },
     {
-      icon: "⏱️",
-      title: "5-Minute Challenge",
-      text: "Quick daily practice",
-      path: "/student/daily-challenge",
+      icon: "🎬",
+      title: "Short Videos",
+      text: "Learn in less time",
+      path: "/student/short-videos",
     },
   ];
 
-  const resources = [
-    {
-      icon: "📖",
-      title: "NCERT Books",
-      text: "Complete textbooks",
-      path: "/student/ncert-books",
-    },
-    {
-      icon: "📝",
-      title: "Previous Papers",
-      text: "Practice paper sets",
-      path: "/student/previous-year-papers",
-    },
-  ];
-
-  const learning = [
+  const learningTools = [
     {
       icon: "📰",
       title: "Current Affairs",
@@ -407,7 +495,7 @@ export function StudentDashboard() {
     {
       icon: "🔤",
       title: "Vocabulary",
-      text: "Improve English",
+      text: "Build better English",
       path: "/student/vocabulary",
     },
     {
@@ -416,12 +504,39 @@ export function StudentDashboard() {
       text: "Study smarter",
       path: "/student/exam-tips",
     },
+    {
+      icon: "⚡",
+      title: "Quick Revision",
+      text: "Revise faster",
+      path: "/student/quick-revision",
+    },
+    {
+      icon: "✍️",
+      title: "Handwritten Notes",
+      text: "Visual revision",
+      path: "/student/handwritten-notes",
+    },
+  ];
+
+  const resources = [
+    {
+      icon: "📖",
+      title: "NCERT Books",
+      text: "Complete textbooks",
+      path: "/student/ncert-books",
+    },
+    {
+      icon: "📝",
+      title: "Previous Year Papers",
+      text: "Practice paper sets",
+      path: "/student/previous-year-papers",
+    },
   ];
 
   if (loading) {
     return (
       <div
-        className={`min-h-screen flex items-center justify-center ${
+        className={`flex min-h-screen items-center justify-center ${
           dark
             ? "bg-slate-950 text-white"
             : "bg-slate-50 text-slate-900"
@@ -429,6 +544,7 @@ export function StudentDashboard() {
       >
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+
           <p className="text-sm font-bold">
             Preparing your dashboard...
           </p>
@@ -455,14 +571,17 @@ export function StudentDashboard() {
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <button
-            onClick={() => go("/student/dashboard")}
+            type="button"
+            onClick={() =>
+              go("/student/dashboard")
+            }
             className="flex items-center gap-3"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-xs font-black text-white shadow-lg">
               RB
             </div>
 
-            <div className="hidden sm:block text-left">
+            <div className="hidden text-left sm:block">
               <p className="text-sm font-black">
                 Ranker Bhaiya
               </p>
@@ -475,9 +594,12 @@ export function StudentDashboard() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => loadDashboard(true)}
+              type="button"
+              onClick={() =>
+                fetchDashboardData(true)
+              }
               disabled={refreshing}
-              className={`rounded-xl p-2.5 ${
+              className={`rounded-xl p-2.5 transition ${
                 dark
                   ? "hover:bg-slate-800"
                   : "hover:bg-slate-100"
@@ -486,16 +608,26 @@ export function StudentDashboard() {
             >
               <span
                 className={
-                  refreshing ? "inline-block animate-spin" : ""
+                  refreshing
+                    ? "inline-block animate-spin"
+                    : ""
                 }
               >
                 ↻
               </span>
             </button>
 
-            <div className="relative" data-profile>
+            <div
+              className="relative"
+              data-profile-menu
+            >
               <button
-                onClick={() => setMenu((value) => !value)}
+                type="button"
+                onClick={() =>
+                  setProfileMenuOpen(
+                    (value) => !value,
+                  )
+                }
                 className={`flex items-center gap-2 rounded-2xl border px-2 py-1.5 ${
                   dark
                     ? "border-slate-800 hover:bg-slate-900"
@@ -503,7 +635,7 @@ export function StudentDashboard() {
                 }`}
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-black text-white">
-                  {initials(name)}
+                  {getInitials(userName)}
                 </div>
 
                 <span className="hidden max-w-24 truncate text-xs font-black sm:block">
@@ -515,7 +647,7 @@ export function StudentDashboard() {
                 </span>
               </button>
 
-              {menu && (
+              {profileMenuOpen && (
                 <div
                   className={`absolute right-0 top-full mt-2 w-60 overflow-hidden rounded-2xl border shadow-2xl ${
                     dark
@@ -525,7 +657,7 @@ export function StudentDashboard() {
                 >
                   <div className="border-b border-slate-200/10 px-4 py-4">
                     <p className="truncate text-sm font-black">
-                      {name}
+                      {userName}
                     </p>
 
                     <p className="mt-1 truncate text-xs text-slate-500">
@@ -541,9 +673,10 @@ export function StudentDashboard() {
                     ["🔒", "Privacy", "/privacy-policy"],
                   ].map(([icon, title, path]) => (
                     <button
+                      type="button"
                       key={path}
                       onClick={() => {
-                        setMenu(false);
+                        setProfileMenuOpen(false);
                         go(path);
                       }}
                       className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold ${
@@ -558,7 +691,8 @@ export function StudentDashboard() {
                   ))}
 
                   <button
-                    onClick={logout}
+                    type="button"
+                    onClick={handleLogout}
                     className="flex w-full items-center gap-3 border-t border-slate-200/10 px-4 py-3 text-left text-sm font-bold text-red-500 hover:bg-red-500/5"
                   >
                     🚪 Logout
@@ -579,9 +713,11 @@ export function StudentDashboard() {
           <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
               <p className="mb-2 text-sm font-bold text-blue-100">
-                {profile?.class_name || profile?.exam
+                {profile?.class_name ||
+                profile?.exam
                   ? `${profile?.class_name || ""}${
-                      profile?.class_name && profile?.exam
+                      profile?.class_name &&
+                      profile?.exam
                         ? " • "
                         : ""
                     }${profile?.exam || ""}`
@@ -593,12 +729,13 @@ export function StudentDashboard() {
               </h1>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100 sm:text-base">
-                Learn smarter, stay consistent and keep moving
-                closer to your goal.
+                Learn smarter, stay consistent and keep
+                moving closer to your goal.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
                 <button
+                  type="button"
                   onClick={() =>
                     go("/student/practice-questions")
                   }
@@ -608,6 +745,7 @@ export function StudentDashboard() {
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => go("/student/ask")}
                   className="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-black text-white backdrop-blur transition hover:bg-white/15"
                 >
@@ -616,7 +754,7 @@ export function StudentDashboard() {
               </div>
             </div>
 
-            {/* MINDSET */}
+            {/* DAILY MINDSET */}
             <div className="max-w-sm rounded-[26px] border border-white/15 bg-white/10 p-5 backdrop-blur-xl">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">
@@ -627,7 +765,7 @@ export function StudentDashboard() {
               </div>
 
               <p className="text-sm font-bold leading-6 text-white">
-                {mindset}
+                {dailyMindset}
               </p>
             </div>
           </div>
@@ -637,17 +775,32 @@ export function StudentDashboard() {
         <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             ["🔥", "Streak", `${streak} days`],
-            ["🎯", "Questions", stats.total],
-            ["✓", "Accuracy", `${stats.accuracy}%`],
-            ["📅", "Active Days", `${weeklyDays}/7`],
+            [
+              "🎯",
+              "Questions",
+              preparationStats.total,
+            ],
+            [
+              "✓",
+              "Accuracy",
+              `${preparationStats.accuracy}%`,
+            ],
+            [
+              "📅",
+              "Active Days",
+              `${weeklyActiveDays}/7`,
+            ],
           ].map(([icon, title, value]) => (
             <Card
-              key={title}
               dark={dark}
+              key={title}
               className="p-4 sm:p-5"
             >
               <div className="flex items-start justify-between">
-                <span className="text-xl">{icon}</span>
+                <span className="text-xl">
+                  {icon}
+                </span>
+
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                   {title}
                 </span>
@@ -669,7 +822,9 @@ export function StudentDashboard() {
             <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-2xl">
-                  {todayActivities.length ? "✅" : "🚀"}
+                  {todayActivities.length
+                    ? "✅"
+                    : "🚀"}
                 </div>
 
                 <div>
@@ -684,12 +839,14 @@ export function StudentDashboard() {
                   </h2>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    Small progress every day creates big results.
+                    Small progress every day creates big
+                    results.
                   </p>
                 </div>
               </div>
 
               <button
+                type="button"
                 onClick={() =>
                   go(
                     todayActivities.length
@@ -716,8 +873,9 @@ export function StudentDashboard() {
           />
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {tools.map((item) => (
+            {preparationTools.map((item) => (
               <button
+                type="button"
                 key={item.title}
                 onClick={() => go(item.path)}
                 className={`group rounded-[24px] border p-5 text-left transition hover:-translate-y-1 ${
@@ -751,8 +909,9 @@ export function StudentDashboard() {
           />
 
           <div className="grid gap-3 lg:grid-cols-12">
-            {/* ASK VIDHYA FEATURE */}
+            {/* ASK VIDHYA */}
             <button
+              type="button"
               onClick={() => go("/student/ask")}
               className="group relative overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-700 p-6 text-left text-white shadow-xl shadow-indigo-900/20 lg:col-span-5"
             >
@@ -785,8 +944,9 @@ export function StudentDashboard() {
             </button>
 
             <div className="grid grid-cols-2 gap-3 lg:col-span-7">
-              {learning.map((item) => (
+              {learningTools.map((item) => (
                 <button
+                  type="button"
                   key={item.title}
                   onClick={() => go(item.path)}
                   className={`rounded-[24px] border p-5 text-left transition hover:-translate-y-1 ${
@@ -823,6 +983,7 @@ export function StudentDashboard() {
           <div className="grid gap-3 sm:grid-cols-2">
             {resources.map((item) => (
               <button
+                type="button"
                 key={item.title}
                 onClick={() => go(item.path)}
                 className={`flex items-center gap-4 rounded-[24px] border p-5 text-left transition hover:-translate-y-1 ${
@@ -862,7 +1023,10 @@ export function StudentDashboard() {
           />
 
           <div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
-            <Card dark={dark} className="p-5 sm:p-6">
+            <Card
+              dark={dark}
+              className="p-5 sm:p-6"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-wider text-blue-500">
@@ -870,12 +1034,16 @@ export function StudentDashboard() {
                   </p>
 
                   <h3 className="mt-1 text-xl font-black">
-                    {stats.accuracy}% accuracy
+                    {preparationStats.accuracy}%
+                    accuracy
                   </h3>
                 </div>
 
                 <button
-                  onClick={() => go("/student/progress")}
+                  type="button"
+                  onClick={() =>
+                    go("/student/progress")
+                  }
                   className="rounded-xl bg-blue-500/10 px-3 py-2 text-xs font-black text-blue-500"
                 >
                   View →
@@ -887,7 +1055,7 @@ export function StudentDashboard() {
                   className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all"
                   style={{
                     width: `${Math.min(
-                      stats.accuracy,
+                      preparationStats.accuracy,
                       100,
                     )}%`,
                   }}
@@ -897,8 +1065,9 @@ export function StudentDashboard() {
               <div className="mt-4 grid grid-cols-3 gap-3">
                 <div>
                   <p className="text-lg font-black">
-                    {stats.total}
+                    {preparationStats.total}
                   </p>
+
                   <p className="text-[10px] text-slate-500">
                     Attempted
                   </p>
@@ -906,8 +1075,9 @@ export function StudentDashboard() {
 
                 <div>
                   <p className="text-lg font-black text-emerald-500">
-                    {stats.correct}
+                    {preparationStats.correct}
                   </p>
+
                   <p className="text-[10px] text-slate-500">
                     Correct
                   </p>
@@ -915,8 +1085,9 @@ export function StudentDashboard() {
 
                 <div>
                   <p className="text-lg font-black text-orange-500">
-                    {stats.total - stats.correct}
+                    {preparationStats.wrong}
                   </p>
+
                   <p className="text-[10px] text-slate-500">
                     Improve
                   </p>
@@ -924,7 +1095,10 @@ export function StudentDashboard() {
               </div>
             </Card>
 
-            <Card dark={dark} className="p-5 sm:p-6">
+            <Card
+              dark={dark}
+              className="p-5 sm:p-6"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-wider text-orange-500">
@@ -932,27 +1106,32 @@ export function StudentDashboard() {
                   </p>
 
                   <h3 className="mt-1 text-xl font-black">
-                    {weeklyDays}/7 days
+                    {weeklyActiveDays}/7 days
                   </h3>
                 </div>
 
-                <span className="text-2xl">📈</span>
+                <span className="text-2xl">
+                  📈
+                </span>
               </div>
 
               <div className="mt-6 flex items-end justify-between gap-2">
                 {Array.from({ length: 7 }).map(
                   (_, index) => {
                     const date = new Date();
+
                     date.setHours(12, 0, 0, 0);
                     date.setDate(
-                      date.getDate() - (6 - index),
+                      date.getDate() -
+                        (6 - index),
                     );
 
-                    const active = activities.some(
-                      (item) =>
-                        item.activity_date ===
-                        dateKey(date),
-                    );
+                    const active =
+                      activities.some(
+                        (item) =>
+                          item.activity_date ===
+                          dateKey(date),
+                      );
 
                     return (
                       <div
@@ -970,7 +1149,9 @@ export function StudentDashboard() {
                         <span className="text-[9px] font-bold text-slate-500">
                           {date.toLocaleDateString(
                             "en-US",
-                            { weekday: "narrow" },
+                            {
+                              weekday: "narrow",
+                            },
                           )}
                         </span>
                       </div>
@@ -982,7 +1163,7 @@ export function StudentDashboard() {
           </div>
         </section>
 
-        {/* WEAK TOPICS */}
+        {/* FOCUS AREAS */}
         <section className="mt-8">
           <SectionTitle
             dark={dark}
@@ -990,7 +1171,7 @@ export function StudentDashboard() {
             subtitle="Topics that deserve a little more attention."
           />
 
-          {weakTopics.length ? (
+          {weakTopics.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-3">
               {weakTopics.map((topic) => (
                 <Card
@@ -1033,8 +1214,11 @@ export function StudentDashboard() {
                   </div>
 
                   <button
+                    type="button"
                     onClick={() =>
-                      go("/student/practice-questions")
+                      go(
+                        "/student/practice-questions",
+                      )
                     }
                     className="mt-4 text-xs font-black text-blue-500"
                   >
@@ -1048,15 +1232,17 @@ export function StudentDashboard() {
               dark={dark}
               className="p-6 text-center"
             >
-              <div className="text-3xl">🎯</div>
+              <div className="text-3xl">
+                🎯
+              </div>
 
               <h3 className="mt-3 text-sm font-black">
                 Your focus areas will appear here
               </h3>
 
               <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
-                Start practicing and we&apos;ll help you identify
-                topics that need more attention.
+                Start practicing and we&apos;ll identify topics
+                that need more attention.
               </p>
             </Card>
           )}
@@ -1075,12 +1261,13 @@ export function StudentDashboard() {
               </h2>
 
               <p className="mt-1 text-xs text-slate-400">
-                Stay consistent. Let Ranker Bhaiya handle the
-                strategy.
+                Stay consistent. Let Ranker Bhaiya handle
+                the strategy.
               </p>
             </div>
 
             <button
+              type="button"
               onClick={() =>
                 go("/student/practice-questions")
               }
