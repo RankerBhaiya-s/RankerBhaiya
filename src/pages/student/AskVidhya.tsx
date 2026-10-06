@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
 } from "react";
 import ReactMarkdown from "react-markdown";
@@ -56,8 +57,19 @@ export function AskVidhya() {
     loading: authLoading,
   } = useAuth();
 
-  const imageInputRef =
+  /* ===================================================
+     IMAGE INPUT REFS
+  =================================================== */
+
+  const cameraInputRef =
     useRef<HTMLInputElement | null>(null);
+
+  const galleryInputRef =
+    useRef<HTMLInputElement | null>(null);
+
+  /* ===================================================
+     STATE
+  =================================================== */
 
   const [conversations, setConversations] =
     useState<Conversation[]>([]);
@@ -165,7 +177,6 @@ export function AskVidhya() {
     conversationId: string,
   ) {
     setError("");
-
     setSelectedConversationId(
       conversationId,
     );
@@ -209,6 +220,20 @@ export function AskVidhya() {
   }
 
   /* ===================================================
+     CLEAR IMAGE INPUTS
+  =================================================== */
+
+  function clearImageInputs() {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
+    }
+
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = "";
+    }
+  }
+
+  /* ===================================================
      NEW CHAT
   =================================================== */
 
@@ -220,9 +245,7 @@ export function AskVidhya() {
     setImageName("");
     setError("");
 
-    if (imageInputRef.current) {
-      imageInputRef.current.value = "";
-    }
+    clearImageInputs();
   }
 
   /* ===================================================
@@ -309,6 +332,8 @@ export function AskVidhya() {
         setQuestion("");
         setImageDataUrl(null);
         setImageName("");
+
+        clearImageInputs();
       }
     } catch (err) {
       console.error(
@@ -389,7 +414,7 @@ export function AskVidhya() {
   =================================================== */
 
   async function handleImageChange(
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: ChangeEvent<HTMLInputElement>,
   ) {
     const file =
       event.target.files?.[0];
@@ -435,6 +460,29 @@ export function AskVidhya() {
 
       setImageDataUrl(dataUrl);
       setImageName(file.name);
+
+      /*
+       * Clear the other input so selecting
+       * the same image again from another
+       * source works properly.
+       */
+      if (
+        cameraInputRef.current &&
+        cameraInputRef.current !==
+          event.target
+      ) {
+        cameraInputRef.current.value =
+          "";
+      }
+
+      if (
+        galleryInputRef.current &&
+        galleryInputRef.current !==
+          event.target
+      ) {
+        galleryInputRef.current.value =
+          "";
+      }
     } catch (err) {
       console.error(
         "Image upload error:",
@@ -457,9 +505,7 @@ export function AskVidhya() {
     setImageDataUrl(null);
     setImageName("");
 
-    if (imageInputRef.current) {
-      imageInputRef.current.value = "";
-    }
+    clearImageInputs();
   }
 
   /* ===================================================
@@ -508,12 +554,6 @@ export function AskVidhya() {
       console.log(
         "========================================",
       );
-
-      /*
-       * The image is sent as a data URL.
-       * The Edge Function must support
-       * image_data_url for vision questions.
-       */
 
       const displayQuestion =
         trimmedQuestion ||
@@ -582,9 +622,7 @@ export function AskVidhya() {
         );
       }
 
-      /*
-       * Record Ask Vidhya activity.
-       */
+      /* Record Ask Vidhya activity */
 
       const activityResult =
         await recordStudentActivity({
@@ -790,9 +828,7 @@ export function AskVidhya() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-      {/* =================================================
-          HEADER
-      ================================================= */}
+      {/* HEADER */}
 
       <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4">
@@ -834,15 +870,11 @@ export function AskVidhya() {
         </div>
       </header>
 
-      {/* =================================================
-          MAIN
-      ================================================= */}
+      {/* MAIN */}
 
       <main className="mx-auto max-w-7xl px-4 py-6">
         <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
-          {/* =================================================
-              CHAT HISTORY
-          ================================================= */}
+          {/* CHAT HISTORY */}
 
           <aside className="rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-900">
             <div className="flex items-center justify-between gap-3">
@@ -962,9 +994,7 @@ export function AskVidhya() {
             </div>
           </aside>
 
-          {/* =================================================
-              CHAT AREA
-          ================================================= */}
+          {/* CHAT AREA */}
 
           <section className="flex min-h-[650px] flex-col rounded-2xl bg-white shadow-sm dark:bg-slate-900">
             {/* STUDENT CONTEXT */}
@@ -1010,9 +1040,7 @@ export function AskVidhya() {
               </div>
             </div>
 
-            {/* =================================================
-                MESSAGES
-            ================================================= */}
+            {/* MESSAGES */}
 
             <div className="flex-1 space-y-5 overflow-y-auto p-5">
               {messages.length ===
@@ -1364,9 +1392,7 @@ export function AskVidhya() {
               </div>
             )}
 
-            {/* =================================================
-                ASK FORM
-            ================================================= */}
+            {/* ASK FORM */}
 
             <form
               onSubmit={handleAsk}
@@ -1425,12 +1451,29 @@ export function AskVidhya() {
                 className="w-full resize-none rounded-2xl border border-slate-300 bg-white p-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
               />
 
+              {/* =================================================
+                  CAMERA + GALLERY
+              ================================================= */}
+
               <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* HIDDEN FILE INPUT */}
+                  {/* CAMERA INPUT */}
 
                   <input
-                    ref={imageInputRef}
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    onChange={
+                      handleImageChange
+                    }
+                    className="hidden"
+                  />
+
+                  {/* GALLERY INPUT */}
+
+                  <input
+                    ref={galleryInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     onChange={
@@ -1439,27 +1482,46 @@ export function AskVidhya() {
                     className="hidden"
                   />
 
-                  {/* UPLOAD BUTTON */}
+                  {/* CAMERA BUTTON */}
 
                   <button
                     type="button"
                     onClick={() =>
-                      imageInputRef.current?.click()
+                      cameraInputRef.current?.click()
                     }
                     disabled={loading}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-blue-800 dark:hover:bg-blue-950/30 dark:hover:text-blue-300"
+                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-950/50"
                   >
                     <span className="text-base">
                       📷
                     </span>
 
-                    Upload Photo
+                    Camera
+                  </button>
+
+                  {/* GALLERY BUTTON */}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      galleryInputRef.current?.click()
+                    }
+                    disabled={loading}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-blue-800 dark:hover:bg-blue-950/30 dark:hover:text-blue-300"
+                  >
+                    <span className="text-base">
+                      🖼️
+                    </span>
+
+                    Gallery
                   </button>
 
                   <p className="hidden text-xs text-slate-400 sm:block">
                     JPG, PNG or WEBP • Max 8 MB
                   </p>
                 </div>
+
+                {/* ASK BUTTON */}
 
                 <button
                   type="submit"
