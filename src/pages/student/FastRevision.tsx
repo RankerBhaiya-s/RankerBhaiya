@@ -66,17 +66,29 @@ const CARD_COUNTS = [5, 10, 15];
 export function FastRevision() {
   const navigate = useNavigate();
 
-  const [subject, setSubject] = useState("General Knowledge");
-  const [topic, setTopic] = useState("");
-  const [difficulty, setDifficulty] = useState("Medium");
-  const [cardCount, setCardCount] = useState(10);
+  const [subject, setSubject] =
+    useState("General Knowledge");
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [topic, setTopic] =
+    useState("");
+
+  const [difficulty, setDifficulty] =
+    useState("Medium");
+
+  const [cardCount, setCardCount] =
+    useState(10);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
   const [result, setResult] =
     useState<RevisionResult | null>(null);
 
-  const [activeCard, setActiveCard] = useState(0);
+  const [activeCard, setActiveCard] =
+    useState(0);
 
   const [quizAnswers, setQuizAnswers] =
     useState<QuizAnswer[]>([]);
@@ -84,23 +96,18 @@ export function FastRevision() {
   const [quizSubmitted, setQuizSubmitted] =
     useState(false);
 
-  const [score, setScore] = useState(0);
+  const [score, setScore] =
+    useState(0);
 
-  /* =====================================================
-     GENERATE REVISION
-  ===================================================== */
+  /* ===================================================
+     GENERATE
+  =================================================== */
 
   async function generateRevision() {
     const cleanTopic = topic.trim();
 
-    if (!cleanTopic) {
-      setError("Please enter a topic for revision.");
-      return;
-    }
-
     setLoading(true);
     setError("");
-
     setResult(null);
     setActiveCard(0);
     setQuizAnswers([]);
@@ -108,10 +115,6 @@ export function FastRevision() {
     setScore(0);
 
     try {
-      console.log("========================================");
-      console.log("⚡ FAST REVISION START");
-      console.log("========================================");
-
       const { data, error: functionError } =
         await supabase.functions.invoke(
           "generate-revision",
@@ -125,21 +128,15 @@ export function FastRevision() {
           },
         );
 
-      console.log(
-        "📦 Fast Revision Response:",
-        data,
-      );
-
       if (functionError) {
-        console.error(
-          "❌ Fast Revision Function Error:",
-          functionError,
-        );
-
         throw new Error(
           functionError.message ||
             "Unable to generate revision.",
         );
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
       const normalized =
@@ -155,41 +152,21 @@ export function FastRevision() {
       }
 
       setResult(normalized);
-
-      console.log(
-        "✅ Fast Revision generated successfully.",
-        normalized,
-      );
     } catch (err) {
       console.error(
-        "========================================",
-      );
-      console.error(
-        "❌ FAST REVISION ERROR",
-      );
-      console.error(err);
-      console.error(
-        "========================================",
+        "Fast Revision Error:",
+        err,
       );
 
-      if (err instanceof Error) {
-        setError(
-          err.message ||
-            "Unable to generate revision.",
-        );
-      } else {
-        setError(
-          "Unable to generate revision.",
-        );
-      }
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to generate revision.",
+      );
     } finally {
       setLoading(false);
     }
   }
-
-  /* =====================================================
-     FORM SUBMIT
-  ===================================================== */
 
   function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -198,9 +175,9 @@ export function FastRevision() {
     void generateRevision();
   }
 
-  /* =====================================================
-     QUIZ ANSWER
-  ===================================================== */
+  /* ===================================================
+     QUIZ
+  =================================================== */
 
   function selectAnswer(
     questionId: string,
@@ -209,13 +186,14 @@ export function FastRevision() {
     if (quizSubmitted) return;
 
     setQuizAnswers((previous) => {
-      const existingIndex =
+      const existing =
         previous.findIndex(
           (item) =>
-            item.questionId === questionId,
+            item.questionId ===
+            questionId,
         );
 
-      if (existingIndex === -1) {
+      if (existing === -1) {
         return [
           ...previous,
           {
@@ -227,7 +205,7 @@ export function FastRevision() {
 
       const updated = [...previous];
 
-      updated[existingIndex] = {
+      updated[existing] = {
         questionId,
         selected,
       };
@@ -236,50 +214,50 @@ export function FastRevision() {
     });
   }
 
-  /* =====================================================
-     GET SELECTED ANSWER
-  ===================================================== */
-
   function getSelectedAnswer(
     questionId: string,
-  ): string {
-    const answer = quizAnswers.find(
-      (item) =>
-        item.questionId === questionId,
+  ) {
+    return (
+      quizAnswers.find(
+        (item) =>
+          item.questionId ===
+          questionId,
+      )?.selected || ""
     );
-
-    return answer?.selected || "";
   }
-
-  /* =====================================================
-     SUBMIT QUIZ
-  ===================================================== */
 
   function submitQuiz() {
     if (!result) return;
-    if (result.quiz.length === 0) return;
 
-    let calculatedScore = 0;
+    let total = 0;
 
-    for (const question of result.quiz) {
+    result.quiz.forEach((question) => {
       const selected =
-        getSelectedAnswer(question.id);
+        getSelectedAnswer(
+          question.id,
+        );
 
       if (
         selected &&
         selected === question.answer
       ) {
-        calculatedScore += 1;
+        total += 1;
       }
-    }
+    });
 
-    setScore(calculatedScore);
+    setScore(total);
     setQuizSubmitted(true);
   }
 
-  /* =====================================================
-     START AGAIN
-  ===================================================== */
+  function retakeQuiz() {
+    setQuizAnswers([]);
+    setQuizSubmitted(false);
+    setScore(0);
+  }
+
+  /* ===================================================
+     RESET
+  =================================================== */
 
   function startAgain() {
     setResult(null);
@@ -290,9 +268,9 @@ export function FastRevision() {
     setScore(0);
   }
 
-  /* =====================================================
+  /* ===================================================
      CARD NAVIGATION
-  ===================================================== */
+  =================================================== */
 
   function previousCard() {
     setActiveCard((current) =>
@@ -311,22 +289,24 @@ export function FastRevision() {
     );
   }
 
-  /* =====================================================
-     UI
-  ===================================================== */
+  /* ===================================================
+     PAGE
+  =================================================== */
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-      {/* =================================================
-          HEADER
-      ================================================= */}
+
+      {/* HEADER */}
 
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+
           <button
             type="button"
             onClick={() =>
-              navigate("/student/dashboard")
+              navigate(
+                "/student/dashboard",
+              )
             }
             className="flex items-center gap-3"
           >
@@ -348,22 +328,25 @@ export function FastRevision() {
           <button
             type="button"
             onClick={() =>
-              navigate("/student/dashboard")
+              navigate(
+                "/student/dashboard",
+              )
             }
-            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
           >
             ← Dashboard
           </button>
+
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
-        {/* =================================================
-            HERO
-        ================================================= */}
+
+        {/* HERO */}
 
         <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-6 text-white shadow-lg sm:p-8">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center justify-between gap-5">
+
             <div className="max-w-3xl">
               <div className="mb-4 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold backdrop-blur">
                 ⚡ SMART LEARNING
@@ -374,25 +357,25 @@ export function FastRevision() {
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-blue-100 sm:text-base">
-                Kisi bhi topic ko quickly revise
-                karo, important points dekho aur
-                MCQs ke through apni preparation
-                test karo.
+                Subject choose karo aur important
+                concepts ko quickly revise karo.
+                Topic optional hai — Vidhya khud
+                important topics select kar sakti hai.
               </p>
             </div>
 
-            <div className="hidden select-none text-7xl md:block">
+            <div className="hidden text-7xl md:block">
               🧠
             </div>
+
           </div>
         </section>
 
-        {/* =================================================
-            GENERATOR
-        ================================================= */}
+        {/* FORM */}
 
         {!result && (
           <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
+
             <div className="mb-6">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
                 Create Revision
@@ -403,9 +386,8 @@ export function FastRevision() {
               </h2>
 
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Topic enter karo aur Vidhya
-                tumhare liye quick revision
-                material prepare karegi.
+                Topic nahi doge to Vidhya subject ke
+                important topics automatically choose karegi.
               </p>
             </div>
 
@@ -413,6 +395,7 @@ export function FastRevision() {
               onSubmit={handleSubmit}
               className="space-y-5"
             >
+
               {/* SUBJECT */}
 
               <div>
@@ -427,7 +410,9 @@ export function FastRevision() {
                   id="revision-subject"
                   value={subject}
                   onChange={(event) =>
-                    setSubject(event.target.value)
+                    setSubject(
+                      event.target.value,
+                    )
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                 >
@@ -442,14 +427,17 @@ export function FastRevision() {
                 </select>
               </div>
 
-              {/* TOPIC */}
+              {/* TOPIC OPTIONAL */}
 
               <div>
                 <label
                   htmlFor="revision-topic"
-                  className="mb-2 block text-sm font-bold"
+                  className="mb-2 flex items-center gap-2 text-sm font-bold"
                 >
                   Topic
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    Optional
+                  </span>
                 </label>
 
                 <input
@@ -457,22 +445,24 @@ export function FastRevision() {
                   type="text"
                   value={topic}
                   onChange={(event) =>
-                    setTopic(event.target.value)
+                    setTopic(
+                      event.target.value,
+                    )
                   }
-                  placeholder="e.g. Fundamental Rights"
+                  placeholder="e.g. Fundamental Rights — or leave blank"
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                 />
 
                 <p className="mt-2 text-xs text-slate-400">
-                  Example: Indian Constitution,
-                  RBI, Mughal Empire,
-                  Photosynthesis, Climate Change
+                  Blank chhodoge to selected subject ke
+                  important exam topics automatically choose honge.
                 </p>
               </div>
 
-              {/* DIFFICULTY + COUNT */}
+              {/* OPTIONS */}
 
               <div className="grid gap-5 sm:grid-cols-2">
+
                 <div>
                   <label
                     htmlFor="revision-difficulty"
@@ -489,16 +479,18 @@ export function FastRevision() {
                         event.target.value,
                       )
                     }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                   >
-                    {DIFFICULTIES.map((item) => (
-                      <option
-                        key={item}
-                        value={item}
-                      >
-                        {item}
-                      </option>
-                    ))}
+                    {DIFFICULTIES.map(
+                      (item) => (
+                        <option
+                          key={item}
+                          value={item}
+                        >
+                          {item}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </div>
 
@@ -520,35 +512,36 @@ export function FastRevision() {
                         ),
                       )
                     }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                   >
-                    {CARD_COUNTS.map((count) => (
-                      <option
-                        key={count}
-                        value={count}
-                      >
-                        {count} cards
-                      </option>
-                    ))}
+                    {CARD_COUNTS.map(
+                      (count) => (
+                        <option
+                          key={count}
+                          value={count}
+                        >
+                          {count} cards
+                        </option>
+                      ),
+                    )}
                   </select>
                 </div>
+
               </div>
 
               {/* ERROR */}
 
               {error && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
-                  <div className="flex items-start gap-3">
-                    <span className="text-xl">
-                      ⚠️
-                    </span>
+                  <div className="flex gap-3">
+                    <span>⚠️</span>
 
                     <div>
                       <p className="font-bold text-red-700 dark:text-red-300">
                         Unable to generate revision
                       </p>
 
-                      <p className="mt-1 text-sm leading-6 text-red-600 dark:text-red-400">
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                         {error}
                       </p>
                     </div>
@@ -574,27 +567,29 @@ export function FastRevision() {
                   </>
                 )}
               </button>
+
             </form>
           </section>
         )}
 
-        {/* =================================================
-            RESULT
-        ================================================= */}
+        {/* RESULT */}
 
         {result && (
           <div className="mt-6 space-y-6">
+
             {/* RESULT HEADER */}
 
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
                     Revision Ready
                   </p>
 
                   <h2 className="mt-1 text-2xl font-black">
-                    {topic}
+                    {topic.trim() ||
+                      `${subject} — Important Topics`}
                   </h2>
 
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -608,8 +603,7 @@ export function FastRevision() {
 
                     {result.cards.length > 0 && (
                       <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700 dark:bg-green-950/40 dark:text-green-300">
-                        {result.cards.length}{" "}
-                        Revision Cards
+                        {result.cards.length} Cards
                       </span>
                     )}
 
@@ -624,20 +618,20 @@ export function FastRevision() {
                 <button
                   type="button"
                   onClick={startAgain}
-                  className="shrink-0 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
                 >
                   ← New Revision
                 </button>
+
               </div>
             </section>
 
-            {/* =================================================
-                REVISION CARDS
-            ================================================= */}
+            {/* CARDS */}
 
             {result.cards.length > 0 && (
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
-                <div className="flex items-center justify-between gap-4">
+
+                <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
                       Quick Notes
@@ -648,7 +642,7 @@ export function FastRevision() {
                     </h2>
                   </div>
 
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold dark:bg-slate-800">
                     {activeCard + 1} /{" "}
                     {result.cards.length}
                   </span>
@@ -656,6 +650,7 @@ export function FastRevision() {
 
                 {result.cards[activeCard] && (
                   <div className="mt-5 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 p-5 dark:from-blue-950/30 dark:to-indigo-950/30 sm:p-7">
+
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg font-black text-white">
                       {activeCard + 1}
                     </div>
@@ -676,8 +671,9 @@ export function FastRevision() {
                       }
                     </p>
 
-                    {result.cards[activeCard]
-                      .keyPoint && (
+                    {result.cards[
+                      activeCard
+                    ].keyPoint && (
                       <div className="mt-5 rounded-xl border border-blue-200 bg-white/70 p-4 dark:border-blue-900 dark:bg-slate-950/40">
                         <p className="text-[11px] font-black uppercase tracking-wide text-blue-600 dark:text-blue-400">
                           🎯 Key Point
@@ -692,20 +688,26 @@ export function FastRevision() {
                         </p>
                       </div>
                     )}
+
                   </div>
                 )}
 
                 <div className="mt-5 flex items-center justify-between gap-3">
+
                   <button
                     type="button"
-                    disabled={activeCard === 0}
-                    onClick={previousCard}
-                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    disabled={
+                      activeCard === 0
+                    }
+                    onClick={
+                      previousCard
+                    }
+                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold transition hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
                   >
                     ← Previous
                   </button>
 
-                  <div className="flex gap-1.5 overflow-x-auto px-2">
+                  <div className="flex gap-1.5 overflow-hidden px-2">
                     {result.cards.map(
                       (_, index) => (
                         <button
@@ -716,15 +718,13 @@ export function FastRevision() {
                               index,
                             )
                           }
-                          className={`h-2.5 w-2.5 shrink-0 rounded-full transition ${
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                             index ===
                             activeCard
                               ? "bg-blue-600"
                               : "bg-slate-300 dark:bg-slate-700"
                           }`}
-                          aria-label={`Go to revision card ${
-                            index + 1
-                          }`}
+                          aria-label={`Revision card ${index + 1}`}
                         />
                       ),
                     )}
@@ -737,36 +737,34 @@ export function FastRevision() {
                       result.cards.length - 1
                     }
                     onClick={nextCard}
-                    className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-40"
                   >
                     Next →
                   </button>
+
                 </div>
               </section>
             )}
 
-            {/* =================================================
-                QUIZ
-            ================================================= */}
+            {/* QUIZ */}
 
             {result.quiz.length > 0 && (
               <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400">
-                    Test Yourself
-                  </p>
 
-                  <h2 className="mt-1 text-2xl font-black">
-                    Practice MCQs 📝
-                  </h2>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400">
+                  Test Yourself
+                </p>
 
-                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                    Revision ke baad apni
-                    understanding test karo.
-                  </p>
-                </div>
+                <h2 className="mt-1 text-2xl font-black">
+                  Practice MCQs 📝
+                </h2>
+
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  Revision ke baad apni understanding test karo.
+                </p>
 
                 <div className="mt-6 space-y-6">
+
                   {result.quiz.map(
                     (question, index) => {
                       const selected =
@@ -776,9 +774,12 @@ export function FastRevision() {
 
                       return (
                         <div
-                          key={question.id}
+                          key={
+                            question.id
+                          }
                           className="rounded-2xl border border-slate-200 p-5 dark:border-slate-800"
                         >
+
                           <div className="flex gap-3">
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-sm font-black text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
                               {index + 1}
@@ -792,6 +793,7 @@ export function FastRevision() {
                           </div>
 
                           <div className="mt-4 grid gap-3">
+
                             {question.options.map(
                               (
                                 option,
@@ -805,27 +807,26 @@ export function FastRevision() {
                                   option ===
                                   question.answer;
 
-                                let optionClass =
-                                  "border-slate-200 hover:border-violet-300 hover:bg-violet-50 dark:border-slate-700 dark:hover:border-violet-700 dark:hover:bg-violet-950/20";
+                                let classes =
+                                  "border-slate-200 hover:border-violet-300 hover:bg-violet-50 dark:border-slate-700 dark:hover:border-violet-700";
 
                                 if (
                                   quizSubmitted &&
                                   isCorrect
                                 ) {
-                                  optionClass =
+                                  classes =
                                     "border-green-300 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/30 dark:text-green-300";
                                 } else if (
                                   quizSubmitted &&
-                                  isSelected &&
-                                  !isCorrect
+                                  isSelected
                                 ) {
-                                  optionClass =
+                                  classes =
                                     "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300";
                                 } else if (
                                   isSelected
                                 ) {
-                                  optionClass =
-                                    "border-violet-500 bg-violet-50 text-violet-800 dark:border-violet-500 dark:bg-violet-950/30 dark:text-violet-200";
+                                  classes =
+                                    "border-violet-500 bg-violet-50 text-violet-800 dark:border-violet-500 dark:bg-violet-950/30";
                                 }
 
                                 return (
@@ -841,9 +842,9 @@ export function FastRevision() {
                                         option,
                                       )
                                     }
-                                    className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left text-sm font-semibold transition ${optionClass}`}
+                                    className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left text-sm font-semibold transition ${classes}`}
                                   >
-                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-black dark:bg-slate-800">
                                       {String.fromCharCode(
                                         65 +
                                           optionIndex,
@@ -855,28 +856,23 @@ export function FastRevision() {
                                     </span>
 
                                     {quizSubmitted &&
-                                      isCorrect && (
-                                        <span>
-                                          ✓
-                                        </span>
-                                      )}
+                                      isCorrect &&
+                                      "✓"}
 
                                     {quizSubmitted &&
                                       isSelected &&
-                                      !isCorrect && (
-                                        <span>
-                                          ✕
-                                        </span>
-                                      )}
+                                      !isCorrect &&
+                                      "✕"}
                                   </button>
                                 );
                               },
                             )}
+
                           </div>
 
                           {quizSubmitted && (
                             <div className="mt-4 rounded-xl bg-slate-50 p-4 dark:bg-slate-950">
-                              <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                              <p className="text-xs font-black uppercase tracking-wide text-slate-500">
                                 Explanation
                               </p>
 
@@ -887,67 +883,60 @@ export function FastRevision() {
                               </p>
                             </div>
                           )}
+
                         </div>
                       );
                     },
                   )}
+
                 </div>
 
-                {/* SCORE */}
+                {quizSubmitted ? (
+                  <>
+                    <div className="mt-6 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 p-6 text-center text-white">
+                      <p className="text-sm text-blue-100">
+                        Your Score
+                      </p>
 
-                {quizSubmitted && (
-                  <div className="mt-6 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 p-6 text-center text-white">
-                    <p className="text-sm font-semibold text-blue-100">
-                      Your Score
-                    </p>
+                      <p className="mt-1 text-4xl font-black">
+                        {score} /{" "}
+                        {result.quiz.length}
+                      </p>
 
-                    <p className="mt-1 text-4xl font-black">
-                      {score} /{" "}
-                      {result.quiz.length}
-                    </p>
+                      <p className="mt-2 text-sm text-blue-100">
+                        {getScoreMessage(
+                          score,
+                          result.quiz.length,
+                        )}
+                      </p>
+                    </div>
 
-                    <p className="mt-2 text-sm text-blue-100">
-                      {getScoreMessage(
-                        score,
-                        result.quiz.length,
-                      )}
-                    </p>
-                  </div>
-                )}
-
-                {/* SUBMIT */}
-
-                {!quizSubmitted && (
+                    <button
+                      type="button"
+                      onClick={
+                        retakeQuiz
+                      }
+                      className="mt-6 w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                    >
+                      Retake Quiz
+                    </button>
+                  </>
+                ) : (
                   <button
                     type="button"
-                    onClick={submitQuiz}
+                    onClick={
+                      submitQuiz
+                    }
                     className="mt-6 w-full rounded-xl bg-violet-600 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-violet-700"
                   >
                     Submit Quiz →
                   </button>
                 )}
 
-                {/* RETAKE */}
-
-                {quizSubmitted && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuizAnswers([]);
-                      setQuizSubmitted(false);
-                      setScore(0);
-                    }}
-                    className="mt-6 w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  >
-                    Retake Quiz
-                  </button>
-                )}
               </section>
             )}
 
-            {/* =================================================
-                TIP
-            ================================================= */}
+            {/* TIP */}
 
             <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5 dark:border-blue-900/50 dark:bg-blue-950/30">
               <h3 className="font-bold text-blue-900 dark:text-blue-200">
@@ -955,41 +944,42 @@ export function FastRevision() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-blue-800 dark:text-blue-300">
-                Important facts ko baar-baar
-                revise karo. Pehle concepts samjho,
-                phir MCQs solve karo aur galat
-                answers ki explanation zaroor padho.
+                Important facts ko baar-baar revise karo.
+                Pehle concepts samjho, phir MCQs solve karo
+                aur galat answers ki explanation zaroor padho.
               </p>
             </section>
-
-            {/* BACK */}
 
             <div className="flex justify-center pb-4">
               <button
                 type="button"
                 onClick={() =>
-                  navigate("/student/dashboard")
+                  navigate(
+                    "/student/dashboard",
+                  )
                 }
-                className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
               >
                 ← Back to Dashboard
               </button>
             </div>
+
           </div>
         )}
+
       </main>
     </div>
   );
 }
 
 /* =====================================================
-   NORMALIZE REVISION RESPONSE
+   NORMALIZE RESPONSE
 ===================================================== */
 
 function normalizeRevisionResponse(
   value: unknown,
 ): RevisionResult {
-  let data: unknown = value;
+  let data: any = value;
 
   if (typeof data === "string") {
     try {
@@ -1003,35 +993,25 @@ function normalizeRevisionResponse(
   }
 
   if (
-    data &&
-    typeof data === "object" &&
-    !Array.isArray(data)
+    data?.data &&
+    typeof data.data === "object"
   ) {
-    const objectData =
-      data as Record<string, unknown>;
-
-    if (
-      objectData.data &&
-      typeof objectData.data === "object"
-    ) {
-      data = objectData.data;
-    } else if (
-      objectData.result &&
-      typeof objectData.result === "object"
-    ) {
-      data = objectData.result;
-    } else if (
-      objectData.revision &&
-      typeof objectData.revision === "object"
-    ) {
-      data = objectData.revision;
-    }
+    data = data.data;
+  } else if (
+    data?.result &&
+    typeof data.result === "object"
+  ) {
+    data = data.result;
+  } else if (
+    data?.revision &&
+    typeof data.revision === "object"
+  ) {
+    data = data.revision;
   }
 
   if (
     !data ||
-    typeof data !== "object" ||
-    Array.isArray(data)
+    typeof data !== "object"
   ) {
     return {
       cards: [],
@@ -1039,252 +1019,247 @@ function normalizeRevisionResponse(
     };
   }
 
-  const root =
-    data as Record<string, unknown>;
-
-  const cards = normalizeCards(
-    root.cards ??
-      root.flashcards ??
-      root.revision_cards ??
-      root.revisionCards,
-  );
-
-  const quiz = normalizeQuiz(
-    root.quiz ??
-      root.mcqs ??
-      root.questions ??
-      root.quiz_questions ??
-      root.quizQuestions,
-  );
-
   return {
-    cards,
-    quiz,
+    cards: normalizeCards(
+      data.cards ||
+        data.flashcards ||
+        data.revision_cards ||
+        data.revisionCards,
+    ),
+    quiz: normalizeQuiz(
+      data.quiz ||
+        data.mcqs ||
+        data.questions ||
+        data.quiz_questions ||
+        data.quizQuestions,
+    ),
   };
 }
 
 /* =====================================================
-   NORMALIZE REVISION CARDS
+   CARDS
 ===================================================== */
 
 function normalizeCards(
   value: unknown,
 ): RevisionCard[] {
-  let parsed: unknown = value;
-
-  if (typeof parsed === "string") {
+  if (typeof value === "string") {
     try {
-      parsed = JSON.parse(parsed);
+      value = JSON.parse(value);
     } catch {
       return [];
     }
   }
 
-  if (!Array.isArray(parsed)) {
+  if (!Array.isArray(value)) {
     return [];
   }
 
-  const result: RevisionCard[] = [];
+  return value
+    .map((item: any, index) => {
+      if (
+        !item ||
+        typeof item !== "object"
+      ) {
+        return null;
+      }
 
-  for (
-    let index = 0;
-    index < parsed.length;
-    index += 1
-  ) {
-    const item = parsed[index];
+      const title =
+        String(
+          item.title ||
+            item.heading ||
+            item.question_en ||
+            item.question ||
+            `Revision Point ${index + 1}`,
+        ).trim();
 
-    if (
-      !item ||
-      typeof item !== "object" ||
-      Array.isArray(item)
-    ) {
-      continue;
-    }
+      const content =
+        String(
+          item.content ||
+            item.description ||
+            item.explanation_en ||
+            item.explanation ||
+            item.answer_en ||
+            item.answer ||
+            "",
+        ).trim();
 
-    const row =
-      item as Record<string, unknown>;
+      const keyPoint =
+        String(
+          item.keyPoint ||
+            item.key_point ||
+            item.key_facts ||
+            "",
+        ).trim();
 
-    const title =
-      typeof row.title === "string"
-        ? row.title.trim()
-        : typeof row.heading === "string"
-          ? row.heading.trim()
-          : typeof row.question === "string"
-            ? row.question.trim()
-            : "";
+      if (!content) {
+        return null;
+      }
 
-    const content =
-      typeof row.content === "string"
-        ? row.content.trim()
-        : typeof row.description === "string"
-          ? row.description.trim()
-          : typeof row.explanation === "string"
-            ? row.explanation.trim()
-            : typeof row.answer === "string"
-              ? row.answer.trim()
-              : "";
-
-    const keyPoint =
-      typeof row.keyPoint === "string"
-        ? row.keyPoint.trim()
-        : typeof row.key_point === "string"
-          ? row.key_point.trim()
-          : typeof row.key_facts === "string"
-            ? row.key_facts.trim()
-            : "";
-
-    if (!title && !content) {
-      continue;
-    }
-
-    result.push({
-      id:
-        typeof row.id === "string" &&
-        row.id.trim()
-          ? row.id.trim()
-          : `revision-card-${index + 1}`,
-
-      title:
-        title ||
-        `Revision Point ${index + 1}`,
-
-      content:
-        content ||
-        "Important revision point.",
-
-      keyPoint:
-        keyPoint || undefined,
-    });
-  }
-
-  return result;
+      return {
+        id:
+          String(
+            item.id ||
+              `revision-card-${index + 1}`,
+          ),
+        title,
+        content,
+        keyPoint:
+          keyPoint || undefined,
+      };
+    })
+    .filter(
+      (
+        item,
+      ): item is RevisionCard =>
+        Boolean(item),
+    );
 }
 
 /* =====================================================
-   NORMALIZE QUIZ
+   QUIZ
 ===================================================== */
 
 function normalizeQuiz(
   value: unknown,
 ): QuizQuestion[] {
-  let parsed: unknown = value;
-
-  if (typeof parsed === "string") {
+  if (typeof value === "string") {
     try {
-      parsed = JSON.parse(parsed);
+      value = JSON.parse(value);
     } catch {
       return [];
     }
   }
 
-  if (!Array.isArray(parsed)) {
+  if (!Array.isArray(value)) {
     return [];
   }
 
   const result: QuizQuestion[] = [];
 
-  for (
-    let index = 0;
-    index < parsed.length;
-    index += 1
-  ) {
-    const item = parsed[index];
+  value.forEach(
+    (item: any, index) => {
+      if (
+        !item ||
+        typeof item !== "object"
+      ) {
+        return;
+      }
 
-    if (
-      !item ||
-      typeof item !== "object" ||
-      Array.isArray(item)
-    ) {
-      continue;
-    }
+      const question =
+        String(
+          item.question ||
+            item.question_en ||
+            "",
+        ).trim();
 
-    const row =
-      item as Record<string, unknown>;
+      if (!question) return;
 
-    const question =
-      typeof row.question === "string"
-        ? row.question.trim()
-        : "";
+      const options: string[] = [];
 
-    if (!question) {
-      continue;
-    }
+      if (Array.isArray(item.options)) {
+        item.options.forEach(
+          (option: any) => {
+            if (
+              typeof option ===
+              "string"
+            ) {
+              const text =
+                option.trim();
 
-    const options: string[] = [];
+              if (text) {
+                options.push(text);
+              }
+            } else if (
+              option &&
+              typeof option ===
+                "object"
+            ) {
+              const text =
+                String(
+                  option.en ||
+                    option.text ||
+                    option.label ||
+                    option.hi ||
+                    "",
+                ).trim();
 
-    if (Array.isArray(row.options)) {
-      for (const option of row.options) {
-        if (typeof option !== "string") {
-          continue;
-        }
+              if (text) {
+                options.push(text);
+              }
+            }
+          },
+        );
+      }
 
-        const cleaned = option.trim();
+      if (options.length !== 4) {
+        return;
+      }
 
-        if (cleaned) {
-          options.push(cleaned);
+      let answer = "";
+
+      if (
+        typeof item.correctAnswer ===
+        "number"
+      ) {
+        answer =
+          options[
+            item.correctAnswer
+          ] || "";
+      } else {
+        answer =
+          String(
+            item.answer ||
+              item.correct_answer ||
+              "",
+          ).trim();
+
+        const upper =
+          answer.toUpperCase();
+
+        if (
+          ["A", "B", "C", "D"].includes(
+            upper,
+          )
+        ) {
+          answer =
+            options[
+              upper.charCodeAt(0) -
+                65
+            ] || "";
         }
       }
-    }
 
-    if (options.length !== 4) {
-      continue;
-    }
+      if (!answer) return;
 
-    const answer =
-      typeof row.answer === "string"
-        ? row.answer.trim()
-        : "";
+      if (
+        !options.includes(answer)
+      ) {
+        return;
+      }
 
-    if (!answer) {
-      continue;
-    }
+      result.push({
+        id:
+          String(
+            item.id ||
+              `quiz-${index + 1}`,
+          ),
 
-    let normalizedAnswer = answer;
+        question,
 
-    const answerUpper =
-      answer.toUpperCase();
+        options,
 
-    if (
-      answerUpper === "A" ||
-      answerUpper === "B" ||
-      answerUpper === "C" ||
-      answerUpper === "D"
-    ) {
-      const answerIndex =
-        answerUpper.charCodeAt(0) - 65;
+        answer,
 
-      normalizedAnswer =
-        options[answerIndex] ||
-        answer;
-    }
-
-    if (
-      !options.includes(normalizedAnswer)
-    ) {
-      continue;
-    }
-
-    const explanation =
-      typeof row.explanation === "string"
-        ? row.explanation.trim()
-        : "";
-
-    const id =
-      typeof row.id === "string" &&
-      row.id.trim()
-        ? row.id.trim()
-        : `quiz-question-${index + 1}`;
-
-    result.push({
-      id,
-      question,
-      options,
-      answer: normalizedAnswer,
-      explanation:
-        explanation ||
-        "Answer ko revise karo aur concept ko dobara samjho.",
-    });
-  }
+        explanation:
+          String(
+            item.explanation ||
+              item.explanation_en ||
+              "Answer ko revise karo aur concept ko dobara samjho.",
+          ).trim(),
+      });
+    },
+  );
 
   return result;
 }
@@ -1296,7 +1271,7 @@ function normalizeQuiz(
 function getScoreMessage(
   score: number,
   total: number,
-): string {
+) {
   if (total <= 0) {
     return "Keep learning!";
   }
