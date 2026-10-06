@@ -23,7 +23,6 @@ interface QuizQuestion {
 interface RevisionResult {
   cards: RevisionCard[];
   quiz: QuizQuestion[];
-  topic?: string;
 }
 
 interface QuizAnswer {
@@ -80,9 +79,7 @@ export function FastRevision() {
         await supabase.functions.invoke("generate-revision", {
           body: {
             subject,
-            // IMPORTANT:
-            // blank topic backend ko auto-topic select karne dega
-            topic: cleanTopic || undefined,
+            topic: cleanTopic,
             difficulty,
             cardCount,
           },
@@ -157,15 +154,11 @@ export function FastRevision() {
   function submitQuiz() {
     if (!result) return;
 
-    let total = 0;
-
-    result.quiz.forEach((question) => {
-      const selected = getSelectedAnswer(question.id);
-
-      if (selected && selected === question.answer) {
-        total += 1;
-      }
-    });
+    const total = result.quiz.reduce((score, question) => {
+      return getSelectedAnswer(question.id) === question.answer
+        ? score + 1
+        : score;
+    }, 0);
 
     setScore(total);
     setQuizSubmitted(true);
@@ -186,41 +179,24 @@ export function FastRevision() {
     setScore(0);
   }
 
-  function previousCard() {
-    setActiveCard((current) => Math.max(0, current - 1));
-  }
-
-  function nextCard() {
-    if (!result) return;
-
-    setActiveCard((current) =>
-      Math.min(result.cards.length - 1, current + 1),
-    );
-  }
-
-  const displayedTopic =
-    result?.topic ||
-    topic.trim() ||
-    `${subject} — Important Topics`;
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5">
           <button
             type="button"
             onClick={() => navigate("/student/dashboard")}
             className="flex items-center gap-3"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-lg font-black text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 font-black text-white shadow-lg shadow-blue-600/20">
               R
             </div>
 
             <div className="text-left">
-              <h1 className="text-lg font-black tracking-tight">
+              <p className="text-sm font-black tracking-tight">
                 RANKER BHAIYA
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Fast Revision
               </p>
             </div>
@@ -229,7 +205,7 @@ export function FastRevision() {
           <button
             type="button"
             onClick={() => navigate("/student/dashboard")}
-            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+            className="rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-bold transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
           >
             ← Dashboard
           </button>
@@ -237,112 +213,62 @@ export function FastRevision() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-6 text-white shadow-lg sm:p-8">
-          <div className="flex items-center justify-between gap-5">
-            <div className="max-w-3xl">
-              <div className="mb-4 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold backdrop-blur">
-                ⚡ SMART LEARNING
-              </div>
-
-              <h2 className="text-3xl font-black sm:text-4xl">
-                Fast Revision 🚀
-              </h2>
-
-              <p className="mt-3 text-sm leading-6 text-blue-100 sm:text-base">
-                Subject choose karo aur important concepts ko quickly
-                revise karo. Topic optional hai — Vidhya khud important
-                topic choose karegi.
-              </p>
-            </div>
-
-            <div className="hidden text-7xl md:block">🧠</div>
-          </div>
-        </section>
-
         {!result && (
-          <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
-            <div className="mb-6">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
-                Create Revision
-              </p>
-
-              <h2 className="mt-1 text-2xl font-black">
-                What do you want to revise?
-              </h2>
-
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Topic optional hai. Blank chhodoge to Vidhya selected
-                subject ke important exam topics choose karegi.
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label
-                  htmlFor="revision-subject"
-                  className="mb-2 block text-sm font-bold"
-                >
-                  Subject
-                </label>
-
-                <select
-                  id="revision-subject"
-                  value={subject}
-                  onChange={(event) => setSubject(event.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                >
-                  {SUBJECTS.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="revision-topic"
-                  className="mb-2 flex items-center gap-2 text-sm font-bold"
-                >
-                  Topic
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                    Optional
+          <>
+            <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-6 text-white shadow-xl shadow-indigo-600/10 sm:p-8">
+              <div className="flex items-center justify-between gap-5">
+                <div className="max-w-3xl">
+                  <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold tracking-wider">
+                    ⚡ SMART REVISION
                   </span>
-                </label>
 
-                <input
-                  id="revision-topic"
-                  type="text"
-                  value={topic}
-                  onChange={(event) => setTopic(event.target.value)}
-                  placeholder="e.g. Fundamental Rights — or leave blank"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
+                  <h1 className="mt-4 text-3xl font-black sm:text-4xl">
+                    Fast Revision
+                  </h1>
 
-                <p className="mt-2 text-xs text-slate-400">
-                  Blank chhodne par selected subject ka important topic
-                  automatically choose hoga.
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100 sm:text-base">
+                    Subject choose karo, topic optional rakho aur
+                    Vidhya important exam-focused revision automatically
+                    prepare karegi.
+                  </p>
+                </div>
+
+                <div className="hidden text-6xl md:block">🧠</div>
+              </div>
+            </section>
+
+            <section className="mt-6 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
+              <div className="mb-6">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
+                  Create Revision
+                </p>
+
+                <h2 className="mt-1 text-2xl font-black">
+                  What do you want to revise?
+                </h2>
+
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  Topic blank chhodoge to selected subject ke important
+                  topics automatically choose honge.
                 </p>
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2">
+              <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label
-                    htmlFor="revision-difficulty"
+                    htmlFor="revision-subject"
                     className="mb-2 block text-sm font-bold"
                   >
-                    Difficulty
+                    Subject
                   </label>
 
                   <select
-                    id="revision-difficulty"
-                    value={difficulty}
-                    onChange={(event) =>
-                      setDifficulty(event.target.value)
-                    }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    id="revision-subject"
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950"
                   >
-                    {DIFFICULTIES.map((item) => (
+                    {SUBJECTS.map((item) => (
                       <option key={item} value={item}>
                         {item}
                       </option>
@@ -352,97 +278,136 @@ export function FastRevision() {
 
                 <div>
                   <label
-                    htmlFor="revision-count"
-                    className="mb-2 block text-sm font-bold"
+                    htmlFor="revision-topic"
+                    className="mb-2 flex items-center gap-2 text-sm font-bold"
                   >
-                    Revision Cards
+                    Topic
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800">
+                      Optional
+                    </span>
                   </label>
 
-                  <select
-                    id="revision-count"
-                    value={cardCount}
-                    onChange={(event) =>
-                      setCardCount(Number(event.target.value))
-                    }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                  >
-                    {CARD_COUNTS.map((count) => (
-                      <option key={count} value={count}>
-                        {count} cards
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    id="revision-topic"
+                    value={topic}
+                    onChange={(event) => setTopic(event.target.value)}
+                    placeholder="e.g. Fundamental Rights"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950"
+                  />
+
+                  <p className="mt-2 text-xs text-slate-400">
+                    Blank = AI important topics automatically select karega.
+                  </p>
                 </div>
-              </div>
 
-              {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
-                  <div className="flex gap-3">
-                    <span>⚠️</span>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="revision-difficulty"
+                      className="mb-2 block text-sm font-bold"
+                    >
+                      Difficulty
+                    </label>
 
-                    <div>
-                      <p className="font-bold text-red-700 dark:text-red-300">
-                        Unable to generate revision
-                      </p>
+                    <select
+                      id="revision-difficulty"
+                      value={difficulty}
+                      onChange={(event) =>
+                        setDifficulty(event.target.value)
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950"
+                    >
+                      {DIFFICULTIES.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                        {error}
-                      </p>
-                    </div>
+                  <div>
+                    <label
+                      htmlFor="revision-count"
+                      className="mb-2 block text-sm font-bold"
+                    >
+                      Revision Cards
+                    </label>
+
+                    <select
+                      id="revision-count"
+                      value={cardCount}
+                      onChange={(event) =>
+                        setCardCount(Number(event.target.value))
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950"
+                    >
+                      {CARD_COUNTS.map((count) => (
+                        <option key={count} value={count}>
+                          {count} cards
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading ? (
-                  <>
-                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                    Generating Revision...
-                  </>
-                ) : (
-                  <>⚡ Generate Fast Revision</>
+                {error && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm dark:border-red-900 dark:bg-red-950/30">
+                    <p className="font-bold text-red-700 dark:text-red-300">
+                      ⚠️ Unable to generate revision
+                    </p>
+                    <p className="mt-1 text-red-600 dark:text-red-400">
+                      {error}
+                    </p>
+                  </div>
                 )}
-              </button>
-            </form>
-          </section>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? (
+                    <>
+                      <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Generating Revision...
+                    </>
+                  ) : (
+                    <>⚡ Generate Fast Revision</>
+                  )}
+                </button>
+              </form>
+            </section>
+          </>
         )}
 
         {result && (
-          <div className="mt-6 space-y-6">
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
+          <div className="space-y-6">
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
                     Revision Ready
                   </p>
 
-                  <h2 className="mt-1 text-2xl font-black">
-                    {displayedTopic}
-                  </h2>
+                  <h1 className="mt-1 text-2xl font-black">
+                    {topic.trim() ||
+                      `${subject} — Important Topics`}
+                  </h1>
 
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                      {subject}
-                    </span>
-
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      {difficulty}
-                    </span>
+                    <Badge>{subject}</Badge>
+                    <Badge>{difficulty}</Badge>
 
                     {result.cards.length > 0 && (
-                      <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700 dark:bg-green-950/40 dark:text-green-300">
+                      <Badge tone="green">
                         {result.cards.length} Cards
-                      </span>
+                      </Badge>
                     )}
 
                     {result.quiz.length > 0 && (
-                      <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                      <Badge tone="violet">
                         {result.quiz.length} MCQs
-                      </span>
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -450,7 +415,7 @@ export function FastRevision() {
                 <button
                   type="button"
                   onClick={startAgain}
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
                 >
                   ← New Revision
                 </button>
@@ -458,13 +423,12 @@ export function FastRevision() {
             </section>
 
             {result.cards.length > 0 && (
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
                       Quick Notes
                     </p>
-
                     <h2 className="mt-1 text-xl font-black">
                       Revision Cards
                     </h2>
@@ -477,7 +441,7 @@ export function FastRevision() {
 
                 {result.cards[activeCard] && (
                   <div className="mt-5 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 p-5 dark:from-blue-950/30 dark:to-indigo-950/30 sm:p-7">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg font-black text-white">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 font-black text-white">
                       {activeCard + 1}
                     </div>
 
@@ -507,35 +471,44 @@ export function FastRevision() {
                   <button
                     type="button"
                     disabled={activeCard === 0}
-                    onClick={previousCard}
-                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold transition hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
+                    onClick={() =>
+                      setActiveCard((current) =>
+                        Math.max(0, current - 1),
+                      )
+                    }
+                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
                   >
                     ← Previous
                   </button>
 
-                  <div className="flex max-w-[50%] gap-1.5 overflow-hidden px-2">
+                  <div className="flex max-w-[45%] gap-1.5 overflow-hidden">
                     {result.cards.map((_, index) => (
                       <button
                         key={index}
                         type="button"
                         onClick={() => setActiveCard(index)}
+                        aria-label={`Revision card ${index + 1}`}
                         className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                           index === activeCard
                             ? "bg-blue-600"
                             : "bg-slate-300 dark:bg-slate-700"
                         }`}
-                        aria-label={`Revision card ${index + 1}`}
                       />
                     ))}
                   </div>
 
                   <button
                     type="button"
-                    disabled={
-                      activeCard === result.cards.length - 1
+                    disabled={activeCard === result.cards.length - 1}
+                    onClick={() =>
+                      setActiveCard((current) =>
+                        Math.min(
+                          result.cards.length - 1,
+                          current + 1,
+                        ),
+                      )
                     }
-                    onClick={nextCard}
-                    className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-40"
+                    className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-40"
                   >
                     Next →
                   </button>
@@ -544,8 +517,8 @@ export function FastRevision() {
             )}
 
             {result.quiz.length > 0 && (
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400">
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-600 dark:text-violet-400">
                   Test Yourself
                 </p>
 
@@ -557,7 +530,7 @@ export function FastRevision() {
                   Revision ke baad apni understanding test karo.
                 </p>
 
-                <div className="mt-6 space-y-6">
+                <div className="mt-6 space-y-5">
                   {result.quiz.map((question, index) => {
                     const selected = getSelectedAnswer(question.id);
 
@@ -587,15 +560,12 @@ export function FastRevision() {
                             if (quizSubmitted && isCorrect) {
                               classes =
                                 "border-green-300 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950/30 dark:text-green-300";
-                            } else if (
-                              quizSubmitted &&
-                              isSelected
-                            ) {
+                            } else if (quizSubmitted && isSelected) {
                               classes =
                                 "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300";
                             } else if (isSelected) {
                               classes =
-                                "border-violet-500 bg-violet-50 text-violet-800 dark:border-violet-500 dark:bg-violet-950/30";
+                                "border-violet-500 bg-violet-50 text-violet-800 dark:bg-violet-950/30";
                             }
 
                             return (
@@ -612,14 +582,9 @@ export function FastRevision() {
                                   {String.fromCharCode(65 + optionIndex)}
                                 </span>
 
-                                <span className="flex-1">
-                                  {option}
-                                </span>
+                                <span className="flex-1">{option}</span>
 
-                                {quizSubmitted &&
-                                  isCorrect &&
-                                  "✓"}
-
+                                {quizSubmitted && isCorrect && "✓"}
                                 {quizSubmitted &&
                                   isSelected &&
                                   !isCorrect &&
@@ -631,7 +596,7 @@ export function FastRevision() {
 
                         {quizSubmitted && (
                           <div className="mt-4 rounded-xl bg-slate-50 p-4 dark:bg-slate-950">
-                            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                            <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">
                               Explanation
                             </p>
 
@@ -664,7 +629,7 @@ export function FastRevision() {
                     <button
                       type="button"
                       onClick={retakeQuiz}
-                      className="mt-6 w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                      className="mt-5 w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
                     >
                       Retake Quiz
                     </button>
@@ -673,7 +638,7 @@ export function FastRevision() {
                   <button
                     type="button"
                     onClick={submitQuiz}
-                    className="mt-6 w-full rounded-xl bg-violet-600 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-violet-700"
+                    className="mt-6 w-full rounded-xl bg-violet-600 px-5 py-3.5 text-sm font-bold text-white hover:bg-violet-700"
                   >
                     Submit Quiz →
                   </button>
@@ -687,8 +652,8 @@ export function FastRevision() {
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-blue-800 dark:text-blue-300">
-                Important facts ko baar-baar revise karo. Pehle concepts
-                samjho, phir MCQs solve karo aur galat answers ki
+                Important facts ko baar-baar revise karo. Pehle concept
+                samjho, phir MCQs solve karo aur wrong answers ki
                 explanation zaroor padho.
               </p>
             </section>
@@ -697,7 +662,7 @@ export function FastRevision() {
               <button
                 type="button"
                 onClick={() => navigate("/student/dashboard")}
-                className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+                className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
               >
                 ← Back to Dashboard
               </button>
@@ -709,9 +674,31 @@ export function FastRevision() {
   );
 }
 
-function normalizeRevisionResponse(
-  value: unknown,
-): RevisionResult {
+function Badge({
+  children,
+  tone = "blue",
+}: {
+  children: React.ReactNode;
+  tone?: "blue" | "green" | "violet";
+}) {
+  const styles = {
+    blue: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+    green:
+      "bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300",
+    violet:
+      "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+  };
+
+  return (
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-bold ${styles[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function normalizeRevisionResponse(value: unknown): RevisionResult {
   let data: any = value;
 
   if (typeof data === "string") {
@@ -726,10 +713,7 @@ function normalizeRevisionResponse(
     data = data.data;
   } else if (data?.result && typeof data.result === "object") {
     data = data.result;
-  } else if (
-    data?.revision &&
-    typeof data.revision === "object"
-  ) {
+  } else if (data?.revision && typeof data.revision === "object") {
     data = data.revision;
   }
 
@@ -738,18 +722,12 @@ function normalizeRevisionResponse(
   }
 
   return {
-    topic:
-      typeof data.topic === "string"
-        ? data.topic.trim()
-        : undefined,
-
     cards: normalizeCards(
       data.cards ||
         data.flashcards ||
         data.revision_cards ||
         data.revisionCards,
     ),
-
     quiz: normalizeQuiz(
       data.quiz ||
         data.mcqs ||
@@ -803,17 +781,13 @@ function normalizeCards(value: unknown): RevisionCard[] {
       if (!content) return null;
 
       return {
-        id: String(
-          item.id || `revision-card-${index + 1}`,
-        ),
+        id: String(item.id || `revision-card-${index + 1}`),
         title,
         content,
         keyPoint: keyPoint || undefined,
       };
     })
-    .filter(
-      (item): item is RevisionCard => Boolean(item),
-    );
+    .filter(Boolean) as RevisionCard[];
 }
 
 function normalizeQuiz(value: unknown): QuizQuestion[] {
@@ -833,9 +807,7 @@ function normalizeQuiz(value: unknown): QuizQuestion[] {
     if (!item || typeof item !== "object") return;
 
     const question = String(
-      item.question ||
-        item.question_en ||
-        "",
+      item.question || item.question_en || "",
     ).trim();
 
     if (!question) return;
@@ -847,10 +819,7 @@ function normalizeQuiz(value: unknown): QuizQuestion[] {
         if (typeof option === "string") {
           const text = option.trim();
           if (text) options.push(text);
-        } else if (
-          option &&
-          typeof option === "object"
-        ) {
+        } else if (option && typeof option === "object") {
           const text = String(
             option.en ||
               option.text ||
@@ -880,8 +849,7 @@ function normalizeQuiz(value: unknown): QuizQuestion[] {
       const upper = answer.toUpperCase();
 
       if (["A", "B", "C", "D"].includes(upper)) {
-        answer =
-          options[upper.charCodeAt(0) - 65] || "";
+        answer = options[upper.charCodeAt(0) - 65] || "";
       }
     }
 
@@ -908,21 +876,13 @@ function getScoreMessage(score: number, total: number) {
 
   const percentage = (score / total) * 100;
 
-  if (percentage === 100) {
-    return "Excellent! Perfect score 🔥";
-  }
-
-  if (percentage >= 80) {
+  if (percentage === 100) return "Excellent! Perfect score 🔥";
+  if (percentage >= 80)
     return "Great job! Your preparation is strong 💪";
-  }
-
-  if (percentage >= 60) {
+  if (percentage >= 60)
     return "Good attempt! Thoda aur revision karo 👍";
-  }
-
-  if (percentage >= 40) {
+  if (percentage >= 40)
     return "Keep practicing. Revision ko repeat karo 📚";
-  }
 
   return "Don't worry. Concepts ko dobara revise karo 💡";
 }
