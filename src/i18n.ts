@@ -56,6 +56,12 @@ const resources = {
       studentLogin: {
         login: "Student Login",
         loginSubtitle: "Login to continue your learning journey.",
+        createSubtitle: "Create your student account to start learning.",
+        fullName: "Full Name",
+        fullNamePlaceholder: "Enter your full name",
+        createAccountButton: "Create Account",
+        alreadyAccount: "Already have an account?",
+        secureAuthentication: "Secure student authentication",
         email: "Email",
         password: "Password",
         loginButton: "Login",
@@ -438,6 +444,12 @@ const resources = {
         login: "स्टूडेंट लॉगिन",
         loginSubtitle:
           "अपनी पढ़ाई जारी रखने के लिए लॉगिन करें।",
+        createSubtitle: "पढ़ाई शुरू करने के लिए अपना स्टूडेंट अकाउंट बनाएं।",
+        fullName: "पूरा नाम",
+        fullNamePlaceholder: "अपना पूरा नाम दर्ज करें",
+        createAccountButton: "अकाउंट बनाएं",
+        alreadyAccount: "पहले से अकाउंट है?",
+        secureAuthentication: "सुरक्षित स्टूडेंट ऑथेंटिकेशन",
         email: "ईमेल",
         password: "पासवर्ड",
         loginButton: "लॉगिन करें",
@@ -823,6 +835,12 @@ const resources = {
         login: "Student Login",
         loginSubtitle:
           "Apni learning journey continue karne ke liye login karo.",
+        createSubtitle: "Learning start karne ke liye apna student account banao.",
+        fullName: "Full Name",
+        fullNamePlaceholder: "Apna full name enter karo",
+        createAccountButton: "Create Account",
+        alreadyAccount: "Pehle se account hai?",
+        secureAuthentication: "Secure student authentication",
         email: "Email",
         password: "Password",
         loginButton: "Login",
@@ -1157,12 +1175,12 @@ const resources = {
   },
 };
 
-const getInitialLanguage = () => {
-  if (typeof window === "undefined") {
-    return "en";
-  }
+const getInitialLanguage = (): "en" | "hi" | "hinglish" => {
+  if (typeof window === "undefined") return "en";
 
-  const savedLanguage = localStorage.getItem(STORAGE_KEY);
+  const savedLanguage =
+    localStorage.getItem(STORAGE_KEY) ??
+    localStorage.getItem("vidyzen-language");
 
   if (
     savedLanguage === "en" ||
