@@ -370,9 +370,6 @@ export default function MathGames() {
     setShowHint(false);
   }
 
-  const accuracy = questionNumber > 0
-    ? Math.round((roundCorrect / Math.max(1, questionNumber - (roundDone ? 0 : 1))) * 100)
-    : 0;
 
   return (
     <div className={`math-games-page ${dark ? "mg-dark" : ""}`}>
