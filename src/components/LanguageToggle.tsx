@@ -1,6 +1,26 @@
+
 import { useTranslation } from "react-i18next";
 
 type Language = "en" | "hi" | "hinglish";
+
+const STORAGE_KEY = "ranker-bhaiya-language";
+const LEGACY_STORAGE_KEY = "vidyzen-language";
+
+function getSavedLanguage(): Language {
+  try {
+    const saved =
+      localStorage.getItem(STORAGE_KEY) ??
+      localStorage.getItem(LEGACY_STORAGE_KEY);
+
+    if (saved === "en" || saved === "hi" || saved === "hinglish") {
+      return saved;
+    }
+  } catch {
+    // Use English if browser storage is unavailable.
+  }
+
+  return "en";
+}
 
 export function LanguageToggle() {
   const { i18n } = useTranslation();
@@ -12,9 +32,15 @@ export function LanguageToggle() {
         ? "hinglish"
         : "en";
 
-  const changeLanguage = (language: Language) => {
-    i18n.changeLanguage(language);
-    localStorage.setItem("vidyzen-language", language);
+  const changeLanguage = async (language: Language) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, language);
+      localStorage.setItem(LEGACY_STORAGE_KEY, language);
+    } catch {
+      // Language can still change for the current session.
+    }
+
+    await i18n.changeLanguage(language);
   };
 
   return (
@@ -23,44 +49,27 @@ export function LanguageToggle() {
       role="group"
       aria-label="Language"
     >
-      <button
-        type="button"
-        onClick={() => changeLanguage("en")}
-        aria-pressed={currentLanguage === "en"}
-        className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-          currentLanguage === "en"
-            ? "bg-white text-blue-600 shadow dark:bg-slate-700 dark:text-blue-400"
-            : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-        }`}
-      >
-        English
-      </button>
-
-      <button
-        type="button"
-        onClick={() => changeLanguage("hi")}
-        aria-pressed={currentLanguage === "hi"}
-        className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-          currentLanguage === "hi"
-            ? "bg-white text-blue-600 shadow dark:bg-slate-700 dark:text-blue-400"
-            : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-        }`}
-      >
-        हिंदी
-      </button>
-
-      <button
-        type="button"
-        onClick={() => changeLanguage("hinglish")}
-        aria-pressed={currentLanguage === "hinglish"}
-        className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-          currentLanguage === "hinglish"
-            ? "bg-white text-blue-600 shadow dark:bg-slate-700 dark:text-blue-400"
-            : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-        }`}
-      >
-        Hinglish
-      </button>
+      {(
+        [
+          ["en", "English"],
+          ["hi", "हिंदी"],
+          ["hinglish", "Hinglish"],
+        ] as const
+      ).map(([language, label]) => (
+        <button
+          key={language}
+          type="button"
+          onClick={() => changeLanguage(language)}
+          aria-pressed={currentLanguage === language}
+          className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
+            currentLanguage === language
+              ? "bg-white text-blue-600 shadow dark:bg-slate-700 dark:text-blue-400"
+              : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
