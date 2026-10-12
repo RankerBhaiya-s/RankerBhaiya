@@ -5,12 +5,15 @@ import { useTheme } from "../../context/ThemeContext";
 import "./MathGames.css";
 
 type GameId = "flashcards" | "tables" | "arithmetic" | "calculator" | "quiz";
+type Level = "easy" | "medium" | "hard";
+
 type Question = {
   prompt: string;
   options: number[];
   answer: number;
   hint: string;
 };
+
 type Stats = {
   played: number;
   correct: number;
@@ -19,6 +22,20 @@ type Stats = {
 };
 
 const STORAGE_KEY = "ranker-bhaiya-math-games-v1";
+const QUESTIONS_PER_ROUND = 10;
+
+const LEVEL_SECONDS: Record<Level, number> = {
+  easy: 5,
+  medium: 10,
+  hard: 15,
+};
+
+const LEVEL_LABELS: Record<Level, { en: string; hi: string }> = {
+  easy: { en: "Easy · 5 sec", hi: "आसान · 5 सेकंड" },
+  medium: { en: "Medium · 10 sec", hi: "मध्यम · 10 सेकंड" },
+  hard: { en: "Hard · 15 sec", hi: "कठिन · 15 सेकंड" },
+};
+
 const GAME_IDS: GameId[] = [
   "flashcards",
   "tables",
@@ -61,15 +78,12 @@ const copy = {
     of: "of",
     time: "Time left",
     points: "Score",
-    submit: "Check answer",
-    next: "Next question →",
     choose: "Choose an answer",
     correct: "Great job! That's correct.",
-    wrong: "Not quite. Here's the correct answer:",
+    wrong: "Not quite. Correct answer:",
     timeUp: "Time's up!",
     completed: "Round complete!",
     accuracy: "Accuracy",
-    playAgain: "Play another round",
     hint: "Hint",
     language: "हिन्दी",
     min: "sec",
@@ -83,23 +97,25 @@ const copy = {
     tableTitle: "Table Practice",
     tableDesc: "Practise multiplication tables.",
     arithmeticTitle: "Addition & Subtraction",
-    arithmeticDesc: "Build speed with basic calculations.",
+    arithmeticDesc: "Build speed with calculations.",
     calculatorTitle: "Calculator Practice",
     calculatorDesc: "Solve mixed-operation challenges.",
     quizTitle: "Math Quiz",
     quizDesc: "Test your overall maths skills.",
     recent: "Recent rounds",
-    empty: "Start a game to see your progress.",
     pointsLabel: "points",
     saved: "Scores save on this device.",
+    level: "Choose difficulty",
+    next: "Next question →",
+    startLevel: "Start round →",
   },
   hi: {
     eyebrow: "सीखें • खेलें • बेहतर बनें",
     title: "मैथ गेम्स",
-    subtitle: "मज़ेदार राउंड खेलकर अपनी गणित की प्रैक्टिस बेहतर बनाएं।",
+    subtitle: "मज़ेदार राउंड खेलकर गणित की प्रैक्टिस बेहतर बनाएं।",
     back: "← डैशबोर्ड",
     games: "अपना गेम चुनें",
-    gamesSub: "एक चुनौती चुनें और खेलना शुरू करें।",
+    gamesSub: "चुनौती चुनें और खेलना शुरू करें।",
     score: "सही जवाब",
     played: "खेले गए राउंड",
     best: "सबसे अच्छा स्कोर",
@@ -113,15 +129,12 @@ const copy = {
     of: "में से",
     time: "बाकी समय",
     points: "स्कोर",
-    submit: "जवाब जाँचें",
-    next: "अगला प्रश्न →",
     choose: "एक जवाब चुनें",
     correct: "बहुत बढ़िया! जवाब सही है।",
-    wrong: "जवाब सही नहीं है। सही उत्तर है:",
+    wrong: "सही उत्तर है:",
     timeUp: "समय पूरा!",
     completed: "राउंड पूरा हुआ!",
     accuracy: "सटीकता",
-    playAgain: "एक और राउंड खेलें",
     hint: "संकेत",
     language: "English",
     min: "सेकंड",
@@ -141,9 +154,11 @@ const copy = {
     quizTitle: "मैथ क्विज़",
     quizDesc: "अपने गणित ज्ञान को परखें।",
     recent: "हाल के राउंड",
-    empty: "अपनी प्रगति देखने के लिए गेम खेलें।",
     pointsLabel: "अंक",
     saved: "स्कोर इसी डिवाइस पर सेव होते हैं।",
+    level: "कठिनाई चुनें",
+    next: "अगला प्रश्न →",
+    startLevel: "राउंड शुरू करें →",
   },
 };
 
@@ -169,56 +184,99 @@ function shuffle<T>(items: T[]): T[] {
   return [...items].sort(() => Math.random() - 0.5);
 }
 
-function makeQuestion(game: GameId): Question {
-  let a = randomInt(2, 20);
-  let b = randomInt(2, 12);
+function makeQuestion(game: GameId, level: Level): Question {
   let answer = 0;
   let prompt = "";
   let hint = "";
 
-  if (game === "tables") {
-    a = randomInt(2, 20);
-    b = randomInt(2, 12);
-    answer = a * b;
-    prompt = `${a} × ${b} = ?`;
-    hint = `${a} groups of ${b}`;
+  const a = level === "easy"
+    ? randomInt(2, 12)
+    : level === "medium"
+      ? randomInt(12, 60)
+      : randomInt(25, 150);
+
+  const b = level === "easy"
+    ? randomInt(2, 10)
+    : level === "medium"
+      ? randomInt(5, 25)
+      : randomInt(12, 60);
+
+  if (level === "hard" && game !== "tables") {
+    const kind = randomInt(1, 6);
+
+    if (kind === 1) {
+      const x = randomInt(12, 45);
+      const y = randomInt(12, 35);
+      const z = randomInt(10, 80);
+      answer = x * y - z;
+      prompt = `${x} × ${y} − ${z} = ?`;
+      hint = "Multiply first, then subtract.";
+    } else if (kind === 2) {
+      const percent = [15, 20, 25, 35, 40, 60, 75][randomInt(0, 6)];
+      const base = randomInt(4, 40) * 20;
+      answer = (base * percent) / 100;
+      prompt = `${percent}% of ${base} = ?`;
+      hint = "Convert the percentage into a fraction.";
+    } else if (kind === 3) {
+      const x = randomInt(12, 30);
+      const y = randomInt(12, 30);
+      const z = randomInt(2, 12);
+      answer = x * x + y - z;
+      prompt = `${x}² + ${y} − ${z} = ?`;
+      hint = "Square the first number before adding.";
+    } else if (kind === 4) {
+      const denominator = [3, 4, 5, 8, 10][randomInt(0, 4)];
+      const whole = denominator * randomInt(40, 150);
+      const subtract = randomInt(15, 100);
+      answer = (whole / denominator) * (denominator - 1) - subtract;
+      prompt = `${denominator - 1}/${denominator} of ${whole} − ${subtract} = ?`;
+      hint = "Find the fraction first, then subtract.";
+    } else if (kind === 5) {
+      const x = randomInt(15, 60);
+      const y = randomInt(12, 40);
+      const z = randomInt(2, 9);
+      answer = x * y + z * z;
+      prompt = `${x} × ${y} + ${z}² = ?`;
+      hint = "Calculate the power before adding.";
+    } else {
+      const x = randomInt(20, 90);
+      const divisor = randomInt(2, 12);
+      const divisible = x - (x % divisor);
+      const extra = randomInt(10, 50);
+      answer = divisible / divisor + extra * 3;
+      prompt = `${divisible} ÷ ${divisor} + ${extra} × 3 = ?`;
+      hint = "Follow BODMAS: division and multiplication first.";
+    }
+  } else if (game === "tables") {
+    const x = level === "easy" ? randomInt(2, 12) : level === "medium" ? randomInt(8, 25) : randomInt(15, 40);
+    const y = level === "easy" ? randomInt(2, 10) : level === "medium" ? randomInt(8, 20) : randomInt(12, 30);
+    answer = x * y;
+    prompt = `${x} × ${y} = ?`;
+    hint = `${x} groups of ${y}`;
   } else if (game === "arithmetic") {
     const subtract = Math.random() > 0.5;
-    if (subtract && b > a) [a, b] = [b, a];
-    answer = subtract ? a - b : a + b;
-    prompt = `${a} ${subtract ? "−" : "+"} ${b} = ?`;
+    const x = Math.max(a, b);
+    const y = Math.min(a, b);
+    answer = subtract ? x - y : x + y;
+    prompt = `${x} ${subtract ? "−" : "+"} ${y} = ?`;
     hint = subtract ? "Find the difference." : "Combine both numbers.";
   } else if (game === "calculator") {
     const operation = randomInt(1, 3);
+    const x = level === "easy" ? randomInt(2, 20) : randomInt(20, 100);
+    const y = level === "easy" ? randomInt(2, 12) : randomInt(10, 50);
+
     if (operation === 1) {
-      answer = a + b;
-      prompt = `${a} + ${b} = ?`;
+      answer = x + y;
+      prompt = `${x} + ${y} = ?`;
       hint = "Add both numbers.";
     } else if (operation === 2) {
-      if (b > a) [a, b] = [b, a];
-      answer = a - b;
-      prompt = `${a} − ${b} = ?`;
+      answer = Math.max(x, y) - Math.min(x, y);
+      prompt = `${Math.max(x, y)} − ${Math.min(x, y)} = ?`;
       hint = "Subtract the smaller number.";
     } else {
-      answer = a * b;
-      prompt = `${a} × ${b} = ?`;
+      answer = x * y;
+      prompt = `${x} × ${y} = ?`;
       hint = "Use multiplication.";
-    }
-  } else if (game === "flashcards") {
-    const operation = randomInt(1, 3);
-    if (operation === 1) {
-      answer = a + b;
-      prompt = `${a} + ${b} = ?`;
-      hint = "Add tens and units.";
-    } else if (operation === 2) {
-      if (b > a) [a, b] = [b, a];
-      answer = a - b;
-      prompt = `${a} − ${b} = ?`;
-      hint = "Find the difference.";
-    } else {
-      answer = a * b;
-      prompt = `${a} × ${b} = ?`;
-      hint = "Think of equal groups.";
     }
   } else {
     const operation = randomInt(1, 4);
@@ -227,27 +285,30 @@ function makeQuestion(game: GameId): Question {
       prompt = `What is ${a} + ${b}?`;
       hint = "Combine both numbers.";
     } else if (operation === 2) {
-      if (b > a) [a, b] = [b, a];
-      answer = a - b;
-      prompt = `What is ${a} − ${b}?`;
+      answer = Math.max(a, b) - Math.min(a, b);
+      prompt = `What is ${Math.max(a, b)} − ${Math.min(a, b)}?`;
       hint = "Find the difference.";
     } else if (operation === 3) {
       answer = a * b;
       prompt = `What is ${a} × ${b}?`;
       hint = "Use multiplication.";
     } else {
-      a = randomInt(2, 12);
-      answer = a;
-      prompt = `${a * b} ÷ ${b} = ?`;
+      const divisor = randomInt(2, 12);
+      const quotient = randomInt(2, 20);
+      answer = quotient;
+      prompt = `${divisor * quotient} ÷ ${divisor} = ?`;
       hint = "Think of the related multiplication fact.";
     }
   }
 
   const wrong = new Set<number>();
   while (wrong.size < 3) {
-    const offset = randomInt(1, 10) * (Math.random() > 0.5 ? 1 : -1);
-    if (answer + offset !== answer && answer + offset >= 0) wrong.add(answer + offset);
+    const offset = randomInt(1, Math.max(10, Math.ceil(Math.abs(answer) * 0.15))) *
+      (Math.random() > 0.5 ? 1 : -1);
+    const candidate = answer + offset;
+    if (candidate !== answer && candidate >= 0) wrong.add(candidate);
   }
+
   return { prompt, options: shuffle([answer, ...wrong]), answer, hint };
 }
 
@@ -255,6 +316,7 @@ function readStats(): Stats {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return initialStats;
+
     const parsed = JSON.parse(raw) as Partial<Stats>;
     return {
       played: Number(parsed.played) || 0,
@@ -276,54 +338,28 @@ export default function MathGames() {
 
   const [stats, setStats] = useState<Stats>(readStats);
   const [selectedGame, setSelectedGame] = useState<GameId | null>(null);
+  const [selectedLevel, setSelectedLevel] = useState<Level>("easy");
   const [question, setQuestion] = useState<Question | null>(null);
   const [questionNumber, setQuestionNumber] = useState(1);
-  const [seconds, setSeconds] = useState(60);
+  const [seconds, setSeconds] = useState(5);
   const [score, setScore] = useState(0);
   const [answered, setAnswered] = useState<number | null>(null);
   const [roundCorrect, setRoundCorrect] = useState(0);
   const [roundDone, setRoundDone] = useState(false);
   const [showHint, setShowHint] = useState(false);
 
-  const isPlaying = selectedGame !== null && !roundDone;
-
-  useEffect(() => {
-    if (!isPlaying) return;
-    const timer = window.setInterval(() => {
-      setSeconds((value) => Math.max(0, value - 1));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (seconds === 0 && selectedGame && !roundDone) {
-      finishRound();
-    }
-    // finishRound is intentionally called only when the timer reaches zero.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seconds]);
+  const isPlaying = selectedGame !== null && !roundDone && answered === null;
 
   const gameTitle = useMemo(
     () => gameInfo.find((game) => game.id === selectedGame),
     [selectedGame],
   );
 
-  function startGame(game: GameId) {
-    setSelectedGame(game);
-    setQuestion(makeQuestion(game));
-    setQuestionNumber(1);
-    setSeconds(60);
-    setScore(0);
-    setRoundCorrect(0);
-    setAnswered(null);
-    setRoundDone(false);
-    setShowHint(false);
-  }
-
   function finishRound(finalScore = score, finalCorrect = roundCorrect) {
     if (!selectedGame || roundDone) return;
+
     setRoundDone(true);
-    const nextStats = {
+    const nextStats: Stats = {
       ...stats,
       played: stats.played + 1,
       correct: stats.correct + finalCorrect,
@@ -333,60 +369,118 @@ export default function MathGames() {
       },
       recent: [
         {
-          game: gameInfo.find((g) => g.id === selectedGame)?.titleKey || selectedGame,
+          game: gameTitle?.titleKey || selectedGame,
           score: finalScore,
           date: new Date().toLocaleDateString(),
         },
         ...stats.recent,
       ].slice(0, 10),
     };
+
     setStats(nextStats);
+
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStats));
     } catch {
-      // Gameplay still works when local storage is unavailable.
-    }
-  }
-
-  function answerQuestion(value: number) {
-    if (answered !== null || roundDone || !question) return;
-    setAnswered(value);
-    if (value === question.answer) {
-      const nextScore = score + 10;
-      const nextCorrect = roundCorrect + 1;
-      setScore(nextScore);
-      setRoundCorrect(nextCorrect);
+      // The round still works if storage is unavailable.
     }
   }
 
   function nextQuestion() {
-    if (questionNumber >= 10) {
+    if (questionNumber >= QUESTIONS_PER_ROUND) {
       finishRound();
       return;
     }
-    if (selectedGame) setQuestion(makeQuestion(selectedGame));
+
+    if (selectedGame) {
+      setQuestion(makeQuestion(selectedGame, selectedLevel));
+    }
+
     setQuestionNumber((value) => value + 1);
+    setSeconds(LEVEL_SECONDS[selectedLevel]);
     setAnswered(null);
     setShowHint(false);
   }
 
+  function answerQuestion(value: number) {
+    if (answered !== null || roundDone || !question) return;
+
+    setAnswered(value);
+
+    if (value === question.answer) {
+      setScore((current) => current + 10);
+      setRoundCorrect((current) => current + 1);
+    }
+  }
+
+  function startGame(game: GameId) {
+    setSelectedGame(game);
+    setQuestion(makeQuestion(game, selectedLevel));
+    setQuestionNumber(1);
+    setSeconds(LEVEL_SECONDS[selectedLevel]);
+    setScore(0);
+    setRoundCorrect(0);
+    setAnswered(null);
+    setRoundDone(false);
+    setShowHint(false);
+  }
+
+  function handleTimeout() {
+    if (answered !== null || roundDone) return;
+
+    setAnswered(-1);
+  }
+
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const timer = window.setInterval(() => {
+      setSeconds((current) => {
+        if (current <= 1) return 0;
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isPlaying, questionNumber, selectedGame]);
+
+  useEffect(() => {
+    if (seconds === 0 && isPlaying) {
+      handleTimeout();
+    }
+    // Timer expiry is handled once per unanswered question.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seconds, isPlaying]);
 
   return (
     <div className={`math-games-page ${dark ? "mg-dark" : ""}`}>
       <div className="mg-shell">
         <header className="mg-topbar">
-          <button className="mg-brand" onClick={() => navigate("/student/dashboard")} type="button">
+          <button
+            className="mg-brand"
+            onClick={() => navigate("/student/dashboard")}
+            type="button"
+          >
             <span className="mg-logo">RB</span>
             <span>
               <strong>Ranker Bhaiya</strong>
               <small>Aapki Mehnat, Hamari Strategy.</small>
             </span>
           </button>
+
           <div className="mg-top-actions">
-            <button className="mg-ghost" onClick={() => setHindi((v) => !v)} type="button">
+            <button
+              className="mg-ghost"
+              onClick={() => setHindi((value) => !value)}
+              type="button"
+            >
               🌐 {t.language}
             </button>
-            <button className="mg-ghost" onClick={() => navigate("/student/dashboard")} type="button">
+            <button
+              className="mg-ghost"
+              onClick={() => navigate("/student/dashboard")}
+              type="button"
+            >
               {t.back}
             </button>
           </div>
@@ -409,22 +503,30 @@ export default function MathGames() {
             </section>
 
             <section className="mg-stat-grid">
-              <div className="mg-stat"><span>🏆</span><small>{t.played}</small><strong>{stats.played}</strong></div>
-              <div className="mg-stat"><span>✅</span><small>{t.score}</small><strong>{stats.correct}</strong></div>
-              <div className="mg-stat"><span>⭐</span><small>{t.best}</small><strong>{Math.max(...GAME_IDS.map((id) => stats.best[id]))}</strong></div>
+              <div className="mg-stat">
+                <span>🏆</span><small>{t.played}</small><strong>{stats.played}</strong>
+              </div>
+              <div className="mg-stat">
+                <span>✅</span><small>{t.score}</small><strong>{stats.correct}</strong>
+              </div>
+              <div className="mg-stat">
+                <span>⭐</span><small>{t.best}</small>
+                <strong>{Math.max(...GAME_IDS.map((id) => stats.best[id]))}</strong>
+              </div>
             </section>
 
             <section className="mg-section">
               <div className="mg-section-heading">
                 <div><h2>{t.games}</h2><p>{t.gamesSub}</p></div>
               </div>
+
               <div className="mg-game-grid">
                 {gameInfo.map((game) => (
                   <button
                     key={game.id}
                     type="button"
                     className={`mg-game-card ${game.color}`}
-                    onClick={() => startGame(game.id)}
+                    onClick={() => setSelectedGame(game.id)}
                   >
                     <span className="mg-game-icon">{game.icon}</span>
                     <span className="mg-game-copy">
@@ -432,7 +534,9 @@ export default function MathGames() {
                       <small>{t[game.descKey]}</small>
                     </span>
                     <span className="mg-game-arrow">↗</span>
-                    <span className="mg-best-line">{t.best}: {stats.best[game.id]}</span>
+                    <span className="mg-best-line">
+                      {t.best}: {stats.best[game.id]}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -442,12 +546,15 @@ export default function MathGames() {
               <div className="mg-section-heading">
                 <div><h2>{t.leaderboard}</h2><p>{t.leaderboardSub}</p></div>
               </div>
+
               {stats.recent.length ? (
                 <div className="mg-score-list">
                   {stats.recent.map((entry, index) => (
                     <div className="mg-score-row" key={`${entry.date}-${index}`}>
                       <span className="mg-rank">{index + 1}</span>
-                      <span className="mg-score-name">{t[entry.game as keyof typeof t] || entry.game}</span>
+                      <span className="mg-score-name">
+                        {t[entry.game as keyof typeof t] || entry.game}
+                      </span>
                       <span className="mg-score-date">{entry.date}</span>
                       <strong>{entry.score} {t.pointsLabel}</strong>
                     </div>
@@ -461,24 +568,90 @@ export default function MathGames() {
           </>
         )}
 
+        {selectedGame && !question && !roundDone && (
+          <section className="mg-play-card">
+            <div className="mg-play-header">
+              <button
+                type="button"
+                className="mg-ghost"
+                onClick={() => setSelectedGame(null)}
+              >
+                ← {t.home}
+              </button>
+            </div>
+
+            <div className="mg-question-area">
+              <span className="mg-question-icon">{gameTitle?.icon}</span>
+              <h2>{t.level}</h2>
+
+              <div className="mg-options">
+                {(["easy", "medium", "hard"] as Level[]).map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    className={`mg-option ${selectedLevel === level ? "is-correct" : ""}`}
+                    onClick={() => setSelectedLevel(level)}
+                  >
+                    {LEVEL_LABELS[level][hindi ? "hi" : "en"]}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                className="mg-primary"
+                onClick={() => startGame(selectedGame)}
+              >
+                {t.startLevel}
+              </button>
+            </div>
+          </section>
+        )}
+
         {selectedGame && question && !roundDone && (
           <section className="mg-play-card">
             <div className="mg-play-header">
-              <button type="button" className="mg-ghost" onClick={() => { setSelectedGame(null); setQuestion(null); }}>
+              <button
+                type="button"
+                className="mg-ghost"
+                onClick={() => {
+                  setSelectedGame(null);
+                  setQuestion(null);
+                }}
+              >
                 ← {t.home}
               </button>
-              <span className={`mg-timer ${seconds <= 10 ? "urgent" : ""}`}>⏱ {seconds} {t.min}</span>
+              <span className={`mg-timer ${seconds <= 3 ? "urgent" : ""}`}>
+                ⏱ {t.time}: {seconds} {t.min}
+              </span>
             </div>
+
             <div className="mg-progress-label">
-              <span>{t.question} {questionNumber} {t.of} 10</span>
+              <span>{t.question} {questionNumber} {t.of} {QUESTIONS_PER_ROUND}</span>
               <span>⭐ {t.points}: {score}</span>
             </div>
-            <div className="mg-progress"><span style={{ width: `${questionNumber * 10}%` }} /></div>
+
+            <div className="mg-progress">
+              <span style={{ width: `${questionNumber * 10}%` }} />
+            </div>
+
             <div className="mg-question-area">
               <span className="mg-question-icon">{gameTitle?.icon}</span>
-              <p className="mg-question-kicker">{selectedGame === "tables" ? t.tablePrompt : selectedGame === "flashcards" ? t.flashPrompt : selectedGame === "arithmetic" ? t.arithmeticPrompt : selectedGame === "calculator" ? t.calculatorPrompt : t.quizPrompt}</p>
+              <p className="mg-question-kicker">
+                {selectedGame === "tables"
+                  ? t.tablePrompt
+                  : selectedGame === "flashcards"
+                    ? t.flashPrompt
+                    : selectedGame === "arithmetic"
+                      ? t.arithmeticPrompt
+                      : selectedGame === "calculator"
+                        ? t.calculatorPrompt
+                        : t.quizPrompt}
+              </p>
+
               <h2>{question.prompt}</h2>
               <p className="mg-select-label">{t.choose}</p>
+
               <div className="mg-options">
                 {question.options.map((option) => (
                   <button
@@ -486,7 +659,15 @@ export default function MathGames() {
                     type="button"
                     disabled={answered !== null}
                     onClick={() => answerQuestion(option)}
-                    className={`mg-option ${answered !== null && option === question.answer ? "is-correct" : ""} ${answered === option && option !== question.answer ? "is-wrong" : ""}`}
+                    className={`mg-option ${
+                      answered !== null && option === question.answer
+                        ? "is-correct"
+                        : ""
+                    } ${
+                      answered === option && option !== question.answer
+                        ? "is-wrong"
+                        : ""
+                    }`}
                   >
                     {option}
                     {answered !== null && option === question.answer && <span>✓</span>}
@@ -494,15 +675,29 @@ export default function MathGames() {
                   </button>
                 ))}
               </div>
+
               {answered !== null && (
                 <div className={`mg-feedback ${answered === question.answer ? "good" : "bad"}`}>
-                  <strong>{answered === question.answer ? t.correct : t.wrong}</strong>
+                  <strong>
+                    {answered === -1
+                      ? t.timeUp
+                      : answered === question.answer
+                        ? t.correct
+                        : t.wrong}
+                  </strong>
                   {answered !== question.answer && <span>{question.answer}</span>}
-                  <button type="button" onClick={nextQuestion}>{questionNumber >= 10 ? t.completed : t.next}</button>
+                  <button type="button" onClick={nextQuestion}>
+                    {questionNumber >= QUESTIONS_PER_ROUND ? t.completed : t.next}
+                  </button>
                 </div>
               )}
+
               <div className="mg-hint-wrap">
-                <button type="button" className="mg-hint-button" onClick={() => setShowHint((v) => !v)}>
+                <button
+                  type="button"
+                  className="mg-hint-button"
+                  onClick={() => setShowHint((value) => !value)}
+                >
                   💡 {t.hint} {showHint ? "−" : "+"}
                 </button>
                 {showHint && <p>{question.hint}</p>}
@@ -516,15 +711,33 @@ export default function MathGames() {
             <div className="mg-result-icon">🏆</div>
             <span className="mg-eyebrow">{t.completed}</span>
             <h1>{score} <small>{t.pointsLabel}</small></h1>
-            <p>{t.accuracy}: {Math.round((roundCorrect / 10) * 100)}% · {roundCorrect}/10</p>
+            <p>{t.accuracy}: {Math.round((roundCorrect / QUESTIONS_PER_ROUND) * 100)}% · {roundCorrect}/{QUESTIONS_PER_ROUND}</p>
+
             <div className="mg-result-actions">
-              <button type="button" className="mg-primary" onClick={() => startGame(selectedGame)}>{t.restart}</button>
-              <button type="button" className="mg-secondary" onClick={() => { setSelectedGame(null); setQuestion(null); }}>{t.home}</button>
+              <button
+                type="button"
+                className="mg-primary"
+                onClick={() => startGame(selectedGame)}
+              >
+                {t.restart}
+              </button>
+              <button
+                type="button"
+                className="mg-secondary"
+                onClick={() => {
+                  setSelectedGame(null);
+                  setQuestion(null);
+                }}
+              >
+                {t.home}
+              </button>
             </div>
           </section>
         )}
 
-        <footer className="mg-footer">© Ranker Bhaiya · Aapki Mehnat, Hamari Strategy.</footer>
+        <footer className="mg-footer">
+          © Ranker Bhaiya · Aapki Mehnat, Hamari Strategy.
+        </footer>
       </div>
     </div>
   );
