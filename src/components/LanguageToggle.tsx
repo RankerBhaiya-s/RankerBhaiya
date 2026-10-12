@@ -4,25 +4,8 @@ import { useTranslation } from "react-i18next";
 type Language = "en" | "hi" | "hinglish";
 
 const STORAGE_KEY = "ranker-bhaiya-language";
-const LEGACY_STORAGE_KEY = "vidyzen-language";
 
-function getSavedLanguage(): Language {
-  try {
-    const saved =
-      localStorage.getItem(STORAGE_KEY) ??
-      localStorage.getItem(LEGACY_STORAGE_KEY);
-
-    if (saved === "en" || saved === "hi" || saved === "hinglish") {
-      return saved;
-    }
-  } catch {
-    // Use English if browser storage is unavailable.
-  }
-
-  return "en";
-}
-
-export function LanguageToggle() {
+export default function LanguageToggle() {
   const { i18n } = useTranslation();
 
   const currentLanguage: Language =
@@ -33,13 +16,8 @@ export function LanguageToggle() {
         : "en";
 
   const changeLanguage = async (language: Language) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, language);
-      localStorage.setItem(LEGACY_STORAGE_KEY, language);
-    } catch {
-      // Language can still change for the current session.
-    }
-
+    localStorage.setItem(STORAGE_KEY, language);
+    localStorage.setItem("vidyzen-language", language);
     await i18n.changeLanguage(language);
   };
 
@@ -73,5 +51,3 @@ export function LanguageToggle() {
     </div>
   );
 }
-
-export default LanguageToggle;
