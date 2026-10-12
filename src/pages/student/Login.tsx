@@ -1,7 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../../lib/supabase";
+import { Logo } from "../../components/Logo";
+
+type RecoveryMode = "none" | "choose" | "link" | "otp" | "new-password";
 
 export function StudentLogin() {
   const { t } = useTranslation();
@@ -11,53 +14,56 @@ export function StudentLogin() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [recoveryMode, setRecoveryMode] = useState<RecoveryMode>("none");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (event) => {
+        if (event === "PASSWORD_RECOVERY") {
+          setRecoveryMode("new-password");
+          setError("");
+          setMessage("Set your new password.");
+        }
+      },
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
   async function redirectStudent(userId: string) {
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error } = await supabase
       .from("profiles")
       .select("full_name, class_name, board, exam")
       .eq("id", userId)
       .maybeSingle();
 
-    if (profileError) {
-      console.error("Profile fetch error:", profileError);
-      throw profileError;
-    }
+    if (error) throw error;
 
-    const profileComplete =
+    const complete =
       Boolean(profile?.full_name?.trim()) &&
       Boolean(profile?.class_name) &&
       Boolean(profile?.board) &&
       Boolean(profile?.exam);
 
-    if (profileComplete) {
-      navigate("/student/dashboard", { replace: true });
-    } else {
-      navigate("/student/profile", { replace: true });
-    }
+    navigate(complete ? "/student/dashboard" : "/student/profile", {
+      replace: true,
+    });
   }
 
   async function handleLogin() {
-    const cleanEmail = email.trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
 
-    const { data, error: loginError } =
-      await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
-      });
-
-    if (loginError) {
-      throw loginError;
-    }
-
-    if (!data.user) {
-      throw new Error("Login failed. Please try again.");
-    }
+    if (error) throw error;
+    if (!data.user) throw new Error("Login failed. Please try again.");
 
     await redirectStudent(data.user.id);
   }
@@ -66,463 +72,487 @@ export function StudentLogin() {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = fullName.trim();
 
-    const { data, error: signupError } =
-      await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: {
-            full_name: cleanName,
-          },
-        },
-      });
+    const { data, error } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password,
+      options: {
+        data: { full_name: cleanName },
+      },
+    });
 
-    if (signupError) {
-      throw signupError;
-    }
-
-    if (!data.user) {
-      throw new Error(
-        "Unable to create account. Please try again.",
-      );
-    }
+    if (error) throw error;
+    if (!data.user) throw new Error("Unable to create account.");
 
     if (!data.session) {
       setMessage(
-        "Account created successfully. Please check your email and confirm your account before logging in. / अकाउंट बन गया है। कृपया अपना ईमेल चेक करके अकाउंट कन्फर्म करें।",
+        "Account created. Check your email and confirm your account before logging in.",
       );
       return;
     }
 
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({
-        full_name: cleanName,
-      })
+      .update({ full_name: cleanName })
       .eq("id", data.user.id);
 
-    if (profileError) {
-      console.error(
-        "Profile name update error:",
-        profileError,
-      );
-    }
+    if (profileError) console.error(profileError);
 
     await redirectStudent(data.user.id);
   }
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
+  async function sendResetLink() {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) throw new Error("Enter your email address.");
 
-    if (loading) {
-      return;
+    const redirectTo = `${window.location.origin}${window.location.pathname}#/student/login`;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      cleanEmail,
+      { redirectTo },
+    );
+
+    if (error) throw error;
+
+    setMessage("If an account exists for this email, a reset email will be sent.");
+  }
+
+  async function sendResetOtp() {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) throw new Error("Enter your email address.");
+
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail);
+
+    if (error) throw error;
+
+    setRecoveryMode("otp");
+    setMessage("Check your email for the password reset code.");
+  }
+
+  async function verifyResetOtp() {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!/^\d{6}$/.test(otp.trim())) {
+      throw new Error("Enter the 6-digit code from your email.");
     }
+
+    const { error } = await supabase.auth.verifyOtp({
+      email: cleanEmail,
+      token: otp.trim(),
+      type: "recovery",
+    });
+
+    if (error) throw error;
+
+    setRecoveryMode("new-password");
+    setMessage("Code verified. Set your new password.");
+  }
+
+  async function updatePassword() {
+    if (newPassword.length < 6) {
+      throw new Error("Password must be at least 6 characters.");
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) throw error;
+
+    await supabase.auth.signOut();
+    setPassword("");
+    setNewPassword("");
+    setOtp("");
+    setRecoveryMode("none");
+    setMessage("Password updated. You can now log in.");
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (loading) return;
 
     setError("");
     setMessage("");
-
-    const cleanEmail = email.trim();
-
-    if (!cleanEmail || !password) {
-      setError(
-        "Please enter email and password. / कृपया ईमेल और पासवर्ड दर्ज करें।",
-      );
-      return;
-    }
-
-    if (isSignup && !fullName.trim()) {
-      setError(
-        "Please enter your full name. / कृपया अपना पूरा नाम दर्ज करें।",
-      );
-      return;
-    }
-
-    if (password.length < 6) {
-      setError(
-        "Password must be at least 6 characters. / पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।",
-      );
-      return;
-    }
-
     setLoading(true);
 
     try {
-      if (isSignup) {
-        await handleSignup();
+      if (recoveryMode === "link") {
+        await sendResetLink();
+      } else if (recoveryMode === "otp") {
+        await verifyResetOtp();
+      } else if (recoveryMode === "new-password") {
+        await updatePassword();
       } else {
-        await handleLogin();
+        if (!email.trim()) throw new Error("Enter your email address.");
+        if (!password) throw new Error("Enter your password.");
+
+        if (isSignup) {
+          if (!fullName.trim()) throw new Error("Enter your full name.");
+          if (password.length < 6) {
+            throw new Error("Password must be at least 6 characters.");
+          }
+          await handleSignup();
+        } else {
+          await handleLogin();
+        }
       }
     } catch (err) {
       console.error("Student authentication error:", err);
-
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again.";
-
-      if (
-        errorMessage
-          .toLowerCase()
-          .includes("invalid login credentials")
-      ) {
-        setError(
-          "Invalid email or password. / ईमेल या पासवर्ड गलत है।",
-        );
-      } else if (
-        errorMessage
-          .toLowerCase()
-          .includes("email not confirmed")
-      ) {
-        setError(
-          "Please confirm your email before logging in. / लॉगिन करने से पहले अपना ईमेल कन्फर्म करें।",
-        );
-      } else if (
-        errorMessage
-          .toLowerCase()
-          .includes("user already registered")
-      ) {
-        setError(
-          "This email is already registered. Please login instead. / यह ईमेल पहले से रजिस्टर है। लॉगिन करें।",
-        );
-      } else if (
-        errorMessage
-          .toLowerCase()
-          .includes("invalid path specified in request url")
-      ) {
-        setError(
-          "Supabase configuration error. Please check VITE_SUPABASE_URL in GitHub Secrets.",
-        );
-      } else {
-        setError(errorMessage);
-      }
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  function toggleMode() {
-    if (loading) {
-      return;
-    }
-
-    setIsSignup((previous) => !previous);
+  function resetRecovery() {
+    setRecoveryMode("none");
+    setOtp("");
+    setNewPassword("");
     setError("");
     setMessage("");
   }
 
+  const recoveryTitle =
+    recoveryMode === "link"
+      ? "Reset password by email link"
+      : recoveryMode === "otp"
+        ? "Verify reset code"
+        : recoveryMode === "new-password"
+          ? "Set a new password"
+          : "Forgot password";
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10 dark:bg-slate-950">
-      {/* =====================================================
-          BACKGROUND DECORATION
-      ===================================================== */}
-
       <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
-
       <div className="pointer-events-none absolute -bottom-32 -right-32 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" />
 
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-turmeric/5 blur-3xl" />
-
-      {/* =====================================================
-          LOGIN WRAPPER
-      ===================================================== */}
-
       <div className="relative w-full max-w-md">
-        {/* Top branding */}
-        <div className="mb-5 text-center">
-          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-xl font-black text-white shadow-lg shadow-blue-600/20">
-            R
-          </div>
-
+        <div className="mb-5 flex flex-col items-center text-center">
+          <Logo withWordmark={false} className="mb-3 text-blue-700 dark:text-blue-300" />
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-600 dark:text-blue-400">
             Ranker Bhaiya
           </p>
         </div>
 
-        {/* =====================================================
-            CARD
-        ===================================================== */}
-
-        <div className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/95 shadow-2xl shadow-slate-900/10 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 dark:shadow-black/30">
-          {/* Top accent */}
+        <div className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/95 shadow-2xl shadow-slate-900/10 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
           <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500" />
 
           <div className="p-6 sm:p-8">
-            {/* =================================================
-                HEADER
-            ================================================= */}
-
-            <div className="mb-8 text-center">
-              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-2xl font-black text-white shadow-xl shadow-blue-600/25">
-                R
-              </div>
-
+            <div className="mb-7 text-center">
               <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-                {isSignup
-                  ? t("studentLogin.createAccount")
-                  : t("studentLogin.login")}
+                {recoveryMode === "none"
+                  ? isSignup
+                    ? t("studentLogin.createAccount")
+                    : t("studentLogin.login")
+                  : recoveryTitle}
               </h1>
-
-              <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
-                {isSignup
-                  ? t("studentLogin.createSubtitle")
-                  : t("studentLogin.loginSubtitle")}
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                {recoveryMode === "none"
+                  ? isSignup
+                    ? t("studentLogin.createSubtitle")
+                    : t("studentLogin.loginSubtitle")
+                  : "Recover your account securely using your email."}
               </p>
             </div>
 
-            {/* =================================================
-                MODE INDICATOR
-            ================================================= */}
-
-            <div className="mb-6 flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!loading) {
+            {recoveryMode === "none" ? (
+              <div className="mb-6 flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
                     setIsSignup(false);
                     setError("");
                     setMessage("");
-                  }
-                }}
-                disabled={loading}
-                className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition ${
-                  !isSignup
-                    ? "bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-400"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                }`}
-              >
-                Login
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!loading) {
+                  }}
+                  disabled={loading}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold ${
+                    !isSignup
+                      ? "bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-400"
+                      : "text-slate-500"
+                  }`}
+                >
+                  Login
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
                     setIsSignup(true);
                     setError("");
                     setMessage("");
-                  }
-                }}
-                disabled={loading}
-                className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition ${
-                  isSignup
-                    ? "bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-400"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                }`}
-              >
-                Create Account
-              </button>
-            </div>
-
-            {/* =================================================
-                FORM
-            ================================================= */}
-
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-5"
-            >
-              {/* FULL NAME */}
-              {isSignup && (
-                <div>
-                  <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                    {t("studentLogin.fullName")}
-                  </label>
-
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
-                      👤
-                    </span>
-
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(event) =>
-                        setFullName(event.target.value)
-                      }
-                      placeholder={t(
-                        "studentLogin.fullNamePlaceholder",
-                      )}
-                      disabled={loading}
-                      autoComplete="name"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* EMAIL */}
-              <div>
-                <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
-                  {t("studentLogin.email")}
-                </label>
-
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
-                    ✉️
-                  </span>
-
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(event) =>
-                      setEmail(event.target.value)
-                    }
-                    placeholder="student@example.com"
-                    disabled={loading}
-                    autoComplete="email"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
-                  />
-                </div>
-              </div>
-
-              {/* PASSWORD */}
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
-                    {t("studentLogin.password")}
-                  </label>
-
-                  <span className="text-xs font-medium text-slate-400">
-                    Min. 6 characters
-                  </span>
-                </div>
-
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
-                    🔒
-                  </span>
-
-                  <input
-                    type={
-                      showPassword
-                        ? "text"
-                        : "password"
-                    }
-                    value={password}
-                    onChange={(event) =>
-                      setPassword(event.target.value)
-                    }
-                    placeholder={t(
-                      "studentLogin.passwordPlaceholder",
-                    )}
-                    disabled={loading}
-                    autoComplete={
-                      isSignup
-                        ? "new-password"
-                        : "current-password"
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-12 pr-14 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowPassword(
-                        (previous) => !previous,
-                      )
-                    }
-                    disabled={loading}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-sm text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 disabled:opacity-50 dark:hover:bg-slate-700 dark:hover:text-white"
-                    aria-label={
-                      showPassword
-                        ? "Hide password"
-                        : "Show password"
-                    }
-                  >
-                    {showPassword ? "🙈" : "👁️"}
-                  </button>
-                </div>
-              </div>
-
-              {/* ERROR */}
-              {error && (
-                <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                  <span className="shrink-0">⚠️</span>
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* MESSAGE */}
-              {message && (
-                <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-5 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
-                  <span className="shrink-0">✓</span>
-                  <span>{message}</span>
-                </div>
-              )}
-
-              {/* SUBMIT */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl hover:shadow-blue-600/25 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-              >
-                {loading ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    <span>
-                      Please wait... / कृपया प्रतीक्षा करें...
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>
-                      {isSignup
-                        ? t(
-                            "studentLogin.createAccountButton",
-                          )
-                        : t(
-                            "studentLogin.loginButton",
-                          )}
-                    </span>
-
-                    <span className="transition-transform group-hover:translate-x-1">
-                      →
-                    </span>
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* =================================================
-                BOTTOM INFO
-            ================================================= */}
-
-            <div className="mt-7 border-t border-slate-100 pt-6 dark:border-slate-800">
-              <div className="text-center text-sm text-slate-500 dark:text-slate-400">
-                {isSignup
-                  ? t("studentLogin.alreadyAccount")
-                  : t("studentLogin.noAccount")}
-
-                <button
-                  type="button"
-                  onClick={toggleMode}
+                  }}
                   disabled={loading}
-                  className="ml-1 font-bold text-blue-600 transition hover:text-indigo-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-400 dark:hover:text-indigo-400"
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold ${
+                    isSignup
+                      ? "bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-400"
+                      : "text-slate-500"
+                  }`}
                 >
-                  {isSignup
-                    ? t("studentLogin.login")
-                    : t("studentLogin.createAccount")}
+                  Create Account
                 </button>
               </div>
+            ) : null}
+
+            {recoveryMode === "choose" ? (
+              <div className="space-y-3">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-200">
+                  Email address
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="student@example.com"
+                  autoComplete="email"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => {
+                    setRecoveryMode("link");
+                    setError("");
+                    setMessage("");
+                  }}
+                  className="w-full rounded-xl border border-blue-200 px-4 py-3 text-sm font-bold text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-slate-800"
+                >
+                  Send reset link
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={sendResetOtpDirect}
+                  className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  Send 6-digit OTP
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {recoveryMode === "none" && isSignup && (
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                      {t("studentLogin.fullName")}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder={t("studentLogin.fullNamePlaceholder")}
+                      autoComplete="name"
+                      disabled={loading}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {recoveryMode !== "new-password" && (
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                      Email address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="student@example.com"
+                      autoComplete="email"
+                      disabled={loading || recoveryMode === "otp"}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none focus:border-blue-500 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {recoveryMode === "none" && (
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                      {t("studentLogin.password")}
+                    </label>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={t("studentLogin.passwordPlaceholder")}
+                      autoComplete={isSignup ? "new-password" : "current-password"}
+                      disabled={loading}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="mt-2 text-xs font-semibold text-blue-600 dark:text-blue-400"
+                    >
+                      {showPassword ? "Hide password" : "Show password"}
+                    </button>
+                  </div>
+                )}
+
+                {recoveryMode === "link" && (
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    We will send a password reset link if this email is registered.
+                  </p>
+                )}
+
+                {recoveryMode === "otp" && (
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                      6-digit code
+                    </label>
+                    <input
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      required
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="123456"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm tracking-[0.3em] outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {recoveryMode === "new-password" && (
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
+                      New password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="At least 6 characters"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {error && (
+                  <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                    {error}
+                  </div>
+                )}
+
+                {message && (
+                  <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+                    {message}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-sm font-black text-white shadow-lg transition hover:from-blue-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading
+                    ? "Please wait..."
+                    : recoveryMode === "link"
+                      ? "Send reset link"
+                      : recoveryMode === "otp"
+                        ? "Verify code"
+                        : recoveryMode === "new-password"
+                          ? "Update password"
+                          : isSignup
+                            ? t("studentLogin.createAccountButton")
+                            : t("studentLogin.loginButton")}
+                </button>
+              </form>
+            )}
+
+            {error && recoveryMode === "choose" && (
+              <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                {error}
+              </div>
+            )}
+
+            {message && recoveryMode === "choose" && (
+              <div role="status" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+                {message}
+              </div>
+            )}
+
+            <div className="mt-6 space-y-3 border-t border-slate-100 pt-5 text-center dark:border-slate-800">
+              {recoveryMode === "none" && !isSignup && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecoveryMode("choose");
+                    setError("");
+                    setMessage("");
+                  }}
+                  className="text-sm font-bold text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  Forgot password?
+                </button>
+              )}
+
+              {recoveryMode !== "none" && (
+                <button
+                  type="button"
+                  onClick={resetRecovery}
+                  disabled={loading}
+                  className="text-sm font-bold text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  Back to login
+                </button>
+              )}
+
+              {recoveryMode === "none" && (
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {isSignup
+                    ? t("studentLogin.alreadyAccount")
+                    : t("studentLogin.noAccount")}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSignup((value) => !value);
+                      setError("");
+                      setMessage("");
+                    }}
+                    disabled={loading}
+                    className="ml-1 font-bold text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {isSignup
+                      ? t("studentLogin.login")
+                      : t("studentLogin.createAccount")}
+                  </button>
+                </p>
+              )}
             </div>
 
-            {/* Security note */}
-            <div className="mt-5 flex items-center justify-center gap-2 text-[11px] font-medium text-slate-400 dark:text-slate-500">
+            <div className="mt-5 flex items-center justify-center gap-2 text-[11px] font-medium text-slate-400">
               <span>🔐</span>
               <span>Secure student authentication</span>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="mt-5 text-center text-xs font-medium text-slate-400 dark:text-slate-500">
+        <p className="mt-5 text-center text-xs font-medium text-slate-400">
           © {new Date().getFullYear()} Ranker Bhaiya
         </p>
       </div>
     </div>
   );
+
+  async function sendResetOtpDirect() {
+    if (loading) return;
+
+    setError("");
+    setMessage("");
+    setLoading(true);
+
+    try {
+      await sendResetOtp();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to send reset code.");
+    } finally {
+      setLoading(false);
+    }
+  }
 }
 
 export default StudentLogin;
