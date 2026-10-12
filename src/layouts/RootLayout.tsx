@@ -1,12 +1,10 @@
 
 import { Outlet, useLocation } from "react-router-dom";
-import LanguageToggle from "./LanguageToggle";
+import LanguageToggle from "../components/LanguageToggle";
 
 export function RootLayout() {
   const { pathname } = useLocation();
-  const isLearnEnglish =
-    pathname.includes("vocabulary") ||
-    pathname.includes("learn-english");
+  const isLearnEnglish = pathname === "/student/vocabulary";
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white">
@@ -15,7 +13,6 @@ export function RootLayout() {
           <LanguageToggle />
         </header>
       )}
-
       <main>
         <Outlet />
       </main>
