@@ -356,6 +356,7 @@ export function StudentDashboard() {
     }
   };
 
+  // Preparation Tools: Math Games included, Short Videos moved out.
   const preparationTools = [
     {
       icon: "📚",
@@ -374,12 +375,6 @@ export function StudentDashboard() {
       title: "Daily Challenge",
       text: "Build your streak",
       path: "/student/daily-challenge",
-    },
-    {
-      icon: "🎬",
-      title: "Short Videos",
-      text: "Learn in less time",
-      path: "/student/short-videos",
     },
     {
       icon: "🧮",
@@ -428,6 +423,7 @@ export function StudentDashboard() {
     },
   ];
 
+  // Study Material: Short Videos added.
   const resources = [
     {
       icon: "📖",
@@ -440,6 +436,12 @@ export function StudentDashboard() {
       title: "Previous Year Papers",
       text: "Practice paper sets",
       path: "/student/previous-year-papers",
+    },
+    {
+      icon: "🎬",
+      title: "Short Videos",
+      text: "Learn in less time",
+      path: "/student/short-videos",
     },
   ];
 
@@ -687,7 +689,7 @@ export function StudentDashboard() {
           </Card>
         </section>
 
-        {/* PREPARATION TOOLS — Math Games added */}
+        {/* PREPARATION TOOLS */}
         <section className="mt-8">
           <SectionTitle
             dark={dark}
@@ -779,7 +781,8 @@ export function StudentDashboard() {
             title="Study Material"
             subtitle="Reliable resources for your preparation."
           />
-          <div className="grid gap-3 sm:grid-cols-2">
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {resources.map((item) => (
               <button
                 type="button"
