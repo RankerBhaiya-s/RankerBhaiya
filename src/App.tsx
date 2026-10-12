@@ -1,3 +1,4 @@
+
 import { HashRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -34,6 +35,7 @@ import HandwrittenNotes from "./pages/student/HandwrittenNotes";
 import ShortVideos from "./pages/student/ShortVideos";
 import NCERTBooks from "./pages/student/NCERTBooks";
 import PreviousYearPapers from "./pages/student/PreviousYearPapers";
+import MathGames from "./pages/student/MathGames";
 
 // Admin Pages
 import { AdminLogin } from "./pages/admin/Login";
@@ -94,8 +96,6 @@ export default function App() {
                     path="student/handwritten-notes"
                     element={<HandwrittenNotes />}
                   />
-
-                  {/* Current Affairs */}
                   <Route
                     path="student/current-affairs"
                     element={<WeeklyCurrentAffairs />}
@@ -104,20 +104,14 @@ export default function App() {
                     path="student/current-affairs/:id"
                     element={<CurrentAffairDetail />}
                   />
-
-                  {/* Newspaper */}
                   <Route
                     path="student/daily-newspaper"
                     element={<DailyNewspaper />}
                   />
-
-                  {/* Revision */}
                   <Route
                     path="student/fast-revision"
                     element={<FastRevision />}
                   />
-
-                  {/* Learning Tools */}
                   <Route
                     path="student/vocabulary"
                     element={<Vocabulary />}
@@ -142,12 +136,17 @@ export default function App() {
                     path="student/daily-challenge"
                     element={<DailyChallenge />}
                   />
+
+                  {/* Math Games */}
+                  <Route
+                    path="student/math-games"
+                    element={<MathGames />}
+                  />
+
                   <Route
                     path="student/short-videos"
                     element={<ShortVideos />}
                   />
-
-                  {/* Exam Resources */}
                   <Route
                     path="student/ncert-books"
                     element={<NCERTBooks />}
