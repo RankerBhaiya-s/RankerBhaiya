@@ -1,3 +1,4 @@
+
 import {
   useCallback,
   useEffect,
@@ -59,10 +60,7 @@ function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
 
   if (!parts.length) return "RB";
-
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
 
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
@@ -72,15 +70,11 @@ function dateKey(date: Date) {
 }
 
 function getStreak(activities: ActivityRow[]) {
-  const dates = new Set(
-    activities.map((item) => item.activity_date),
-  );
-
+  const dates = new Set(activities.map((item) => item.activity_date));
   let streak = 0;
 
   for (let i = 0; i < 365; i++) {
     const date = new Date();
-
     date.setHours(12, 0, 0, 0);
     date.setDate(date.getDate() - i);
 
@@ -95,10 +89,7 @@ function getStreak(activities: ActivityRow[]) {
 }
 
 function getAttemptCategory(attempt: PracticeAttempt) {
-  return (
-    attempt.practice_questions?.category ||
-    "General Practice"
-  );
+  return attempt.practice_questions?.category || "General Practice";
 }
 
 function Card({
@@ -113,9 +104,7 @@ function Card({
   return (
     <div
       className={`rounded-[26px] border ${
-        dark
-          ? "border-slate-800 bg-slate-900/80"
-          : "border-slate-200 bg-white"
+        dark ? "border-slate-800 bg-slate-900/80" : "border-slate-200 bg-white"
       } ${className}`}
     >
       {children}
@@ -134,16 +123,10 @@ function SectionTitle({
 }) {
   return (
     <div className="mb-4">
-      <h2 className="text-lg font-black tracking-tight">
-        {title}
-      </h2>
+      <h2 className="text-lg font-black tracking-tight">{title}</h2>
 
       {subtitle && (
-        <p
-          className={`mt-1 text-xs ${
-            dark ? "text-slate-500" : "text-slate-500"
-          }`}
-        >
+        <p className={`mt-1 text-xs ${dark ? "text-slate-500" : "text-slate-500"}`}>
           {subtitle}
         </p>
       )}
@@ -180,92 +163,68 @@ export function StudentDashboard() {
       }
 
       try {
-        const [
-          profileResponse,
-          activityResponse,
-          attemptsResponse,
-        ] = await Promise.all([
-          supabase
-            .from("profiles")
-            .select("full_name,class_name,board,exam")
-            .eq("id", user.id)
-            .maybeSingle(),
+        const [profileResponse, activityResponse, attemptsResponse] =
+          await Promise.all([
+            supabase
+              .from("profiles")
+              .select("full_name,class_name,board,exam")
+              .eq("id", user.id)
+              .maybeSingle(),
 
-          supabase
-            .from("student_daily_activity")
-            .select("activity_date,activity_type")
-            .eq("user_id", user.id)
-            .order("activity_date", {
-              ascending: false,
-            }),
+            supabase
+              .from("student_daily_activity")
+              .select("activity_date,activity_type")
+              .eq("user_id", user.id)
+              .order("activity_date", { ascending: false }),
 
-          supabase
-            .from("practice_attempts")
-            .select(`
-              id,
-              user_id,
-              question_id,
-              is_correct,
-              created_at,
-              practice_questions(category)
-            `)
-            .eq("user_id", user.id)
-            .order("created_at", {
-              ascending: false,
-            }),
-        ]);
+            supabase
+              .from("practice_attempts")
+              .select(`
+                id,
+                user_id,
+                question_id,
+                is_correct,
+                created_at,
+                practice_questions(category)
+              `)
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: false }),
+          ]);
 
         if (profileResponse.error) {
-          console.error(
-            "Profile fetch error:",
-            profileResponse.error,
-          );
+          console.error("Profile fetch error:", profileResponse.error);
         } else {
           setProfile(profileResponse.data);
         }
 
         if (activityResponse.error) {
-          console.error(
-            "Activity fetch error:",
-            activityResponse.error,
-          );
+          console.error("Activity fetch error:", activityResponse.error);
           setActivities([]);
         } else {
           setActivities(activityResponse.data || []);
         }
 
         if (attemptsResponse.error) {
-          console.error(
-            "Practice attempts fetch error:",
-            attemptsResponse.error,
-          );
+          console.error("Practice attempts fetch error:", attemptsResponse.error);
           setAttempts([]);
         } else {
           const rows = attemptsResponse.data || [];
 
-          const normalized: PracticeAttempt[] = rows.map(
-            (row) => {
-              const relation = row.practice_questions;
+          const normalized: PracticeAttempt[] = rows.map((row) => {
+            const relation = row.practice_questions;
+            const question = Array.isArray(relation) ? relation[0] : relation;
 
-              const question = Array.isArray(relation)
-                ? relation[0]
-                : relation;
-
-              return {
-                id: String(row.id),
-                user_id: String(row.user_id),
-                question_id: String(row.question_id),
-                is_correct: Boolean(row.is_correct),
-                created_at: String(row.created_at),
-                practice_questions: question
-                  ? {
-                      category:
-                        question.category ?? null,
-                    }
-                  : null,
-              };
-            },
-          );
+            return {
+              id: String(row.id),
+              user_id: String(row.user_id),
+              question_id: String(row.question_id),
+              is_correct: Boolean(row.is_correct),
+              created_at: String(row.created_at),
+              practice_questions: question
+                ? { category: question.category ?? null }
+                : null,
+            };
+          });
 
           setAttempts(normalized);
         }
@@ -292,26 +251,17 @@ export function StudentDashboard() {
       }
     };
 
-    document.addEventListener(
-      "mousedown",
-      handleOutsideClick,
-    );
+    document.addEventListener("mousedown", handleOutsideClick);
 
     return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleOutsideClick,
-      );
+      document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, []);
 
-  const language =
-    i18n.language?.toLowerCase() || "en";
+  const language = i18n.language?.toLowerCase() || "en";
 
   const dailyMindset = useMemo(() => {
-    if (language.startsWith("hinglish")) {
-      return getMindsetText("hinglish");
-    }
+    if (language.startsWith("hinglish")) return getMindsetText("hinglish");
 
     if (
       language === "hi" ||
@@ -331,86 +281,47 @@ export function StudentDashboard() {
     user?.email?.split("@")[0] ||
     "Student";
 
-  const firstName =
-    userName.trim().split(/\s+/)[0] || "Student";
+  const firstName = userName.trim().split(/\s+/)[0] || "Student";
 
-  const streak = useMemo(
-    () => getStreak(activities),
-    [activities],
-  );
+  const streak = useMemo(() => getStreak(activities), [activities]);
 
   const preparationStats = useMemo(() => {
     const total = attempts.length;
+    const correct = attempts.filter((item) => item.is_correct).length;
+    const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
 
-    const correct = attempts.filter(
-      (item) => item.is_correct,
-    ).length;
-
-    const accuracy =
-      total > 0
-        ? Math.round((correct / total) * 100)
-        : 0;
-
-    return {
-      total,
-      correct,
-      wrong: total - correct,
-      accuracy,
-    };
+    return { total, correct, wrong: total - correct, accuracy };
   }, [attempts]);
 
   const weeklyActiveDays = useMemo(() => {
-    const activeDates = new Set(
-      activities.map((item) => item.activity_date),
-    );
-
+    const activeDates = new Set(activities.map((item) => item.activity_date));
     let count = 0;
 
     for (let i = 0; i < 7; i++) {
       const date = new Date();
-
       date.setHours(12, 0, 0, 0);
       date.setDate(date.getDate() - i);
 
-      if (activeDates.has(dateKey(date))) {
-        count++;
-      }
+      if (activeDates.has(dateKey(date))) count++;
     }
 
     return count;
   }, [activities]);
 
   const todayActivities = useMemo(
-    () =>
-      activities.filter(
-        (item) =>
-          item.activity_date === todayKey(),
-      ),
+    () => activities.filter((item) => item.activity_date === todayKey()),
     [activities],
   );
 
   const weakTopics = useMemo<WeakTopic[]>(() => {
-    const map = new Map<
-      string,
-      {
-        total: number;
-        wrong: number;
-      }
-    >();
+    const map = new Map<string, { total: number; wrong: number }>();
 
     attempts.forEach((attempt) => {
       const category = getAttemptCategory(attempt);
-
-      const current = map.get(category) || {
-        total: 0,
-        wrong: 0,
-      };
+      const current = map.get(category) || { total: 0, wrong: 0 };
 
       current.total += 1;
-
-      if (!attempt.is_correct) {
-        current.wrong += 1;
-      }
+      if (!attempt.is_correct) current.wrong += 1;
 
       map.set(category, current);
     });
@@ -420,18 +331,11 @@ export function StudentDashboard() {
         name,
         total: value.total,
         wrong: value.wrong,
-        accuracy: Math.round(
-          ((value.total - value.wrong) /
-            value.total) *
-            100,
-        ),
+        accuracy: Math.round(((value.total - value.wrong) / value.total) * 100),
       }))
       .filter((topic) => topic.total >= 2)
       .sort((a, b) => {
-        if (b.wrong !== a.wrong) {
-          return b.wrong - a.wrong;
-        }
-
+        if (b.wrong !== a.wrong) return b.wrong - a.wrong;
         return a.accuracy - b.accuracy;
       })
       .slice(0, 3);
@@ -476,6 +380,12 @@ export function StudentDashboard() {
       title: "Short Videos",
       text: "Learn in less time",
       path: "/student/short-videos",
+    },
+    {
+      icon: "🧮",
+      title: "Math Games",
+      text: "Learn maths by playing",
+      path: "/student/math-games",
     },
   ];
 
@@ -537,17 +447,12 @@ export function StudentDashboard() {
     return (
       <div
         className={`flex min-h-screen items-center justify-center ${
-          dark
-            ? "bg-slate-950 text-white"
-            : "bg-slate-50 text-slate-900"
+          dark ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"
         }`}
       >
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-
-          <p className="text-sm font-bold">
-            Preparing your dashboard...
-          </p>
+          <p className="text-sm font-bold">Preparing your dashboard...</p>
         </div>
       </div>
     );
@@ -556,25 +461,18 @@ export function StudentDashboard() {
   return (
     <div
       className={`min-h-screen ${
-        dark
-          ? "bg-[#070b16] text-white"
-          : "bg-[#f6f8fc] text-slate-900"
+        dark ? "bg-[#070b16] text-white" : "bg-[#f6f8fc] text-slate-900"
       }`}
     >
-      {/* HEADER */}
       <header
         className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
-          dark
-            ? "border-slate-800 bg-[#070b16]/90"
-            : "border-slate-200 bg-white/90"
+          dark ? "border-slate-800 bg-[#070b16]/90" : "border-slate-200 bg-white/90"
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <button
             type="button"
-            onClick={() =>
-              go("/student/dashboard")
-            }
+            onClick={() => go("/student/dashboard")}
             className="flex items-center gap-3"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-xs font-black text-white shadow-lg">
@@ -582,10 +480,7 @@ export function StudentDashboard() {
             </div>
 
             <div className="hidden text-left sm:block">
-              <p className="text-sm font-black">
-                Ranker Bhaiya
-              </p>
-
+              <p className="text-sm font-black">Ranker Bhaiya</p>
               <p className="text-[10px] font-semibold text-slate-500">
                 Aapki Mehnat, Hamari Strategy.
               </p>
@@ -595,39 +490,22 @@ export function StudentDashboard() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() =>
-                fetchDashboardData(true)
-              }
+              onClick={() => fetchDashboardData(true)}
               disabled={refreshing}
               className={`rounded-xl p-2.5 transition ${
-                dark
-                  ? "hover:bg-slate-800"
-                  : "hover:bg-slate-100"
+                dark ? "hover:bg-slate-800" : "hover:bg-slate-100"
               }`}
               title="Refresh"
             >
-              <span
-                className={
-                  refreshing
-                    ? "inline-block animate-spin"
-                    : ""
-                }
-              >
+              <span className={refreshing ? "inline-block animate-spin" : ""}>
                 ↻
               </span>
             </button>
 
-            <div
-              className="relative"
-              data-profile-menu
-            >
+            <div className="relative" data-profile-menu>
               <button
                 type="button"
-                onClick={() =>
-                  setProfileMenuOpen(
-                    (value) => !value,
-                  )
-                }
+                onClick={() => setProfileMenuOpen((value) => !value)}
                 className={`flex items-center gap-2 rounded-2xl border px-2 py-1.5 ${
                   dark
                     ? "border-slate-800 hover:bg-slate-900"
@@ -641,28 +519,18 @@ export function StudentDashboard() {
                 <span className="hidden max-w-24 truncate text-xs font-black sm:block">
                   {firstName}
                 </span>
-
-                <span className="hidden text-xs sm:block">
-                  ▾
-                </span>
+                <span className="hidden text-xs sm:block">▾</span>
               </button>
 
               {profileMenuOpen && (
                 <div
                   className={`absolute right-0 top-full mt-2 w-60 overflow-hidden rounded-2xl border shadow-2xl ${
-                    dark
-                      ? "border-slate-800 bg-slate-900"
-                      : "border-slate-200 bg-white"
+                    dark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white"
                   }`}
                 >
                   <div className="border-b border-slate-200/10 px-4 py-4">
-                    <p className="truncate text-sm font-black">
-                      {userName}
-                    </p>
-
-                    <p className="mt-1 truncate text-xs text-slate-500">
-                      {user?.email}
-                    </p>
+                    <p className="truncate text-sm font-black">{userName}</p>
+                    <p className="mt-1 truncate text-xs text-slate-500">{user?.email}</p>
                   </div>
 
                   {[
@@ -680,9 +548,7 @@ export function StudentDashboard() {
                         go(path);
                       }}
                       className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold ${
-                        dark
-                          ? "hover:bg-slate-800"
-                          : "hover:bg-slate-50"
+                        dark ? "hover:bg-slate-800" : "hover:bg-slate-50"
                       }`}
                     >
                       <span>{icon}</span>
@@ -713,13 +579,9 @@ export function StudentDashboard() {
           <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
               <p className="mb-2 text-sm font-bold text-blue-100">
-                {profile?.class_name ||
-                profile?.exam
+                {profile?.class_name || profile?.exam
                   ? `${profile?.class_name || ""}${
-                      profile?.class_name &&
-                      profile?.exam
-                        ? " • "
-                        : ""
+                      profile?.class_name && profile?.exam ? " • " : ""
                     }${profile?.exam || ""}`
                   : "Your preparation space"}
               </p>
@@ -729,16 +591,13 @@ export function StudentDashboard() {
               </h1>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100 sm:text-base">
-                Learn smarter, stay consistent and keep
-                moving closer to your goal.
+                Learn smarter, stay consistent and keep moving closer to your goal.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    go("/student/practice-questions")
-                  }
+                  onClick={() => go("/student/practice-questions")}
                   className="rounded-xl bg-white px-4 py-2.5 text-xs font-black text-indigo-700 shadow-lg transition hover:scale-[1.02]"
                 >
                   Start Practice →
@@ -754,16 +613,13 @@ export function StudentDashboard() {
               </div>
             </div>
 
-            {/* DAILY MINDSET */}
             <div className="max-w-sm rounded-[26px] border border-white/15 bg-white/10 p-5 backdrop-blur-xl">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">
                   Daily Mindset
                 </span>
-
                 <span className="text-xl">💭</span>
               </div>
-
               <p className="text-sm font-bold leading-6 text-white">
                 {dailyMindset}
               </p>
@@ -775,72 +631,41 @@ export function StudentDashboard() {
         <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             ["🔥", "Streak", `${streak} days`],
-            [
-              "🎯",
-              "Questions",
-              preparationStats.total,
-            ],
-            [
-              "✓",
-              "Accuracy",
-              `${preparationStats.accuracy}%`,
-            ],
-            [
-              "📅",
-              "Active Days",
-              `${weeklyActiveDays}/7`,
-            ],
+            ["🎯", "Questions", preparationStats.total],
+            ["✓", "Accuracy", `${preparationStats.accuracy}%`],
+            ["📅", "Active Days", `${weeklyActiveDays}/7`],
           ].map(([icon, title, value]) => (
-            <Card
-              dark={dark}
-              key={title}
-              className="p-4 sm:p-5"
-            >
+            <Card dark={dark} key={title} className="p-4 sm:p-5">
               <div className="flex items-start justify-between">
-                <span className="text-xl">
-                  {icon}
-                </span>
-
+                <span className="text-xl">{icon}</span>
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                   {title}
                 </span>
               </div>
-
-              <p className="mt-4 text-xl font-black">
-                {value}
-              </p>
+              <p className="mt-4 text-xl font-black">{value}</p>
             </Card>
           ))}
         </section>
 
         {/* TODAY'S MISSION */}
         <section className="mt-8">
-          <Card
-            dark={dark}
-            className="overflow-hidden"
-          >
+          <Card dark={dark} className="overflow-hidden">
             <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-2xl">
-                  {todayActivities.length
-                    ? "✅"
-                    : "🚀"}
+                  {todayActivities.length ? "✅" : "🚀"}
                 </div>
-
                 <div>
                   <p className="text-xs font-black uppercase tracking-wider text-amber-500">
                     Today&apos;s Mission
                   </p>
-
                   <h2 className="mt-1 text-lg font-black">
                     {todayActivities.length
                       ? "Great work! Keep the momentum going."
                       : "Complete one focused learning activity."}
                   </h2>
-
                   <p className="mt-1 text-xs text-slate-500">
-                    Small progress every day creates big
-                    results.
+                    Small progress every day creates big results.
                   </p>
                 </div>
               </div>
@@ -856,15 +681,13 @@ export function StudentDashboard() {
                 }
                 className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3 text-xs font-black text-white shadow-lg shadow-orange-500/20"
               >
-                {todayActivities.length
-                  ? "View Progress"
-                  : "Start Mission →"}
+                {todayActivities.length ? "View Progress" : "Start Mission →"}
               </button>
             </div>
           </Card>
         </section>
 
-        {/* PREPARATION TOOLS */}
+        {/* PREPARATION TOOLS — Math Games added */}
         <section className="mt-8">
           <SectionTitle
             dark={dark}
@@ -887,14 +710,8 @@ export function StudentDashboard() {
                 <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-500/10 text-xl transition group-hover:scale-110">
                   {item.icon}
                 </div>
-
-                <h3 className="text-sm font-black">
-                  {item.title}
-                </h3>
-
-                <p className="mt-1 text-[11px] text-slate-500">
-                  {item.text}
-                </p>
+                <h3 className="text-sm font-black">{item.title}</h3>
+                <p className="mt-1 text-[11px] text-slate-500">{item.text}</p>
               </button>
             ))}
           </div>
@@ -909,37 +726,26 @@ export function StudentDashboard() {
           />
 
           <div className="grid gap-3 lg:grid-cols-12">
-            {/* ASK VIDHYA */}
             <button
               type="button"
               onClick={() => go("/student/ask")}
               className="group relative overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-700 p-6 text-left text-white shadow-xl shadow-indigo-900/20 lg:col-span-5"
             >
               <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
-
               <div className="relative">
                 <div className="flex items-center justify-between">
                   <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-2xl">
                     ✨
                   </span>
-
                   <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black">
                     AI LEARNING
                   </span>
                 </div>
-
-                <h3 className="mt-7 text-2xl font-black">
-                  Ask Vidhya
-                </h3>
-
+                <h3 className="mt-7 text-2xl font-black">Ask Vidhya</h3>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-blue-100">
-                  Stuck on a concept? Ask, understand and move
-                  ahead without wasting time.
+                  Stuck on a concept? Ask, understand and move ahead without wasting time.
                 </p>
-
-                <div className="mt-6 text-xs font-black">
-                  Ask anything →
-                </div>
+                <div className="mt-6 text-xs font-black">Ask anything →</div>
               </div>
             </button>
 
@@ -958,14 +764,8 @@ export function StudentDashboard() {
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-lg">
                     {item.icon}
                   </span>
-
-                  <h3 className="mt-4 text-sm font-black">
-                    {item.title}
-                  </h3>
-
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    {item.text}
-                  </p>
+                  <h3 className="mt-4 text-sm font-black">{item.title}</h3>
+                  <p className="mt-1 text-[11px] text-slate-500">{item.text}</p>
                 </button>
               ))}
             </div>
@@ -979,7 +779,6 @@ export function StudentDashboard() {
             title="Study Material"
             subtitle="Reliable resources for your preparation."
           />
-
           <div className="grid gap-3 sm:grid-cols-2">
             {resources.map((item) => (
               <button
@@ -995,20 +794,11 @@ export function StudentDashboard() {
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-2xl">
                   {item.icon}
                 </span>
-
                 <div className="min-w-0">
-                  <h3 className="text-sm font-black">
-                    {item.title}
-                  </h3>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    {item.text}
-                  </p>
+                  <h3 className="text-sm font-black">{item.title}</h3>
+                  <p className="mt-1 text-xs text-slate-500">{item.text}</p>
                 </div>
-
-                <span className="ml-auto text-slate-400">
-                  →
-                </span>
+                <span className="ml-auto text-slate-400">→</span>
               </button>
             ))}
           </div>
@@ -1023,27 +813,19 @@ export function StudentDashboard() {
           />
 
           <div className="grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
-            <Card
-              dark={dark}
-              className="p-5 sm:p-6"
-            >
+            <Card dark={dark} className="p-5 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-wider text-blue-500">
                     Practice Performance
                   </p>
-
                   <h3 className="mt-1 text-xl font-black">
-                    {preparationStats.accuracy}%
-                    accuracy
+                    {preparationStats.accuracy}% accuracy
                   </h3>
                 </div>
-
                 <button
                   type="button"
-                  onClick={() =>
-                    go("/student/progress")
-                  }
+                  onClick={() => go("/student/progress")}
                   className="rounded-xl bg-blue-500/10 px-3 py-2 text-xs font-black text-blue-500"
                 >
                   View →
@@ -1053,111 +835,68 @@ export function StudentDashboard() {
               <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-500/10">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 transition-all"
-                  style={{
-                    width: `${Math.min(
-                      preparationStats.accuracy,
-                      100,
-                    )}%`,
-                  }}
+                  style={{ width: `${Math.min(preparationStats.accuracy, 100)}%` }}
                 />
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-3">
                 <div>
-                  <p className="text-lg font-black">
-                    {preparationStats.total}
-                  </p>
-
-                  <p className="text-[10px] text-slate-500">
-                    Attempted
-                  </p>
+                  <p className="text-lg font-black">{preparationStats.total}</p>
+                  <p className="text-[10px] text-slate-500">Attempted</p>
                 </div>
-
                 <div>
                   <p className="text-lg font-black text-emerald-500">
                     {preparationStats.correct}
                   </p>
-
-                  <p className="text-[10px] text-slate-500">
-                    Correct
-                  </p>
+                  <p className="text-[10px] text-slate-500">Correct</p>
                 </div>
-
                 <div>
                   <p className="text-lg font-black text-orange-500">
                     {preparationStats.wrong}
                   </p>
-
-                  <p className="text-[10px] text-slate-500">
-                    Improve
-                  </p>
+                  <p className="text-[10px] text-slate-500">Improve</p>
                 </div>
               </div>
             </Card>
 
-            <Card
-              dark={dark}
-              className="p-5 sm:p-6"
-            >
+            <Card dark={dark} className="p-5 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-wider text-orange-500">
                     Weekly Consistency
                   </p>
-
                   <h3 className="mt-1 text-xl font-black">
                     {weeklyActiveDays}/7 days
                   </h3>
                 </div>
-
-                <span className="text-2xl">
-                  📈
-                </span>
+                <span className="text-2xl">📈</span>
               </div>
 
               <div className="mt-6 flex items-end justify-between gap-2">
-                {Array.from({ length: 7 }).map(
-                  (_, index) => {
-                    const date = new Date();
+                {Array.from({ length: 7 }).map((_, index) => {
+                  const date = new Date();
+                  date.setHours(12, 0, 0, 0);
+                  date.setDate(date.getDate() - (6 - index));
 
-                    date.setHours(12, 0, 0, 0);
-                    date.setDate(
-                      date.getDate() -
-                        (6 - index),
-                    );
+                  const active = activities.some(
+                    (item) => item.activity_date === dateKey(date),
+                  );
 
-                    const active =
-                      activities.some(
-                        (item) =>
-                          item.activity_date ===
-                          dateKey(date),
-                      );
-
-                    return (
+                  return (
+                    <div key={index} className="flex flex-1 flex-col items-center gap-2">
                       <div
-                        key={index}
-                        className="flex flex-1 flex-col items-center gap-2"
-                      >
-                        <div
-                          className={`w-full rounded-lg ${
-                            active
-                              ? "h-10 bg-gradient-to-t from-blue-600 to-violet-500"
-                              : "h-5 bg-slate-500/10"
-                          }`}
-                        />
-
-                        <span className="text-[9px] font-bold text-slate-500">
-                          {date.toLocaleDateString(
-                            "en-US",
-                            {
-                              weekday: "narrow",
-                            },
-                          )}
-                        </span>
-                      </div>
-                    );
-                  },
-                )}
+                        className={`w-full rounded-lg ${
+                          active
+                            ? "h-10 bg-gradient-to-t from-blue-600 to-violet-500"
+                            : "h-5 bg-slate-500/10"
+                        }`}
+                      />
+                      <span className="text-[9px] font-bold text-slate-500">
+                        {date.toLocaleDateString("en-US", { weekday: "narrow" })}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </Card>
           </div>
@@ -1174,22 +913,14 @@ export function StudentDashboard() {
           {weakTopics.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-3">
               {weakTopics.map((topic) => (
-                <Card
-                  dark={dark}
-                  key={topic.name}
-                  className="p-5"
-                >
+                <Card dark={dark} key={topic.name} className="p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-black">
-                        {topic.name}
-                      </h3>
-
+                      <h3 className="text-sm font-black">{topic.name}</h3>
                       <p className="mt-1 text-[11px] text-slate-500">
                         {topic.total} attempts
                       </p>
                     </div>
-
                     <span
                       className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
                         topic.accuracy < 50
@@ -1204,22 +935,13 @@ export function StudentDashboard() {
                   <div className="mt-5 h-2 rounded-full bg-slate-500/10">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500"
-                      style={{
-                        width: `${Math.max(
-                          topic.accuracy,
-                          5,
-                        )}%`,
-                      }}
+                      style={{ width: `${Math.max(topic.accuracy, 5)}%` }}
                     />
                   </div>
 
                   <button
                     type="button"
-                    onClick={() =>
-                      go(
-                        "/student/practice-questions",
-                      )
-                    }
+                    onClick={() => go("/student/practice-questions")}
                     className="mt-4 text-xs font-black text-blue-500"
                   >
                     Practice more →
@@ -1228,21 +950,13 @@ export function StudentDashboard() {
               ))}
             </div>
           ) : (
-            <Card
-              dark={dark}
-              className="p-6 text-center"
-            >
-              <div className="text-3xl">
-                🎯
-              </div>
-
+            <Card dark={dark} className="p-6 text-center">
+              <div className="text-3xl">🎯</div>
               <h3 className="mt-3 text-sm font-black">
                 Your focus areas will appear here
               </h3>
-
               <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
-                Start practicing and we&apos;ll identify topics
-                that need more attention.
+                Start practicing and we&apos;ll identify topics that need more attention.
               </p>
             </Card>
           )}
@@ -1255,22 +969,16 @@ export function StudentDashboard() {
               <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-300">
                 Keep Going
               </p>
-
               <h2 className="mt-2 text-xl font-black">
                 Aaj ka effort, kal ka rank. 🚀
               </h2>
-
               <p className="mt-1 text-xs text-slate-400">
-                Stay consistent. Let Ranker Bhaiya handle
-                the strategy.
+                Stay consistent. Let Ranker Bhaiya handle the strategy.
               </p>
             </div>
-
             <button
               type="button"
-              onClick={() =>
-                go("/student/practice-questions")
-              }
+              onClick={() => go("/student/practice-questions")}
               className="rounded-xl bg-white px-5 py-3 text-xs font-black text-slate-900"
             >
               Continue Preparation →
