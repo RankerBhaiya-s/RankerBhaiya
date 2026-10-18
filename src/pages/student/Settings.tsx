@@ -137,6 +137,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [notificationLoading, setNotificationLoading] =
     useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
 
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<
@@ -290,6 +291,45 @@ export default function Settings() {
 
   /*
    * ----------------------------------------
+   * LOAD MASTER PUSH STATUS
+   * ----------------------------------------
+   */
+
+  useEffect(() => {
+    if (!user?.id) {
+      setPushEnabled(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadPushStatus() {
+      const { data, error } = await supabase
+        .from("study_push_subscriptions")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Push status load error:", error);
+        setPushEnabled(false);
+        return;
+      }
+
+      setPushEnabled(Boolean(data?.length));
+    }
+
+    void loadPushStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  /*
+   * ----------------------------------------
    * MESSAGE
    * ----------------------------------------
    */
@@ -321,6 +361,55 @@ export default function Settings() {
       preferences.practice_reminders ||
       preferences.streak_reminders
     );
+  }
+
+  /*
+   * ----------------------------------------
+   * MASTER PUSH TOGGLE
+   * ----------------------------------------
+   */
+
+  async function updateMasterPush(value: boolean) {
+    if (!user?.id || notificationLoading) return;
+
+    setNotificationLoading(true);
+    setMessage("");
+
+    try {
+      if (value) {
+        if (!notificationsSupported) {
+          throw new Error("Your browser does not support push notifications.");
+        }
+
+        await registerPushNotifications(user.id);
+        setPushEnabled(true);
+
+        if ("Notification" in window) {
+          setNotificationsPermission(Notification.permission);
+        }
+
+        showMessage("Push reminders are enabled.", "success");
+      } else {
+        await removePushSubscription(user.id);
+        setPushEnabled(false);
+        showMessage("All push reminders are disabled.", "success");
+      }
+    } catch (error) {
+      console.error("Master push toggle error:", error);
+
+      if ("Notification" in window) {
+        setNotificationsPermission(Notification.permission);
+      }
+
+      showMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to update push notification settings.",
+        "error",
+      );
+    } finally {
+      setNotificationLoading(false);
+    }
   }
 
   /*
@@ -371,6 +460,7 @@ export default function Settings() {
         setMessage("");
 
         await registerPushNotifications(userId);
+        setPushEnabled(true);
 
         if ("Notification" in window) {
           setNotificationsPermission(
@@ -451,6 +541,7 @@ export default function Settings() {
     if (!hasAnyNotificationEnabled(nextPreferences)) {
       try {
         await removePushSubscription(userId);
+        setPushEnabled(false);
       } catch (error) {
         console.error(
           "Remove push subscription error:",
@@ -958,6 +1049,25 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            <div className="border-b border-slate-100 dark:border-slate-800">
+              <SettingRow
+                icon="🔔"
+                title="Enable all push notifications"
+                description={
+                  pushEnabled
+                    ? "Push reminders are enabled on this device"
+                    : "Turn on to receive Ranker Bhaiya study reminders"
+                }
+                right={
+                  <Toggle
+                    enabled={pushEnabled}
+                    disabled={notificationLoading || !notificationsSupported}
+                    onChange={updateMasterPush}
+                  />
+                }
+              />
             </div>
 
             {!notificationsSupported && (
