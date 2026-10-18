@@ -1,143 +1,88 @@
+
 import { supabase } from "./supabase";
 
 const VAPID_PUBLIC_KEY =
-  import.meta.env.VITE_VAPID_PUBLIC_KEY;
+  import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 
-function urlBase64ToUint8Array(base64String: string) {
-  const padding =
-    "=".repeat((4 - (base64String.length % 4)) % 4);
-
-  const base64 =
-    (base64String + padding)
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
 
   const rawData = window.atob(base64);
+  const bytes = new Uint8Array(rawData.length);
 
-  return Uint8Array.from(
-    [...rawData].map((char) => char.charCodeAt(0)),
-  );
+  for (let i = 0; i < rawData.length; i++) {
+    bytes[i] = rawData.charCodeAt(i);
+  }
+
+  return bytes;
 }
 
-export async function registerPushNotifications(
-  userId: string,
-) {
+export async function registerPushNotifications(userId: string) {
   if (!userId) {
-    throw new Error("User is not logged in.");
+    throw new Error("Please log in before enabling reminders.");
   }
 
-  if (typeof window === "undefined") {
-    throw new Error("Notifications are unavailable.");
-  }
-
-  if (!("Notification" in window)) {
-    throw new Error(
-      "Notifications are not supported by this browser.",
-    );
-  }
-
-  if (!("serviceWorker" in navigator)) {
-    throw new Error(
-      "Service Worker is not supported by this browser.",
-    );
-  }
-
-  if (!("PushManager" in window)) {
-    throw new Error(
-      "Push notifications are not supported by this browser.",
-    );
+  if (
+    typeof window === "undefined" ||
+    !("Notification" in window) ||
+    !("serviceWorker" in navigator) ||
+    !("PushManager" in window)
+  ) {
+    throw new Error("Push notifications are not supported by this browser.");
   }
 
   if (!VAPID_PUBLIC_KEY) {
-    throw new Error(
-      "VAPID public key is missing.",
-    );
+    throw new Error("VITE_VAPID_PUBLIC_KEY is not configured.");
   }
 
-  /*
-   * Ask browser permission
-   */
+  if (!window.isSecureContext) {
+    throw new Error("Push notifications require HTTPS.");
+  }
 
-  const permission =
-    await Notification.requestPermission();
+  const permission = await Notification.requestPermission();
 
   if (permission !== "granted") {
     throw new Error(
       permission === "denied"
-        ? "Notifications are blocked. Please allow notifications from your browser site settings."
+        ? "Notifications are blocked in browser settings."
         : "Notification permission was not granted.",
     );
   }
 
-  /*
-   * Register Service Worker
-   *
-   * GitHub Pages base:
-   * /RankerBhaiya/
-   */
-
-  const registration =
-    await navigator.serviceWorker.register(
-      "/RankerBhaiya/sw.js",
-      {
-        scope: "/RankerBhaiya/",
-      },
-    );
+  const registration = await navigator.serviceWorker.register(
+    "/RankerBhaiya/sw.js",
+    { scope: "/RankerBhaiya/" },
+  );
 
   await navigator.serviceWorker.ready;
 
-  /*
-   * Check existing subscription
-   */
-
-  let subscription =
-    await registration.pushManager.getSubscription();
-
-  /*
-   * Create new subscription if needed
-   */
+  let subscription = await registration.pushManager.getSubscription();
 
   if (!subscription) {
-    subscription =
-      await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey:
-          urlBase64ToUint8Array(
-            VAPID_PUBLIC_KEY,
-          ),
-      });
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
   }
 
   const json = subscription.toJSON();
 
-  if (
-    !json.endpoint ||
-    !json.keys?.p256dh ||
-    !json.keys?.auth
-  ) {
-    throw new Error(
-      "Invalid push subscription.",
-    );
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
+    throw new Error("The browser returned an incomplete push subscription.");
   }
 
-  /*
-   * Save subscription in Supabase
-   */
-
   const { error } = await supabase
-    .from("push_subscriptions")
+    .from("study_push_subscriptions")
     .upsert(
       {
         user_id: userId,
         endpoint: json.endpoint,
-        p256dh: json.keys.p256dh,
-        auth: json.keys.auth,
-        updated_at:
-          new Date().toISOString(),
+        subscription: json,
       },
-      {
-        onConflict: "user_id,endpoint",
-      },
+      { onConflict: "endpoint" },
     );
 
   if (error) {
@@ -147,57 +92,33 @@ export async function registerPushNotifications(
   return subscription;
 }
 
-/*
- * Remove user's push subscription
- */
-
-export async function removePushSubscription(
-  userId: string,
-) {
+export async function removePushSubscription(userId: string) {
   if (!userId) return;
 
-  if (
-    typeof window === "undefined" ||
-    !("serviceWorker" in navigator)
-  ) {
-    return;
-  }
+  if ("serviceWorker" in navigator) {
+    try {
+      const registration =
+        await navigator.serviceWorker.getRegistration("/RankerBhaiya/");
 
-  /*
-   * Remove subscription from browser
-   */
-
-  try {
-    const registration =
-      await navigator.serviceWorker.getRegistration(
-        "/RankerBhaiya/",
-      );
-
-    if (registration) {
       const subscription =
-        await registration.pushManager.getSubscription();
+        await registration?.pushManager.getSubscription();
 
       if (subscription) {
+        const endpoint = subscription.endpoint;
+
+        const { error } = await supabase
+          .from("study_push_subscriptions")
+          .delete()
+          .eq("user_id", userId)
+          .eq("endpoint", endpoint);
+
+        if (error) throw error;
+
         await subscription.unsubscribe();
       }
+    } catch (error) {
+      console.error("Could not remove push subscription:", error);
+      throw error;
     }
-  } catch (error) {
-    console.error(
-      "Browser push unsubscribe error:",
-      error,
-    );
-  }
-
-  /*
-   * Remove subscriptions from Supabase
-   */
-
-  const { error } = await supabase
-    .from("push_subscriptions")
-    .delete()
-    .eq("user_id", userId);
-
-  if (error) {
-    throw error;
   }
 }
