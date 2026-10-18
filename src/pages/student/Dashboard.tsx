@@ -1,4 +1,3 @@
-
 import {
   useCallback,
   useEffect,
@@ -13,6 +12,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { supabase } from "../../lib/supabase";
 import { getMindsetText } from "../../data/dailyMindsets";
+import { registerPushNotifications } from "../../lib/pushNotifications";
 
 type ActivityRow = {
   activity_date: string;
@@ -148,6 +148,8 @@ export function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [enablingReminders, setEnablingReminders] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState("");
 
   const fetchDashboardData = useCallback(
     async (refresh = false) => {
@@ -356,6 +358,26 @@ export function StudentDashboard() {
     }
   };
 
+  const handleEnableReminders = async () => {
+    if (!user?.id || enablingReminders) return;
+
+    setEnablingReminders(true);
+    setReminderMessage("");
+
+    try {
+      await registerPushNotifications(user.id);
+      setReminderMessage("Study reminders enabled on this browser.");
+    } catch (error) {
+      setReminderMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not enable study reminders. Please try again.",
+      );
+    } finally {
+      setEnablingReminders(false);
+    }
+  };
+
   // Preparation Tools: Math Games included, Short Videos moved out.
   const preparationTools = [
     {
@@ -492,6 +514,15 @@ export function StudentDashboard() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={handleEnableReminders}
+              disabled={enablingReminders}
+              className="rounded-xl bg-indigo-600 px-3 py-2.5 text-[10px] font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4 sm:text-xs"
+              title="Enable hourly study reminders"
+            >
+              {enablingReminders ? "Enabling…" : "🔔 Reminders"}
+            </button>
+            <button
+              type="button"
               onClick={() => fetchDashboardData(true)}
               disabled={refreshing}
               className={`rounded-xl p-2.5 transition ${
@@ -571,6 +602,19 @@ export function StudentDashboard() {
           </div>
         </div>
       </header>
+
+      {reminderMessage && (
+        <div
+          role="status"
+          className={`mx-auto mt-3 max-w-7xl px-4 text-xs font-semibold sm:px-6 lg:px-8 ${
+            reminderMessage.includes("enabled")
+              ? "text-emerald-600"
+              : "text-rose-500"
+          }`}
+        >
+          {reminderMessage}
+        </div>
+      )}
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* HERO */}
