@@ -104,7 +104,7 @@ function Card({
   return (
     <div
       className={`rounded-[26px] border ${
-        dark ? "border-slate-800 bg-slate-900/80" : "border-slate-200 bg-white"
+        dark ? "border-white/[0.08] bg-[#0C1630]/90 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl" : "border-slate-200/80 bg-white/90 shadow-[0_12px_35px_rgba(30,64,175,0.05)] backdrop-blur-xl"
       } ${className}`}
     >
       {children}
@@ -485,12 +485,12 @@ export function StudentDashboard() {
   return (
     <div
       className={`min-h-screen ${
-        dark ? "bg-[#070b16] text-white" : "bg-[#f6f8fc] text-slate-900"
+        dark ? "bg-[#050A18] text-slate-100" : "bg-[#F4F7FF] text-slate-900"
       }`}
     >
       <header
         className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
-          dark ? "border-slate-800 bg-[#070b16]/90" : "border-slate-200 bg-white/90"
+          dark ? "border-white/[0.08] bg-[#050A18]/85 shadow-[0_8px_30px_rgba(0,0,0,0.18)]" : "border-slate-200/80 bg-white/85 shadow-sm"
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
@@ -616,13 +616,13 @@ export function StudentDashboard() {
         </div>
       )}
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {/* HERO */}
-        <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-800 p-6 text-white shadow-2xl shadow-indigo-900/20 sm:p-8">
-          <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-cyan-400/10 blur-3xl" />
+        <section className="relative isolate overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(ellipse_at_top_right,rgba(129,140,248,0.34),transparent_36%),radial-gradient(ellipse_at_bottom_left,rgba(56,189,248,0.20),transparent_40%),linear-gradient(135deg,#07142F_0%,#172554_48%,#312E81_100%)] p-6 text-white shadow-[0_24px_80px_rgba(30,64,175,0.28)] sm:rounded-[36px] sm:p-9">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full bg-violet-400/20 blur-[80px]" />
+          <div className="pointer-events-none absolute -bottom-28 left-1/4 h-64 w-64 rounded-full bg-sky-400/15 blur-[80px]" />
 
-          <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="relative grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-center lg:gap-10">
             <div>
               <p className="mb-2 text-sm font-bold text-blue-100">
                 {profile?.class_name || profile?.exam
@@ -659,7 +659,7 @@ export function StudentDashboard() {
               </div>
             </div>
 
-            <div className="max-w-sm rounded-[26px] border border-white/15 bg-white/10 p-5 backdrop-blur-xl">
+            <div className="max-w-sm rounded-[26px] border border-white/15 bg-white/[0.08] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl lg:justify-self-end">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-[0.18em] text-blue-100">
                   Daily Mindset
@@ -674,14 +674,14 @@ export function StudentDashboard() {
         </section>
 
         {/* STATS */}
-        <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <section className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-4 sm:gap-4">
           {[
             ["🔥", "Streak", `${streak} days`],
             ["🎯", "Questions", preparationStats.total],
             ["✓", "Accuracy", `${preparationStats.accuracy}%`],
             ["📅", "Active Days", `${weeklyActiveDays}/7`],
           ].map(([icon, title, value]) => (
-            <Card dark={dark} key={title} className="p-4 sm:p-5">
+            <Card dark={dark} key={title} className="p-4 transition duration-300 hover:-translate-y-1 hover:border-indigo-400/30 sm:p-5">
               <div className="flex items-start justify-between">
                 <span className="text-xl">{icon}</span>
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
@@ -694,8 +694,8 @@ export function StudentDashboard() {
         </section>
 
         {/* TODAY'S MISSION */}
-        <section className="mt-8">
-          <Card dark={dark} className="overflow-hidden">
+        <section className="mt-9 sm:mt-10">
+          <Card dark={dark} className="overflow-hidden transition duration-300 hover:border-indigo-400/30">
             <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-2xl">
@@ -734,7 +734,7 @@ export function StudentDashboard() {
         </section>
 
         {/* PREPARATION TOOLS */}
-        <section className="mt-8">
+        <section className="mt-9 sm:mt-10">
           <SectionTitle
             dark={dark}
             title="Preparation Tools"
@@ -764,18 +764,18 @@ export function StudentDashboard() {
         </section>
 
         {/* LEARNING HUB */}
-        <section className="mt-8">
+        <section className="mt-9 sm:mt-10">
           <SectionTitle
             dark={dark}
             title="Learning Hub"
             subtitle="Learn something useful every day."
           />
 
-          <div className="grid gap-3 lg:grid-cols-12">
+          <div className="grid gap-4 lg:grid-cols-12">
             <button
               type="button"
               onClick={() => go("/student/ask")}
-              className="group relative overflow-hidden rounded-[28px] bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-700 p-6 text-left text-white shadow-xl shadow-indigo-900/20 lg:col-span-5"
+              className="group relative overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.20),transparent_35%),linear-gradient(135deg,#4338CA_0%,#5B21B6_48%,#1D4ED8_100%)] p-6 text-left text-white shadow-[0_20px_60px_rgba(67,56,202,0.24)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_26px_70px_rgba(67,56,202,0.32)] lg:col-span-5"
             >
               <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
               <div className="relative">
@@ -819,7 +819,7 @@ export function StudentDashboard() {
         </section>
 
         {/* STUDY MATERIAL */}
-        <section className="mt-8">
+        <section className="mt-9 sm:mt-10">
           <SectionTitle
             dark={dark}
             title="Study Material"
@@ -852,7 +852,7 @@ export function StudentDashboard() {
         </section>
 
         {/* YOUR PREPARATION */}
-        <section className="mt-8">
+        <section className="mt-9 sm:mt-10">
           <SectionTitle
             dark={dark}
             title="Your Preparation"
@@ -950,7 +950,7 @@ export function StudentDashboard() {
         </section>
 
         {/* FOCUS AREAS */}
-        <section className="mt-8">
+        <section className="mt-9 sm:mt-10">
           <SectionTitle
             dark={dark}
             title="Focus Areas"
@@ -1010,7 +1010,7 @@ export function StudentDashboard() {
         </section>
 
         {/* FINAL CTA */}
-        <section className="mt-8 overflow-hidden rounded-[28px] bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-white sm:p-7">
+        <section className="mt-9 overflow-hidden rounded-[30px] border border-indigo-400/15 bg-[radial-gradient(ellipse_at_top_right,rgba(99,102,241,0.20),transparent_38%),linear-gradient(120deg,#07142F_0%,#111C3D_55%,#24205A_100%)] p-6 text-white shadow-[0_20px_60px_rgba(15,23,42,0.22)] sm:mt-10 sm:rounded-[34px] sm:p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-300">
