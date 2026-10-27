@@ -21,7 +21,7 @@ import { StudentProfile } from "./pages/student/Profile";
 import Settings from "./pages/student/Settings";
 import { StudentSyllabus } from "./pages/student/Syllabus";
 import { AskVidhya } from "./pages/student/AskVidhya";
-import DailyNewspaper from "./pages/student/DailyNewspaper";
+import DailyNews from "./pages/student/DailyNews";
 import WeeklyCurrentAffairs from "./pages/student/WeeklyCurrentAffairs";
 import { CurrentAffairDetail } from "./pages/student/CurrentAffairDetail";
 import { FastRevision } from "./pages/student/FastRevision";
@@ -41,7 +41,6 @@ import MathGames from "./pages/student/MathGames";
 import { AdminLogin } from "./pages/admin/Login";
 import { AdminDashboard } from "./pages/admin/Dashboard";
 import { AdminCurrentAffairs } from "./pages/admin/AdminCurrentAffairs";
-import AdminNewspaper from "./pages/admin/AdminNewspaper";
 import AdminNCERT from "./pages/admin/AdminNCERT";
 import AdminPreviousYearPapers from "./pages/admin/AdminPreviousYearPapers";
 
@@ -105,8 +104,8 @@ export default function App() {
                     element={<CurrentAffairDetail />}
                   />
                   <Route
-                    path="student/daily-newspaper"
-                    element={<DailyNewspaper />}
+                    path="student/daily-news"
+                    element={<DailyNews />}
                   />
                   <Route
                     path="student/fast-revision"
@@ -136,13 +135,10 @@ export default function App() {
                     path="student/daily-challenge"
                     element={<DailyChallenge />}
                   />
-
-                  {/* Math Games */}
                   <Route
                     path="student/math-games"
                     element={<MathGames />}
                   />
-
                   <Route
                     path="student/short-videos"
                     element={<ShortVideos />}
@@ -172,10 +168,6 @@ export default function App() {
                   <Route
                     path="admin/current-affairs"
                     element={<AdminCurrentAffairs />}
-                  />
-                  <Route
-                    path="admin/newspaper"
-                    element={<AdminNewspaper />}
                   />
                   <Route
                     path="admin/ncert"
