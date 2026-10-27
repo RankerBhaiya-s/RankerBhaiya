@@ -413,12 +413,12 @@ export function StudentDashboard() {
       text: "Stay exam ready",
       path: "/student/current-affairs",
     },
-    {
-      icon: "🗞️",
-      title: "Daily Newspaper",
-      text: "Read smarter",
-      path: "/student/daily-newspaper",
-    },
+   {
+  icon: "📰",
+  title: "Daily News",
+  text: "Top exam-focused news every day",
+  path: "/student/daily-news",
+},
     {
       icon: "🔤",
       title: "Vocabulary",
