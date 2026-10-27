@@ -290,44 +290,45 @@ export default function Settings() {
   }, [user?.id]);
 
   /*
-   * ----------------------------------------
-   * LOAD MASTER PUSH STATUS
-   * ----------------------------------------
-   */
+ * ----------------------------------------
+ * LOAD MASTER PUSH STATUS
+ * ----------------------------------------
+ */
 
-  useEffect(() => {
-    if (!user?.id) {
+useEffect(() => {
+  if (!user?.id) {
+    setPushEnabled(false);
+    return;
+  }
+
+  // Capture the ID before entering the async function.
+  const userId = user.id;
+  let cancelled = false;
+
+  async function loadPushStatus() {
+    const { data, error } = await supabase
+      .from("study_push_subscriptions")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1);
+
+    if (cancelled) return;
+
+    if (error) {
+      console.error("Push status load error:", error);
       setPushEnabled(false);
       return;
     }
 
-    let cancelled = false;
+    setPushEnabled(Boolean(data?.length));
+  }
 
-    async function loadPushStatus() {
-      const { data, error } = await supabase
-        .from("study_push_subscriptions")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1);
+  void loadPushStatus();
 
-      if (cancelled) return;
-
-      if (error) {
-        console.error("Push status load error:", error);
-        setPushEnabled(false);
-        return;
-      }
-
-      setPushEnabled(Boolean(data?.length));
-    }
-
-    void loadPushStatus();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id]);
-
+  return () => {
+    cancelled = true;
+  };
+}, [user?.id]);
   /*
    * ----------------------------------------
    * MESSAGE
