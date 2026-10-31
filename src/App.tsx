@@ -1,4 +1,3 @@
-
 import { HashRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -22,6 +21,7 @@ import Settings from "./pages/student/Settings";
 import { StudentSyllabus } from "./pages/student/Syllabus";
 import { AskVidhya } from "./pages/student/AskVidhya";
 import DailyNews from "./pages/student/DailyNews";
+import RSSDailyNews from "./pages/student/RSSDailyNews";
 import WeeklyCurrentAffairs from "./pages/student/WeeklyCurrentAffairs";
 import { CurrentAffairDetail } from "./pages/student/CurrentAffairDetail";
 import { FastRevision } from "./pages/student/FastRevision";
@@ -41,6 +41,7 @@ import MathGames from "./pages/student/MathGames";
 import { AdminLogin } from "./pages/admin/Login";
 import { AdminDashboard } from "./pages/admin/Dashboard";
 import { AdminCurrentAffairs } from "./pages/admin/AdminCurrentAffairs";
+import AdminDailyNews from "./pages/admin/AdminDailyNews";
 import AdminNCERT from "./pages/admin/AdminNCERT";
 import AdminPreviousYearPapers from "./pages/admin/AdminPreviousYearPapers";
 
@@ -107,6 +108,13 @@ export default function App() {
                     path="student/daily-news"
                     element={<DailyNews />}
                   />
+
+                  {/* Separate RSS Daily News */}
+                  <Route
+                    path="student/rss-news"
+                    element={<RSSDailyNews />}
+                  />
+
                   <Route
                     path="student/fast-revision"
                     element={<FastRevision />}
@@ -169,6 +177,13 @@ export default function App() {
                     path="admin/current-affairs"
                     element={<AdminCurrentAffairs />}
                   />
+
+                  {/* Separate RSS Daily News Admin */}
+                  <Route
+                    path="admin/daily-news"
+                    element={<AdminDailyNews />}
+                  />
+
                   <Route
                     path="admin/ncert"
                     element={<AdminNCERT />}
