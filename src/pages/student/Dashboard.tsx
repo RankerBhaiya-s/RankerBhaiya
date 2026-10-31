@@ -1,3 +1,4 @@
+
 import {
   useCallback,
   useEffect,
@@ -104,7 +105,9 @@ function Card({
   return (
     <div
       className={`rounded-[26px] border ${
-        dark ? "border-white/[0.08] bg-[#0C1630]/90 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl" : "border-slate-200/80 bg-white/90 shadow-[0_12px_35px_rgba(30,64,175,0.05)] backdrop-blur-xl"
+        dark
+          ? "border-white/[0.08] bg-[#0C1630]/90 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl"
+          : "border-slate-200/80 bg-white/90 shadow-[0_12px_35px_rgba(30,64,175,0.05)] backdrop-blur-xl"
       } ${className}`}
     >
       {children}
@@ -413,12 +416,18 @@ export function StudentDashboard() {
       text: "Stay exam ready",
       path: "/student/current-affairs",
     },
-   {
-  icon: "📰",
-  title: "Daily News",
-  text: "Top exam-focused news every day",
-  path: "/student/daily-news",
-},
+    {
+      icon: "📰",
+      title: "Daily News",
+      text: "Top exam-focused news every day",
+      path: "/student/daily-news",
+    },
+    {
+      icon: "🌐",
+      title: "RSS Daily News",
+      text: "AI-curated latest exam news",
+      path: "/student/rss-news",
+    },
     {
       icon: "🔤",
       title: "Vocabulary",
@@ -490,7 +499,9 @@ export function StudentDashboard() {
     >
       <header
         className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
-          dark ? "border-white/[0.08] bg-[#050A18]/85 shadow-[0_8px_30px_rgba(0,0,0,0.18)]" : "border-slate-200/80 bg-white/85 shadow-sm"
+          dark
+            ? "border-white/[0.08] bg-[#050A18]/85 shadow-[0_8px_30px_rgba(0,0,0,0.18)]"
+            : "border-slate-200/80 bg-white/85 shadow-sm"
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
@@ -521,6 +532,7 @@ export function StudentDashboard() {
             >
               {enablingReminders ? "Enabling…" : "🔔 Reminders"}
             </button>
+
             <button
               type="button"
               onClick={() => fetchDashboardData(true)}
@@ -558,12 +570,16 @@ export function StudentDashboard() {
               {profileMenuOpen && (
                 <div
                   className={`absolute right-0 top-full mt-2 w-60 overflow-hidden rounded-2xl border shadow-2xl ${
-                    dark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white"
+                    dark
+                      ? "border-slate-800 bg-slate-900"
+                      : "border-slate-200 bg-white"
                   }`}
                 >
                   <div className="border-b border-slate-200/10 px-4 py-4">
                     <p className="truncate text-sm font-black">{userName}</p>
-                    <p className="mt-1 truncate text-xs text-slate-500">{user?.email}</p>
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {user?.email}
+                    </p>
                   </div>
 
                   {[
@@ -681,7 +697,11 @@ export function StudentDashboard() {
             ["✓", "Accuracy", `${preparationStats.accuracy}%`],
             ["📅", "Active Days", `${weeklyActiveDays}/7`],
           ].map(([icon, title, value]) => (
-            <Card dark={dark} key={title} className="p-4 transition duration-300 hover:-translate-y-1 hover:border-indigo-400/30 sm:p-5">
+            <Card
+              dark={dark}
+              key={title}
+              className="p-4 transition duration-300 hover:-translate-y-1 hover:border-indigo-400/30 sm:p-5"
+            >
               <div className="flex items-start justify-between">
                 <span className="text-xl">{icon}</span>
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
@@ -695,7 +715,10 @@ export function StudentDashboard() {
 
         {/* TODAY'S MISSION */}
         <section className="mt-9 sm:mt-10">
-          <Card dark={dark} className="overflow-hidden transition duration-300 hover:border-indigo-400/30">
+          <Card
+            dark={dark}
+            className="overflow-hidden transition duration-300 hover:border-indigo-400/30"
+          >
             <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-2xl">
