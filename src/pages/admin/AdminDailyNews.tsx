@@ -612,7 +612,7 @@ export default function AdminDailyNews() {
                 <label className={labelClass}>Published At</label>
                 <input
                   type="datetime-local"
-                  value={form.published_at}
+                  value={form.published_at ?? ""}
                   onChange={(e) => updateField("published_at", e.target.value)}
                   className={inputClass}
                 />
