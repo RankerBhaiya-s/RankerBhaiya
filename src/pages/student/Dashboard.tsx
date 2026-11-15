@@ -381,7 +381,6 @@ export function StudentDashboard() {
     }
   };
 
-  // Preparation Tools: Math Games included, Short Videos moved out.
   const preparationTools = [
     {
       icon: "📚",
@@ -409,6 +408,7 @@ export function StudentDashboard() {
     },
   ];
 
+  // Learning Hub: Current Affairs and Trending News.
   const learningTools = [
     {
       icon: "📰",
@@ -417,14 +417,8 @@ export function StudentDashboard() {
       path: "/student/current-affairs",
     },
     {
-      icon: "📰",
-      title: "Daily News",
-      text: "Top exam-focused news every day",
-      path: "/student/daily-news",
-    },
-    {
       icon: "🌐",
-      title: "RSS Daily News",
+      title: "Trending News",
       text: "AI-curated latest exam news",
       path: "/student/rss-news",
     },
@@ -454,7 +448,6 @@ export function StudentDashboard() {
     },
   ];
 
-  // Study Material: Short Videos added.
   const resources = [
     {
       icon: "📖",
