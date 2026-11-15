@@ -1,4 +1,3 @@
-
 import {
   useCallback,
   useEffect,
@@ -150,7 +149,11 @@ function SectionTitle({
           {title}
         </h2>
         {subtitle && (
-          <p className={`mt-1 text-xs ${dark ? "text-slate-500" : "text-slate-500"}`}>
+          <p
+            className={`mt-1 text-xs ${
+              dark ? "text-slate-500" : "text-slate-500"
+            }`}
+          >
             {subtitle}
           </p>
         )}
@@ -326,7 +329,10 @@ export function StudentDashboard() {
         }
 
         if (attemptsResponse.error) {
-          console.error("Practice attempts fetch error:", attemptsResponse.error);
+          console.error(
+            "Practice attempts fetch error:",
+            attemptsResponse.error,
+          );
           setAttempts([]);
         } else {
           const rows = attemptsResponse.data || [];
@@ -594,15 +600,18 @@ export function StudentDashboard() {
       setEnablingReminders(false);
     }
   };
-
-  const overviewItems: NavItem[] = [
+    const overviewItems: NavItem[] = [
     { icon: "⌂", title: "Dashboard", path: "/student/dashboard" },
     { icon: "📊", title: "My Progress", path: "/student/progress" },
   ];
 
   const preparationItems: NavItem[] = [
     { icon: "📅", title: "Study Planner", path: "/student/study-planner" },
-    { icon: "🎯", title: "Practice Questions", path: "/student/practice-questions" },
+    {
+      icon: "🎯",
+      title: "Practice Questions",
+      path: "/student/practice-questions",
+    },
     { icon: "⚡", title: "Daily Challenge", path: "/student/daily-challenge" },
     { icon: "🧮", title: "Math Games", path: "/student/math-games" },
   ];
@@ -614,12 +623,20 @@ export function StudentDashboard() {
     { icon: "🔤", title: "Vocabulary", path: "/student/vocabulary" },
     { icon: "💡", title: "Exam Tips", path: "/student/exam-tips" },
     { icon: "⚡", title: "Quick Revision", path: "/student/fast-revision" },
-    { icon: "✍️", title: "Handwritten Notes", path: "/student/handwritten-notes" },
+    {
+      icon: "✍️",
+      title: "Handwritten Notes",
+      path: "/student/handwritten-notes",
+    },
   ];
 
   const materialItems: NavItem[] = [
     { icon: "📖", title: "NCERT Books", path: "/student/ncert-books" },
-    { icon: "📝", title: "Previous Year Papers", path: "/student/previous-year-papers" },
+    {
+      icon: "📝",
+      title: "Previous Year Papers",
+      path: "/student/previous-year-papers",
+    },
     { icon: "🎬", title: "Short Videos", path: "/student/short-videos" },
     { icon: "📚", title: "Syllabus", path: "/student/syllabus" },
   ];
@@ -631,9 +648,17 @@ export function StudentDashboard() {
     { icon: "🔤", title: "Vocabulary", path: "/student/vocabulary" },
     { icon: "💡", title: "Exam Tips", path: "/student/exam-tips" },
     { icon: "⚡", title: "Quick Revision", path: "/student/fast-revision" },
-    { icon: "✍️", title: "Handwritten Notes", path: "/student/handwritten-notes" },
+    {
+      icon: "✍️",
+      title: "Handwritten Notes",
+      path: "/student/handwritten-notes",
+    },
     { icon: "📖", title: "NCERT Books", path: "/student/ncert-books" },
-    { icon: "📝", title: "Previous Year Papers", path: "/student/previous-year-papers" },
+    {
+      icon: "📝",
+      title: "Previous Year Papers",
+      path: "/student/previous-year-papers",
+    },
     { icon: "🎬", title: "Short Videos", path: "/student/short-videos" },
     { icon: "📚", title: "Syllabus", path: "/student/syllabus" },
     { icon: "👤", title: "My Profile", path: "/student/profile" },
@@ -670,25 +695,9 @@ export function StudentDashboard() {
     },
   ];
 
+  // News Hub has its own dedicated cards.
+  // Learning Hub contains only learning resources.
   const learningTools = [
-    {
-      icon: "📰",
-      title: "Current Affairs",
-      text: "Exam-focused updates",
-      path: "/student/current-affairs",
-    },
-    {
-      icon: "📡",
-      title: "Daily News",
-      text: "Your daily news reading",
-      path: "/student/daily-news",
-    },
-    {
-      icon: "🌐",
-      title: "Trending News",
-      text: "Latest exam-relevant news",
-      path: "/student/rss-news",
-    },
     {
       icon: "🔤",
       title: "Vocabulary",
@@ -861,25 +870,28 @@ export function StudentDashboard() {
           </div>
         ) : (
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-5">
-            {[...overviewItems, ...preparationItems, ...learningItems, ...materialItems].map(
-              (item) => (
-                <button
-                  type="button"
-                  key={item.path}
-                  title={item.title}
-                  onClick={() => go(item.path)}
-                  className={`flex h-10 w-full items-center justify-center rounded-xl text-lg ${
-                    location.pathname === item.path
-                      ? "bg-indigo-500/20 text-indigo-400"
-                      : dark
-                        ? "text-slate-400 hover:bg-white/[0.06]"
-                        : "text-slate-600 hover:bg-slate-100"
-                  }`}
-                >
-                  {item.icon}
-                </button>
-              ),
-            )}
+            {[
+              ...overviewItems,
+              ...preparationItems,
+              ...learningItems,
+              ...materialItems,
+            ].map((item) => (
+              <button
+                type="button"
+                key={item.path}
+                title={item.title}
+                onClick={() => go(item.path)}
+                className={`flex h-10 w-full items-center justify-center rounded-xl text-lg ${
+                  location.pathname === item.path
+                    ? "bg-indigo-500/20 text-indigo-400"
+                    : dark
+                      ? "text-slate-400 hover:bg-white/[0.06]"
+                      : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {item.icon}
+              </button>
+            ))}
           </div>
         )}
 
@@ -1045,8 +1057,7 @@ export function StudentDashboard() {
             {reminderMessage}
           </div>
         )}
-
-        <main className="mx-auto max-w-[1500px] px-4 py-5 pb-28 sm:px-6 sm:py-7 sm:pb-28 lg:px-8 lg:pb-10">
+                <main className="mx-auto max-w-[1500px] px-4 py-5 pb-28 sm:px-6 sm:py-7 sm:pb-28 lg:px-8 lg:pb-10">
           {/* HERO */}
           <section className="relative isolate overflow-hidden rounded-[30px] border border-indigo-300/10 bg-[radial-gradient(ellipse_at_top_right,rgba(129,140,248,0.32),transparent_35%),radial-gradient(ellipse_at_bottom_left,rgba(56,189,248,0.20),transparent_40%),linear-gradient(135deg,#07142F_0%,#172554_48%,#312E81_100%)] p-6 text-white shadow-[0_24px_80px_rgba(30,64,175,0.22)] sm:rounded-[34px] sm:p-8 lg:p-10">
             <div className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full bg-violet-400/20 blur-[80px]" />
@@ -1364,123 +1375,42 @@ export function StudentDashboard() {
                 </div>
               </button>
 
-              {/* DAILY NEWS */}
+              {/* TRENDING NEWS */}
               <button
                 type="button"
-                onClick={() => go("/student/daily-news")}
+                onClick={() => go("/student/rss-news")}
                 className={`group relative overflow-hidden rounded-[26px] border p-5 text-left transition duration-300 hover:-translate-y-1 sm:p-6 ${
                   dark
-                    ? "border-emerald-500/20 bg-gradient-to-br from-[#102E35] via-[#10242F] to-[#0C1630] hover:border-emerald-400/50"
-                    : "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white hover:border-emerald-300 hover:shadow-xl"
+                    ? "border-violet-500/20 bg-gradient-to-br from-[#24204A] via-[#171D3D] to-[#0C1630] hover:border-violet-400/50"
+                    : "border-violet-200 bg-gradient-to-br from-violet-50 to-white hover:border-violet-300 hover:shadow-xl"
                 }`}
               >
-                <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-emerald-500/15 blur-3xl" />
+                <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-violet-500/15 blur-3xl" />
 
                 <div className="relative flex items-start justify-between">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/15 text-2xl">
-                    📡
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/15 text-2xl">
+                    🌐
                   </span>
-                  <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[9px] font-black tracking-wider text-emerald-500">
-                    DAILY READ
+                  <span className="rounded-full bg-violet-500/10 px-3 py-1 text-[9px] font-black tracking-wider text-violet-400">
+                    LATEST UPDATES
                   </span>
                 </div>
 
                 <h3 className="relative mt-5 text-lg font-black">
-                  Daily News
+                  Trending News
                 </h3>
                 <p className="relative mt-2 text-xs leading-6 text-slate-500">
-                  Read daily newspaper updates and improve your awareness
-                  with structured news content.
+                  Latest news, important updates और exam-relevant घटनाओं की
+                  जानकारी एक ही जगह।
                 </p>
 
                 <div className="relative mt-5 flex items-center justify-between">
-                  <span className="text-xs font-black text-emerald-500">
-                    Explore Daily News
+                  <span className="text-xs font-black text-violet-500">
+                    Explore Trending News
                   </span>
                   <span className="transition-transform group-hover:translate-x-1">
                     →
                   </span>
-                </div>
-              </button>
-
-              {/* TRENDING NEWS FEATURED CARD */}
-              <button
-                type="button"
-                onClick={() => go("/student/rss-news")}
-                className="group relative isolate overflow-hidden rounded-[28px] border border-violet-400/25 bg-[radial-gradient(ellipse_at_top_right,rgba(167,139,250,0.30),transparent_38%),radial-gradient(ellipse_at_bottom_left,rgba(56,189,248,0.18),transparent_42%),linear-gradient(125deg,#111A3B_0%,#211B55_52%,#172554_100%)] p-5 text-left text-white shadow-[0_18px_55px_rgba(79,70,229,0.15)] transition duration-300 hover:-translate-y-1 hover:border-violet-300/50 hover:shadow-[0_25px_65px_rgba(79,70,229,0.25)] lg:col-span-2 sm:p-7"
-              >
-                <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-violet-500/20 blur-[80px]" />
-                <div className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-sky-400/15 blur-[70px]" />
-
-                <div className="relative">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-                      </span>
-                      <span className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-300">
-                        Latest Updates
-                      </span>
-                    </div>
-
-                    <span className="text-[9px] font-black tracking-[0.16em] text-violet-200/70">
-                      RANKER BHAIYA • NEWS HUB
-                    </span>
-                  </div>
-
-                  <div className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-3xl shadow-lg backdrop-blur-xl">
-                          🌐
-                        </span>
-                        <div>
-                          <h3 className="text-xl font-black sm:text-2xl">
-                            Trending News
-                          </h3>
-                          <p className="mt-1 text-[10px] font-semibold text-violet-200">
-                            आज की महत्वपूर्ण खबरें
-                          </p>
-                        </div>
-                      </div>
-
-                      <h4 className="mt-6 text-xl font-black leading-tight sm:text-2xl">
-                        Stay Ahead of the News.
-                      </h4>
-
-                      <p className="mt-2 max-w-xl text-xs leading-6 text-blue-100/80 sm:text-sm">
-                        Latest news, exam-relevant updates और महत्वपूर्ण
-                        घटनाओं की जानकारी एक ही जगह।
-                      </p>
-
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        <span className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[9px] font-bold text-blue-100">
-                          🎯 Exam Relevant
-                        </span>
-                        <span className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[9px] font-bold text-blue-100">
-                          📚 Key Facts
-                        </span>
-                        <span className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[9px] font-bold text-blue-100">
-                          🌍 Hindi + English
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex h-28 w-28 shrink-0 items-center justify-center self-center rounded-[30px] border border-white/15 bg-white/[0.07] text-6xl shadow-2xl backdrop-blur-xl transition duration-500 group-hover:rotate-6 group-hover:scale-105 sm:h-36 sm:w-36 sm:text-7xl">
-                      📰
-                    </div>
-                  </div>
-
-                  <div className="mt-7 flex items-center justify-between border-t border-white/10 pt-5">
-                    <span className="text-xs font-bold text-blue-100">
-                      Explore the latest updates
-                    </span>
-                    <span className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-[10px] font-black text-indigo-800 shadow-lg transition group-hover:-translate-y-0.5 group-hover:shadow-xl sm:text-xs">
-                      Explore Trending News
-                      <span className="text-sm">→</span>
-                    </span>
-                  </div>
                 </div>
               </button>
             </div>
@@ -1495,7 +1425,7 @@ export function StudentDashboard() {
             />
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {learningTools.slice(3).map((item) => (
+              {learningTools.map((item) => (
                 <button
                   type="button"
                   key={item.title}
@@ -1556,8 +1486,7 @@ export function StudentDashboard() {
               ))}
             </div>
           </section>
-
-          {/* PERFORMANCE ANALYTICS */}
+                            {/* PERFORMANCE ANALYTICS */}
           <section className="mt-8 sm:mt-10">
             <SectionTitle
               dark={dark}
