@@ -523,6 +523,40 @@ export function StudentDashboard() {
     };
   }, [preparationStats, weakTopics, weeklyActiveDays]);
 
+  const achievements = useMemo(() => {
+    return [
+      {
+        icon: "🔥",
+        title: "Consistency Starter",
+        description: "Complete a 3-day study streak",
+        unlocked: streak >= 3,
+      },
+      {
+        icon: "🎯",
+        title: "Practice Explorer",
+        description: "Attempt 25 practice questions",
+        unlocked: preparationStats.total >= 25,
+      },
+      {
+        icon: "🏆",
+        title: "Accuracy Champion",
+        description: "Reach 80% practice accuracy",
+        unlocked:
+          preparationStats.total >= 10 && preparationStats.accuracy >= 80,
+      },
+      {
+        icon: "📅",
+        title: "Weekly Regular",
+        description: "Study on 5 days in a week",
+        unlocked: weeklyActiveDays >= 5,
+      },
+    ];
+  }, [streak, preparationStats, weeklyActiveDays]);
+
+  const unlockedAchievements = achievements.filter(
+    (item) => item.unlocked,
+  ).length;
+
   const go = (path: string) => {
     setMobileMoreOpen(false);
     setProfileMenuOpen(false);
@@ -574,7 +608,9 @@ export function StudentDashboard() {
   ];
 
   const learningItems: NavItem[] = [
-    { icon: "📰", title: "News Hub", path: "/student/current-affairs" },
+    { icon: "📰", title: "Current Affairs", path: "/student/current-affairs" },
+    { icon: "📡", title: "Daily News", path: "/student/daily-news" },
+    { icon: "🌐", title: "Trending News", path: "/student/rss-news" },
     { icon: "🔤", title: "Vocabulary", path: "/student/vocabulary" },
     { icon: "💡", title: "Exam Tips", path: "/student/exam-tips" },
     { icon: "⚡", title: "Quick Revision", path: "/student/fast-revision" },
@@ -592,6 +628,10 @@ export function StudentDashboard() {
     { icon: "📰", title: "Current Affairs", path: "/student/current-affairs" },
     { icon: "📡", title: "Daily News", path: "/student/daily-news" },
     { icon: "🌐", title: "Trending News", path: "/student/rss-news" },
+    { icon: "🔤", title: "Vocabulary", path: "/student/vocabulary" },
+    { icon: "💡", title: "Exam Tips", path: "/student/exam-tips" },
+    { icon: "⚡", title: "Quick Revision", path: "/student/fast-revision" },
+    { icon: "✍️", title: "Handwritten Notes", path: "/student/handwritten-notes" },
     { icon: "📖", title: "NCERT Books", path: "/student/ncert-books" },
     { icon: "📝", title: "Previous Year Papers", path: "/student/previous-year-papers" },
     { icon: "🎬", title: "Short Videos", path: "/student/short-videos" },
@@ -609,28 +649,24 @@ export function StudentDashboard() {
       title: "Study Planner",
       text: "Organise your preparation",
       path: "/student/study-planner",
-      color: "indigo",
     },
     {
       icon: "🎯",
       title: "Practice Questions",
       text: "Test your understanding",
       path: "/student/practice-questions",
-      color: "blue",
     },
     {
       icon: "⚡",
       title: "Daily Challenge",
       text: "Keep your momentum",
       path: "/student/daily-challenge",
-      color: "amber",
     },
     {
       icon: "🧮",
       title: "Math Games",
       text: "Explore maths interactively",
       path: "/student/math-games",
-      color: "violet",
     },
   ];
 
@@ -824,8 +860,8 @@ export function StudentDashboard() {
             />
           </div>
         ) : (
-          <div className="flex-1 space-y-3 px-4 py-5">
-            {[...overviewItems, ...preparationItems, ...learningItems].map(
+          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-5">
+            {[...overviewItems, ...preparationItems, ...learningItems, ...materialItems].map(
               (item) => (
                 <button
                   type="button"
@@ -1083,7 +1119,7 @@ export function StudentDashboard() {
             </div>
           </section>
 
-          {/* STATS */}
+          {/* DAILY STATS */}
           <section className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-4 sm:gap-4">
             <StatCard
               dark={dark}
@@ -1280,62 +1316,177 @@ export function StudentDashboard() {
             </div>
           </section>
 
-          {/* NEWS HUB */}
+          {/* PREMIUM NEWS HUB */}
           <section className="mt-8 sm:mt-10">
             <SectionTitle
               dark={dark}
               title="News Hub"
-              subtitle="Three dedicated spaces to stay informed and exam-ready."
+              subtitle="Stay informed with dedicated news and exam-preparation resources."
             />
 
-            <div className="grid gap-3 md:grid-cols-3">
-              {learningTools.slice(0, 3).map((item, index) => (
-                <button
-                  type="button"
-                  key={item.title}
-                  onClick={() => go(item.path)}
-                  className={`group relative overflow-hidden rounded-[24px] border p-5 text-left transition duration-300 hover:-translate-y-1 ${
-                    dark
-                      ? "border-white/[0.07] bg-[#0C1630] hover:border-blue-500/40"
-                      : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-lg"
-                  }`}
-                >
-                  <div
-                    className={`pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full blur-3xl ${
-                      index === 0
-                        ? "bg-blue-500/10"
-                        : index === 1
-                          ? "bg-emerald-500/10"
-                          : "bg-violet-500/10"
-                    }`}
-                  />
-                  <div className="relative flex items-start justify-between">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-2xl">
-                      {item.icon}
-                    </span>
-                    <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-[9px] font-black text-blue-400">
-                      {index === 0
-                        ? "EXAM FOCUS"
-                        : index === 1
-                          ? "DAILY READ"
-                          : "TRENDING"}
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* CURRENT AFFAIRS */}
+              <button
+                type="button"
+                onClick={() => go("/student/current-affairs")}
+                className={`group relative overflow-hidden rounded-[26px] border p-5 text-left transition duration-300 hover:-translate-y-1 sm:p-6 ${
+                  dark
+                    ? "border-blue-500/20 bg-gradient-to-br from-[#10264A] via-[#101D3A] to-[#0C1630] hover:border-blue-400/50"
+                    : "border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:border-blue-300 hover:shadow-xl"
+                }`}
+              >
+                <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-blue-500/15 blur-3xl" />
+
+                <div className="relative flex items-start justify-between">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/15 text-2xl">
+                    📰
+                  </span>
+                  <span className="rounded-full bg-blue-500/10 px-3 py-1 text-[9px] font-black tracking-wider text-blue-400">
+                    EXAM FOCUS
+                  </span>
+                </div>
+
+                <h3 className="relative mt-5 text-lg font-black">
+                  Current Affairs
+                </h3>
+                <p className="relative mt-2 text-xs leading-6 text-slate-500">
+                  Important national and international events with key facts
+                  and exam-oriented information.
+                </p>
+
+                <div className="relative mt-5 flex items-center justify-between">
+                  <span className="text-xs font-black text-blue-500">
+                    Explore Current Affairs
+                  </span>
+                  <span className="transition-transform group-hover:translate-x-1">
+                    →
+                  </span>
+                </div>
+              </button>
+
+              {/* DAILY NEWS */}
+              <button
+                type="button"
+                onClick={() => go("/student/daily-news")}
+                className={`group relative overflow-hidden rounded-[26px] border p-5 text-left transition duration-300 hover:-translate-y-1 sm:p-6 ${
+                  dark
+                    ? "border-emerald-500/20 bg-gradient-to-br from-[#102E35] via-[#10242F] to-[#0C1630] hover:border-emerald-400/50"
+                    : "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white hover:border-emerald-300 hover:shadow-xl"
+                }`}
+              >
+                <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-emerald-500/15 blur-3xl" />
+
+                <div className="relative flex items-start justify-between">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/15 text-2xl">
+                    📡
+                  </span>
+                  <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-[9px] font-black tracking-wider text-emerald-500">
+                    DAILY READ
+                  </span>
+                </div>
+
+                <h3 className="relative mt-5 text-lg font-black">
+                  Daily News
+                </h3>
+                <p className="relative mt-2 text-xs leading-6 text-slate-500">
+                  Read daily newspaper updates and improve your awareness
+                  with structured news content.
+                </p>
+
+                <div className="relative mt-5 flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-500">
+                    Explore Daily News
+                  </span>
+                  <span className="transition-transform group-hover:translate-x-1">
+                    →
+                  </span>
+                </div>
+              </button>
+
+              {/* TRENDING NEWS FEATURED CARD */}
+              <button
+                type="button"
+                onClick={() => go("/student/rss-news")}
+                className="group relative isolate overflow-hidden rounded-[28px] border border-violet-400/25 bg-[radial-gradient(ellipse_at_top_right,rgba(167,139,250,0.30),transparent_38%),radial-gradient(ellipse_at_bottom_left,rgba(56,189,248,0.18),transparent_42%),linear-gradient(125deg,#111A3B_0%,#211B55_52%,#172554_100%)] p-5 text-left text-white shadow-[0_18px_55px_rgba(79,70,229,0.15)] transition duration-300 hover:-translate-y-1 hover:border-violet-300/50 hover:shadow-[0_25px_65px_rgba(79,70,229,0.25)] lg:col-span-2 sm:p-7"
+              >
+                <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-violet-500/20 blur-[80px]" />
+                <div className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-sky-400/15 blur-[70px]" />
+
+                <div className="relative">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5">
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                      </span>
+                      <span className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-300">
+                        Latest Updates
+                      </span>
+                    </div>
+
+                    <span className="text-[9px] font-black tracking-[0.16em] text-violet-200/70">
+                      RANKER BHAIYA • NEWS HUB
                     </span>
                   </div>
-                  <h3 className="relative mt-5 text-base font-black">
-                    {item.title}
-                  </h3>
-                  <p className="relative mt-1 text-xs text-slate-500">
-                    {item.text}
-                  </p>
-                  <div className="relative mt-5 text-xs font-black text-blue-500">
-                    Explore news →
+
+                  <div className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-3xl shadow-lg backdrop-blur-xl">
+                          🌐
+                        </span>
+                        <div>
+                          <h3 className="text-xl font-black sm:text-2xl">
+                            Trending News
+                          </h3>
+                          <p className="mt-1 text-[10px] font-semibold text-violet-200">
+                            आज की महत्वपूर्ण खबरें
+                          </p>
+                        </div>
+                      </div>
+
+                      <h4 className="mt-6 text-xl font-black leading-tight sm:text-2xl">
+                        Stay Ahead of the News.
+                      </h4>
+
+                      <p className="mt-2 max-w-xl text-xs leading-6 text-blue-100/80 sm:text-sm">
+                        Latest news, exam-relevant updates और महत्वपूर्ण
+                        घटनाओं की जानकारी एक ही जगह।
+                      </p>
+
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        <span className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[9px] font-bold text-blue-100">
+                          🎯 Exam Relevant
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[9px] font-bold text-blue-100">
+                          📚 Key Facts
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[9px] font-bold text-blue-100">
+                          🌍 Hindi + English
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex h-28 w-28 shrink-0 items-center justify-center self-center rounded-[30px] border border-white/15 bg-white/[0.07] text-6xl shadow-2xl backdrop-blur-xl transition duration-500 group-hover:rotate-6 group-hover:scale-105 sm:h-36 sm:w-36 sm:text-7xl">
+                      📰
+                    </div>
                   </div>
-                </button>
-              ))}
+
+                  <div className="mt-7 flex items-center justify-between border-t border-white/10 pt-5">
+                    <span className="text-xs font-bold text-blue-100">
+                      Explore the latest updates
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-[10px] font-black text-indigo-800 shadow-lg transition group-hover:-translate-y-0.5 group-hover:shadow-xl sm:text-xs">
+                      Explore Trending News
+                      <span className="text-sm">→</span>
+                    </span>
+                  </div>
+                </div>
+              </button>
             </div>
           </section>
 
-          {/* OTHER LEARNING TOOLS */}
+          {/* LEARNING HUB */}
           <section className="mt-8 sm:mt-10">
             <SectionTitle
               dark={dark}
@@ -1406,7 +1557,7 @@ export function StudentDashboard() {
             </div>
           </section>
 
-          {/* PERFORMANCE */}
+          {/* PERFORMANCE ANALYTICS */}
           <section className="mt-8 sm:mt-10">
             <SectionTitle
               dark={dark}
@@ -1581,6 +1732,56 @@ export function StudentDashboard() {
                 </p>
               </Card>
             )}
+          </section>
+
+          {/* WEEKLY ACHIEVEMENTS */}
+          <section className="mt-8 sm:mt-10">
+            <SectionTitle
+              dark={dark}
+              title="Weekly Achievements"
+              subtitle="Milestones from your preparation journey."
+              action={
+                <span className="rounded-full bg-violet-500/10 px-3 py-1.5 text-[10px] font-black text-violet-500">
+                  {unlockedAchievements}/{achievements.length} Unlocked
+                </span>
+              }
+            />
+
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              {achievements.map((achievement) => (
+                <Card
+                  dark={dark}
+                  key={achievement.title}
+                  className={`p-4 sm:p-5 ${
+                    achievement.unlocked
+                      ? "border-emerald-500/25"
+                      : "opacity-75"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/10 text-2xl">
+                      {achievement.icon}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-1 text-[8px] font-black ${
+                        achievement.unlocked
+                          ? "bg-emerald-500/10 text-emerald-500"
+                          : "bg-slate-500/10 text-slate-500"
+                      }`}
+                    >
+                      {achievement.unlocked ? "UNLOCKED" : "IN PROGRESS"}
+                    </span>
+                  </div>
+
+                  <h3 className="mt-4 text-xs font-black sm:text-sm">
+                    {achievement.title}
+                  </h3>
+                  <p className="mt-1 text-[10px] leading-5 text-slate-500">
+                    {achievement.description}
+                  </p>
+                </Card>
+              ))}
+            </div>
           </section>
 
           {/* FINAL CTA */}
