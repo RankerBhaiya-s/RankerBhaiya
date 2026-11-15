@@ -319,8 +319,6 @@ export default function RSSDailyNews() {
   const [activeCategory, setActiveCategory] = useState("All");
 
   const [expandedNews, setExpandedNews] = useState<string[]>([]);
-  const [expandedMcqs, setExpandedMcqs] = useState<string[]>([]);
-
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<string, string>
   >({});
@@ -777,7 +775,7 @@ export default function RSSDailyNews() {
             </div>
           )}
 
-          {filteredNews.map((item, index) => {
+          {filteredNews.map((item) => {
             const title = displayText(item.title, item.title_hi, isHindi);
             const summary = displayText(item.summary, item.summary_hi, isHindi);
             const introduction = displayText(
