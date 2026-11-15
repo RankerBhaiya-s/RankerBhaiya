@@ -45,6 +45,7 @@ import AdminDailyNews from "./pages/admin/AdminDailyNews";
 import AdminNCERT from "./pages/admin/AdminNCERT";
 import AdminPreviousYearPapers from "./pages/admin/AdminPreviousYearPapers";
 
+// Query Client
 const queryClient = new QueryClient();
 
 export default function App() {
@@ -55,55 +56,71 @@ export default function App() {
           <HashRouter>
             <Routes>
               <Route element={<RootLayout />}>
-                {/* Public */}
+                {/* ================= PUBLIC PAGES ================= */}
+
                 <Route index element={<Home />} />
+
                 <Route path="about" element={<AboutUs />} />
+
                 <Route path="contact" element={<ContactUs />} />
+
                 <Route
                   path="privacy-policy"
                   element={<PrivacyPolicy />}
                 />
 
-                {/* Student Login */}
+                {/* ================= STUDENT LOGIN ================= */}
+
                 <Route
                   path="student/login"
                   element={<StudentLogin />}
                 />
 
-                {/* Protected Student Routes */}
+                {/* ================= PROTECTED STUDENT ROUTES ================= */}
+
                 <Route element={<ProtectedRoute allowedRole="student" />}>
                   <Route
                     path="student/dashboard"
                     element={<StudentDashboard />}
                   />
+
                   <Route
                     path="student/profile"
                     element={<StudentProfile />}
                   />
+
                   <Route
                     path="student/settings"
                     element={<Settings />}
                   />
+
                   <Route
                     path="student/syllabus"
                     element={<StudentSyllabus />}
                   />
+
                   <Route
                     path="student/ask"
                     element={<AskVidhya />}
                   />
+
                   <Route
                     path="student/handwritten-notes"
                     element={<HandwrittenNotes />}
                   />
+
+                  {/* Current Affairs */}
                   <Route
                     path="student/current-affairs"
                     element={<WeeklyCurrentAffairs />}
                   />
+
                   <Route
                     path="student/current-affairs/:id"
                     element={<CurrentAffairDetail />}
                   />
+
+                  {/* Existing Daily News */}
                   <Route
                     path="student/daily-news"
                     element={<DailyNews />}
@@ -119,60 +136,73 @@ export default function App() {
                     path="student/fast-revision"
                     element={<FastRevision />}
                   />
+
                   <Route
                     path="student/vocabulary"
                     element={<Vocabulary />}
                   />
+
                   <Route
                     path="student/exam-tips"
                     element={<ExamTips />}
                   />
+
                   <Route
                     path="student/study-planner"
                     element={<StudyPlanner />}
                   />
+
                   <Route
                     path="student/practice-questions"
                     element={<PracticeQuestions />}
                   />
+
                   <Route
                     path="student/progress"
                     element={<ProgressTracker />}
                   />
+
                   <Route
                     path="student/daily-challenge"
                     element={<DailyChallenge />}
                   />
+
                   <Route
                     path="student/math-games"
                     element={<MathGames />}
                   />
+
                   <Route
                     path="student/short-videos"
                     element={<ShortVideos />}
                   />
+
                   <Route
                     path="student/ncert-books"
                     element={<NCERTBooks />}
                   />
+
                   <Route
                     path="student/previous-year-papers"
                     element={<PreviousYearPapers />}
                   />
                 </Route>
 
-                {/* Admin Login */}
+                {/* ================= ADMIN LOGIN ================= */}
+
                 <Route
                   path="admin/login"
                   element={<AdminLogin />}
                 />
 
-                {/* Protected Admin Routes */}
+                {/* ================= PROTECTED ADMIN ROUTES ================= */}
+
                 <Route element={<ProtectedRoute allowedRole="admin" />}>
                   <Route
                     path="admin/dashboard"
                     element={<AdminDashboard />}
                   />
+
                   <Route
                     path="admin/current-affairs"
                     element={<AdminCurrentAffairs />}
@@ -188,13 +218,15 @@ export default function App() {
                     path="admin/ncert"
                     element={<AdminNCERT />}
                   />
+
                   <Route
                     path="admin/previous-year-papers"
                     element={<AdminPreviousYearPapers />}
                   />
                 </Route>
 
-                {/* 404 */}
+                {/* ================= 404 ================= */}
+
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
