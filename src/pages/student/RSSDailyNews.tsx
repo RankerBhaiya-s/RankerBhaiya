@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -63,8 +62,19 @@ const CATEGORIES = [
   "Other",
 ];
 
+// Safely convert database values into strings.
+function safeText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return "";
+}
+
 function normalizeMcqs(value: unknown): MCQ[] {
-  let parsed = value;
+  let parsed: unknown = value;
 
   if (typeof parsed === "string") {
     try {
@@ -79,33 +89,32 @@ function normalizeMcqs(value: unknown): MCQ[] {
   return parsed
     .filter(
       (item): item is Record<string, unknown> =>
-        typeof item === "object" && item !== null,
+        typeof item === "object" && item !== null && !Array.isArray(item),
     )
     .map((item) => ({
-      question: typeof item.question === "string" ? item.question : "",
+      question: safeText(item.question),
       options: Array.isArray(item.options)
-        ? item.options.filter(
-            (option): option is string => typeof option === "string",
-          )
+        ? item.options.map(safeText).filter(Boolean)
         : [],
-      answer: typeof item.answer === "string" ? item.answer : "",
-      explanation:
-        typeof item.explanation === "string" ? item.explanation : "",
+      answer: safeText(item.answer),
+      explanation: safeText(item.explanation),
     }))
     .filter(
       (item) =>
-        item.question.trim() &&
+        item.question.length > 0 &&
         item.options.length > 0 &&
-        item.answer.trim(),
+        item.answer.length > 0,
     );
 }
 
-function formatDate(value: string, isHindi: boolean) {
-  if (!value) return "—";
+function formatDate(value: unknown, isHindi: boolean): string {
+  const dateValue = safeText(value);
 
-  const parsed = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (!dateValue) return "—";
 
-  if (Number.isNaN(parsed.getTime())) return value;
+  const parsed = new Date(`${dateValue.slice(0, 10)}T00:00:00`);
+
+  if (Number.isNaN(parsed.getTime())) return dateValue;
 
   return new Intl.DateTimeFormat(isHindi ? "hi-IN" : "en-IN", {
     day: "numeric",
@@ -115,48 +124,51 @@ function formatDate(value: string, isHindi: boolean) {
 }
 
 function displayText(
-  english: string | null | undefined,
-  hindi: string | null | undefined,
+  english: unknown,
+  hindi: unknown,
   isHindi: boolean,
-) {
-  if (isHindi && hindi?.trim()) return hindi;
-  return english?.trim() || "";
+): string {
+  const englishText = safeText(english);
+  const hindiText = safeText(hindi);
+
+  if (isHindi && hindiText) return hindiText;
+
+  return englishText;
 }
 
-function isCorrectAnswer(mcq: MCQ, selected: string) {
-  const answer = mcq.answer.trim().toLowerCase();
-  const chosen = selected.trim().toLowerCase();
+function isCorrectAnswer(mcq: MCQ, selected: string): boolean {
+  const answer = safeText(mcq.answer).toLowerCase();
+  const chosen = safeText(selected).toLowerCase();
 
   if (!answer || !chosen) return false;
 
-  // Answer is the exact option text.
   if (answer === chosen) return true;
 
-  // Answer is a zero-based option index.
+  // Zero-based option index.
   if (/^\d+$/.test(answer)) {
     const index = Number(answer);
 
-    if (mcq.options[index]?.trim().toLowerCase() === chosen) {
+    if (mcq.options[index] && safeText(mcq.options[index]).toLowerCase() === chosen) {
       return true;
     }
   }
 
-  // Answer is A, B, C, D or A), B), etc.
+  // A, B, C, D option labels.
   const letterMatch = answer.match(/^([a-d])(?:[\s).:-]|$)/);
 
   if (letterMatch) {
     const index = letterMatch[1].charCodeAt(0) - 97;
 
-    if (mcq.options[index]?.trim().toLowerCase() === chosen) {
+    if (mcq.options[index] && safeText(mcq.options[index]).toLowerCase() === chosen) {
       return true;
     }
   }
 
-  // Answer is an option number from 1 to 4.
+  // One-based option number.
   if (/^[1-4]$/.test(answer)) {
     const index = Number(answer) - 1;
 
-    if (mcq.options[index]?.trim().toLowerCase() === chosen) {
+    if (mcq.options[index] && safeText(mcq.options[index]).toLowerCase() === chosen) {
       return true;
     }
   }
@@ -170,20 +182,19 @@ function getErrorMessage(error: unknown): string {
   if (
     typeof error === "object" &&
     error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
+    "message" in error
   ) {
-    return error.message;
+    return safeText(error.message) || "Unknown database error";
   }
 
-  return "Unknown database error";
+  return safeText(error) || "Unknown database error";
 }
 
 export default function RSSDailyNews() {
   const navigate = useNavigate();
   const { i18n } = useTranslation();
 
-  const isHindi = i18n.language?.toLowerCase().startsWith("hi") ?? false;
+  const isHindi = safeText(i18n.language).toLowerCase().startsWith("hi");
 
   const [news, setNews] = useState<RSSNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,9 +204,7 @@ export default function RSSDailyNews() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [expandedNews, setExpandedNews] = useState<string[]>([]);
   const [expandedMcqs, setExpandedMcqs] = useState<string[]>([]);
-  const [selectedAnswers, setSelectedAnswers] = useState<
-    Record<string, string>
-  >({});
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
 
   const t = useCallback(
     (english: string, hindi: string) => (isHindi ? hindi : english),
@@ -209,8 +218,6 @@ export default function RSSDailyNews() {
     );
   }, [t]);
 
-  // Load published news.
-  // Authentication is handled by the application's protected route.
   const loadNews = useCallback(
     async (isRefresh = false) => {
       if (isRefresh) {
@@ -247,40 +254,34 @@ export default function RSSDailyNews() {
           .order("published_at", { ascending: false })
           .limit(100);
 
-        if (fetchError) {
-          throw fetchError;
-        }
+        if (fetchError) throw fetchError;
 
         const rows: RSSNewsItem[] = (data ?? []).map((row) => ({
-          id: row.id,
-          news_date: row.news_date ?? "",
-          source_name: row.source_name ?? "",
-          source_url: row.source_url ?? "",
-          published_at: row.published_at ?? null,
-          title: row.title ?? "",
-          title_hi: row.title_hi ?? "",
-          summary: row.summary ?? "",
-          summary_hi: row.summary_hi ?? "",
-          key_facts: row.key_facts ?? "",
-          key_facts_hi: row.key_facts_hi ?? "",
-          exam_point: row.exam_point ?? "",
-          exam_point_hi: row.exam_point_hi ?? "",
+          id: safeText(row.id),
+          news_date: safeText(row.news_date),
+          source_name: safeText(row.source_name),
+          source_url: safeText(row.source_url),
+          published_at:
+            typeof row.published_at === "string" ? row.published_at : null,
+          title: safeText(row.title),
+          title_hi: safeText(row.title_hi),
+          summary: safeText(row.summary),
+          summary_hi: safeText(row.summary_hi),
+          key_facts: safeText(row.key_facts),
+          key_facts_hi: safeText(row.key_facts_hi),
+          exam_point: safeText(row.exam_point),
+          exam_point_hi: safeText(row.exam_point_hi),
           mcqs: normalizeMcqs(row.mcqs),
-          category: row.category ?? "Other",
-          language: row.language ?? "english",
+          category: safeText(row.category) || "Other",
+          language: safeText(row.language) || "english",
         }));
 
         setNews(rows);
       } catch (err) {
         console.error("Trending News loading error:", err);
 
-        const message = getErrorMessage(err);
-
         setError(
-          `${t(
-            "News could not be loaded.",
-            "न्यूज़ लोड नहीं हो सकी।",
-          )} ${message}`,
+          `${t("News could not be loaded.", "न्यूज़ लोड नहीं हो सकी।")} ${getErrorMessage(err)}`,
         );
       } finally {
         setLoading(false);
@@ -297,8 +298,8 @@ export default function RSSDailyNews() {
   const availableCategories = useMemo(() => {
     const categories = new Set(
       news
-        .map((item) => item.category?.trim())
-        .filter((item): item is string => Boolean(item)),
+        .map((item) => safeText(item.category))
+        .filter(Boolean),
     );
 
     return CATEGORIES.filter(
@@ -307,7 +308,7 @@ export default function RSSDailyNews() {
   }, [news]);
 
   const filteredNews = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = safeText(search).toLowerCase();
 
     return news.filter((item) => {
       const searchable = [
@@ -322,6 +323,7 @@ export default function RSSDailyNews() {
         item.source_name,
         item.category,
       ]
+        .map(safeText)
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -363,9 +365,7 @@ export default function RSSDailyNews() {
       <main className="min-h-screen bg-slate-50 px-4 py-12 text-slate-900 dark:bg-slate-950 dark:text-white">
         <div className="mx-auto max-w-6xl animate-pulse">
           <div className="h-40 rounded-3xl bg-slate-200 dark:bg-slate-800" />
-
           <div className="mt-8 h-10 w-2/3 rounded-xl bg-slate-200 dark:bg-slate-800" />
-
           <div className="mt-5 grid gap-5 md:grid-cols-2">
             <div className="h-64 rounded-2xl bg-slate-200 dark:bg-slate-800" />
             <div className="h-64 rounded-2xl bg-slate-200 dark:bg-slate-800" />
@@ -380,11 +380,9 @@ export default function RSSDailyNews() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 dark:bg-slate-950 dark:text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-
-        {/* HERO SECTION */}
+        {/* HERO */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-800 p-6 text-white shadow-xl sm:p-9">
           <div className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-cyan-400/20 blur-3xl" />
-
           <div className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-indigo-400/20 blur-3xl" />
 
           <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
@@ -402,7 +400,6 @@ export default function RSSDailyNews() {
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-2xl">
                   📰
                 </span>
-
                 <span className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">
                   Ranker Bhaiya
                 </span>
@@ -424,11 +421,7 @@ export default function RSSDailyNews() {
               <p className="text-sm text-blue-100">
                 {t("Available news", "उपलब्ध खबरें")}
               </p>
-
-              <p className="mt-1 text-4xl font-black">
-                {news.length}
-              </p>
-
+              <p className="mt-1 text-4xl font-black">{news.length}</p>
               <p className="mt-1 text-xs text-blue-200">
                 {t("Published articles", "प्रकाशित खबरें")}
               </p>
@@ -442,7 +435,6 @@ export default function RSSDailyNews() {
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {t("Latest available date", "नवीनतम उपलब्ध तारीख")}
             </p>
-
             <p className="mt-1 font-bold">
               {latestDate
                 ? formatDate(latestDate, isHindi)
@@ -456,10 +448,7 @@ export default function RSSDailyNews() {
             disabled={refreshing}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <span aria-hidden="true">
-              {refreshing ? "⏳" : "↻"}
-            </span>
-
+            <span aria-hidden="true">{refreshing ? "⏳" : "↻"}</span>
             {refreshing
               ? t("Refreshing...", "रिफ्रेश हो रहा है...")
               : t("Refresh news", "न्यूज़ रिफ्रेश करें")}
@@ -472,7 +461,6 @@ export default function RSSDailyNews() {
             <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg">
               🔎
             </span>
-
             <input
               type="search"
               value={search}
@@ -508,20 +496,14 @@ export default function RSSDailyNews() {
           </div>
         </section>
 
-        {/* ERROR MESSAGE */}
+        {/* ERROR */}
         {error && (
           <section
             role="alert"
             className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
           >
-            <p className="font-bold">
-              {t("Loading error", "लोडिंग में समस्या")}
-            </p>
-
-            <p className="mt-2 break-words text-sm leading-6">
-              {error}
-            </p>
-
+            <p className="font-bold">{t("Loading error", "लोडिंग में समस्या")}</p>
+            <p className="mt-2 break-words text-sm leading-6">{error}</p>
             <button
               type="button"
               onClick={() => void loadNews(true)}
@@ -540,12 +522,10 @@ export default function RSSDailyNews() {
               <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
                 {t("NEWS DESK", "न्यूज़ डेस्क")}
               </p>
-
               <h2 className="mt-1 text-2xl font-black">
                 {t("Latest updates", "ताज़ा अपडेट")}
               </h2>
             </div>
-
             <span className="rounded-full bg-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
               {filteredNews.length} {t("results", "परिणाम")}
             </span>
@@ -554,13 +534,11 @@ export default function RSSDailyNews() {
           {!error && filteredNews.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center dark:border-slate-700 dark:bg-slate-900">
               <div className="text-5xl">📰</div>
-
               <h3 className="mt-4 text-xl font-bold">
                 {news.length === 0
                   ? t("News is being prepared", "खबरें तैयार की जा रही हैं")
                   : t("No matching news found", "कोई मिलती-जुलती खबर नहीं मिली")}
               </h3>
-
               <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500 dark:text-slate-400">
                 {news.length === 0
                   ? t(
@@ -572,8 +550,7 @@ export default function RSSDailyNews() {
                       "दूसरा शब्द खोजें या कोई अन्य श्रेणी चुनें।",
                     )}
               </p>
-
-              {search || activeCategory !== "All" ? (
+              {(search || activeCategory !== "All") && (
                 <button
                   type="button"
                   onClick={() => {
@@ -584,34 +561,15 @@ export default function RSSDailyNews() {
                 >
                   {t("Clear filters", "फ़िल्टर हटाएँ")}
                 </button>
-              ) : null}
+              )}
             </div>
           ) : (
             <div className="space-y-5">
               {filteredNews.map((item, index) => {
-                const title = displayText(
-                  item.title,
-                  item.title_hi,
-                  isHindi,
-                );
-
-                const summary = displayText(
-                  item.summary,
-                  item.summary_hi,
-                  isHindi,
-                );
-
-                const facts = displayText(
-                  item.key_facts,
-                  item.key_facts_hi,
-                  isHindi,
-                );
-
-                const examPoint = displayText(
-                  item.exam_point,
-                  item.exam_point_hi,
-                  isHindi,
-                );
+                const title = displayText(item.title, item.title_hi, isHindi);
+                const summary = displayText(item.summary, item.summary_hi, isHindi);
+                const facts = displayText(item.key_facts, item.key_facts_hi, isHindi);
+                const examPoint = displayText(item.exam_point, item.exam_point_hi, isHindi);
 
                 const isExpanded = expandedNews.includes(item.id);
                 const mcqsExpanded = expandedMcqs.includes(item.id);
@@ -629,17 +587,14 @@ export default function RSSDailyNews() {
                             ? CATEGORY_HI[item.category] ?? item.category
                             : item.category}
                         </span>
-
                         <span className="text-xs text-slate-500 dark:text-slate-400">
                           {formatDate(item.news_date, isHindi)}
                         </span>
-
                         {item.source_name && (
                           <span className="text-xs text-slate-500 dark:text-slate-400">
                             • {item.source_name}
                           </span>
                         )}
-
                         <span className="ml-auto text-xs font-semibold text-slate-400">
                           #{index + 1}
                         </span>
@@ -656,7 +611,6 @@ export default function RSSDailyNews() {
                           <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             {t("News summary", "खबर का सार")}
                           </p>
-
                           <p className="whitespace-pre-line text-sm leading-7 text-slate-700 dark:text-slate-200">
                             {summary}
                           </p>
@@ -670,7 +624,6 @@ export default function RSSDailyNews() {
                             <span>📌</span>
                             {t("Key facts", "मुख्य तथ्य")}
                           </p>
-
                           <p className="whitespace-pre-line text-sm leading-7 text-slate-600 dark:text-slate-300">
                             {facts}
                           </p>
@@ -683,7 +636,6 @@ export default function RSSDailyNews() {
                           <p className="mb-1 text-xs font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-200">
                             {t("Exam point", "परीक्षा बिंदु")}
                           </p>
-
                           <p className="whitespace-pre-line text-sm leading-7 text-amber-950 dark:text-amber-100">
                             {examPoint}
                           </p>
@@ -700,10 +652,7 @@ export default function RSSDailyNews() {
                           {isExpanded
                             ? t("Show less", "कम दिखाएँ")
                             : t("More details", "और जानकारी")}
-
-                          <span aria-hidden="true">
-                            {isExpanded ? "↑" : "↓"}
-                          </span>
+                          <span aria-hidden="true">{isExpanded ? "↑" : "↓"}</span>
                         </button>
 
                         {item.mcqs.length > 0 && (
@@ -713,7 +662,6 @@ export default function RSSDailyNews() {
                             className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-800"
                           >
                             <span>✍️</span>
-
                             {mcqsExpanded
                               ? t("Hide MCQs", "MCQ छिपाएँ")
                               : `${t("Practice MCQs", "MCQ अभ्यास")} (${item.mcqs.length})`}
@@ -738,17 +686,14 @@ export default function RSSDailyNews() {
                           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                             {t("News information", "खबर की जानकारी")}
                           </p>
-
                           <p className="mt-2 text-sm">
                             <strong>{t("Source:", "स्रोत:")}</strong>{" "}
                             {item.source_name || "—"}
                           </p>
-
                           <p className="mt-1 text-sm">
                             <strong>{t("Date:", "तारीख:")}</strong>{" "}
                             {formatDate(item.news_date, isHindi)}
                           </p>
-
                           {item.published_at && (
                             <p className="mt-1 text-sm">
                               <strong>{t("Published:", "प्रकाशित:")}</strong>{" "}
@@ -772,7 +717,6 @@ export default function RSSDailyNews() {
                               const mcqId = `${item.id}-${mcqIndex}`;
                               const selected = selectedAnswers[mcqId];
                               const answered = Boolean(selected);
-
                               const correct = selected
                                 ? isCorrectAnswer(mcq, selected)
                                 : false;
@@ -786,17 +730,14 @@ export default function RSSDailyNews() {
                                     <span className="mr-2 text-blue-700 dark:text-blue-300">
                                       Q{mcqIndex + 1}.
                                     </span>
-
                                     {mcq.question}
                                   </p>
 
                                   <div className="mt-4 grid gap-2">
                                     {mcq.options.map((option, optionIndex) => {
                                       const isSelected = selected === option;
-
                                       const isRightOption =
-                                        answered &&
-                                        isCorrectAnswer(mcq, option);
+                                        answered && isCorrectAnswer(mcq, option);
 
                                       let optionStyle =
                                         "border-slate-200 hover:border-blue-400 hover:bg-blue-50 dark:border-slate-700 dark:hover:bg-slate-800";
@@ -814,17 +755,12 @@ export default function RSSDailyNews() {
                                           key={`${mcqId}-${optionIndex}`}
                                           type="button"
                                           disabled={answered}
-                                          onClick={() =>
-                                            selectAnswer(mcqId, option)
-                                          }
+                                          onClick={() => selectAnswer(mcqId, option)}
                                           className={`flex items-start gap-3 rounded-xl border p-3 text-left text-sm leading-6 transition disabled:cursor-default ${optionStyle}`}
                                         >
                                           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-extrabold dark:bg-slate-800">
-                                            {String.fromCharCode(
-                                              65 + optionIndex,
-                                            )}
+                                            {String.fromCharCode(65 + optionIndex)}
                                           </span>
-
                                           <span>{option}</span>
                                         </button>
                                       );
@@ -848,11 +784,8 @@ export default function RSSDailyNews() {
                                               "उत्तर सही नहीं है। हाइलाइट किया गया उत्तर देखें।",
                                             )}
                                       </p>
-
                                       {mcq.explanation && (
-                                        <p className="mt-1">
-                                          {mcq.explanation}
-                                        </p>
+                                        <p className="mt-1">{mcq.explanation}</p>
                                       )}
                                     </div>
                                   )}
@@ -875,7 +808,6 @@ export default function RSSDailyNews() {
           <p className="font-extrabold text-blue-800 dark:text-blue-300">
             Ranker Bhaiya
           </p>
-
           <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
             {t(
               "Learn smarter. Prepare with confidence.",
