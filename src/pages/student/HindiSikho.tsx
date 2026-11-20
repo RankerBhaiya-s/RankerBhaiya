@@ -36,26 +36,22 @@ const modules: Module[] = [
     lessons: [
       {
         title: "संज्ञा",
-        content:
-          "किसी व्यक्ति, वस्तु, स्थान, प्राणी या भाव के नाम को संज्ञा कहते हैं।",
+        content: "किसी व्यक्ति, वस्तु, स्थान, प्राणी या भाव के नाम को संज्ञा कहते हैं।",
         examples: ["राम — व्यक्तिवाचक संज्ञा", "दिल्ली — स्थान का नाम", "ईमानदारी — भाववाचक संज्ञा"],
       },
       {
         title: "सर्वनाम",
-        content:
-          "संज्ञा के स्थान पर प्रयोग किए जाने वाले शब्दों को सर्वनाम कहते हैं।",
+        content: "संज्ञा के स्थान पर प्रयोग किए जाने वाले शब्दों को सर्वनाम कहते हैं।",
         examples: ["मैं", "तुम", "वह", "हम", "वे"],
       },
       {
         title: "विशेषण",
-        content:
-          "जो शब्द संज्ञा या सर्वनाम की विशेषता बताते हैं, उन्हें विशेषण कहते हैं।",
+        content: "जो शब्द संज्ञा या सर्वनाम की विशेषता बताते हैं, उन्हें विशेषण कहते हैं।",
         examples: ["सुंदर फूल", "लंबा पेड़", "मेहनती विद्यार्थी"],
       },
       {
         title: "क्रिया",
-        content:
-          "जिस शब्द से किसी काम के करने या होने का बोध होता है, उसे क्रिया कहते हैं।",
+        content: "जिस शब्द से किसी काम के करने या होने का बोध होता है, उसे क्रिया कहते हैं।",
         examples: ["राम पढ़ता है।", "बच्चे खेल रहे हैं।", "पक्षी उड़ते हैं।"],
       },
     ],
@@ -90,8 +86,7 @@ const modules: Module[] = [
     lessons: [
       {
         title: "पर्यायवाची शब्द",
-        content:
-          "समान या लगभग समान अर्थ बताने वाले शब्द पर्यायवाची कहलाते हैं।",
+        content: "समान या लगभग समान अर्थ बताने वाले शब्द पर्यायवाची कहलाते हैं।",
         examples: ["सूर्य — रवि, भानु, दिनकर", "पृथ्वी — धरती, धरा, वसुंधरा", "जल — नीर, पानी, वारि"],
       },
       {
@@ -101,8 +96,7 @@ const modules: Module[] = [
       },
       {
         title: "अनेक शब्दों के लिए एक शब्द",
-        content:
-          "कई शब्दों के स्थान पर प्रयोग होने वाला एक सार्थक शब्द इस श्रेणी में आता है।",
+        content: "कई शब्दों के स्थान पर प्रयोग होने वाला एक सार्थक शब्द इस श्रेणी में आता है।",
         examples: ["जो कभी न मरे — अमर", "जो सब कुछ जानता हो — सर्वज्ञ", "जो पढ़ा-लिखा न हो — निरक्षर"],
       },
     ],
@@ -137,20 +131,17 @@ const modules: Module[] = [
     lessons: [
       {
         title: "संधि",
-        content:
-          "दो वर्णों के मेल से होने वाले विकार को संधि कहते हैं। संधि के प्रमुख प्रकार स्वर, व्यंजन और विसर्ग संधि हैं।",
+        content: "दो वर्णों के मेल से होने वाले विकार को संधि कहते हैं। संधि के प्रमुख प्रकार स्वर, व्यंजन और विसर्ग संधि हैं।",
         examples: ["विद्या + आलय = विद्यालय", "महा + ईश = महेश", "सत् + जन = सज्जन"],
       },
       {
         title: "स्वर संधि",
-        content:
-          "जब दो स्वरों के मेल से परिवर्तन होता है, तो उसे स्वर संधि कहते हैं।",
+        content: "जब दो स्वरों के मेल से परिवर्तन होता है, तो उसे स्वर संधि कहते हैं।",
         examples: ["महा + ईश = महेश", "नर + इंद्र = नरेंद्र"],
       },
       {
         title: "समास",
-        content:
-          "दो या दो से अधिक शब्दों के मेल से बने संक्षिप्त शब्द को समास कहते हैं।",
+        content: "दो या दो से अधिक शब्दों के मेल से बने संक्षिप्त शब्द को समास कहते हैं।",
         examples: ["राजपुत्र — राजा का पुत्र", "नीलकमल — नीला है जो कमल", "माता-पिता — माता और पिता"],
       },
     ],
@@ -185,14 +176,12 @@ const modules: Module[] = [
     lessons: [
       {
         title: "मुहावरे",
-        content:
-          "ऐसा वाक्यांश जिसका अर्थ उसके सामान्य शब्दार्थ से अलग होता है, मुहावरा कहलाता है।",
+        content: "ऐसा वाक्यांश जिसका अर्थ उसके सामान्य शब्दार्थ से अलग होता है, मुहावरा कहलाता है।",
         examples: ["आँखों का तारा — बहुत प्यारा", "नाक कटना — अपमान होना", "दाँत खट्टे करना — बुरी तरह हराना"],
       },
       {
         title: "लोकोक्तियाँ",
-        content:
-          "लोक अनुभव पर आधारित प्रचलित कथन, जो किसी सीख या सत्य को व्यक्त करते हैं, लोकोक्ति कहलाते हैं।",
+        content: "लोक अनुभव पर आधारित प्रचलित कथन, जो किसी सीख या सत्य को व्यक्त करते हैं, लोकोक्ति कहलाते हैं।",
         examples: ["जैसी करनी वैसी भरनी", "एकता में बल है", "देर आए दुरुस्त आए"],
       },
     ],
@@ -227,14 +216,12 @@ const modules: Module[] = [
     lessons: [
       {
         title: "शुद्ध वर्तनी",
-        content:
-          "शब्दों को भाषा के मानक नियमों के अनुसार सही रूप में लिखना शुद्ध वर्तनी कहलाता है।",
+        content: "शब्दों को भाषा के मानक नियमों के अनुसार सही रूप में लिखना शुद्ध वर्तनी कहलाता है।",
         examples: ["आशीर्वाद", "उज्ज्वल", "कृपया", "स्वास्थ्य", "आवश्यक"],
       },
       {
         title: "सामान्य अशुद्धियाँ",
-        content:
-          "समान उच्चारण वाले शब्दों में मात्रा और अक्षरों की गलती से वर्तनी अशुद्ध हो सकती है।",
+        content: "समान उच्चारण वाले शब्दों में मात्रा और अक्षरों की गलती से वर्तनी अशुद्ध हो सकती है।",
         examples: ["आर्शीवाद ❌ → आशीर्वाद ✓", "उज्वल ❌ → उज्ज्वल ✓", "किरपया ❌ → कृपया ✓"],
       },
     ],
@@ -269,8 +256,7 @@ const modules: Module[] = [
     lessons: [
       {
         title: "Quiz कैसे खेलें?",
-        content:
-          "प्रत्येक प्रश्न के चार विकल्प होंगे। सही विकल्प चुनने पर आपको तुरंत परिणाम और उत्तर का स्पष्टीकरण मिलेगा।",
+        content: "प्रत्येक प्रश्न के चार विकल्प होंगे। सही विकल्प चुनने पर आपको तुरंत परिणाम और उत्तर का स्पष्टीकरण मिलेगा।",
         examples: ["हर सही उत्तर पर 10 अंक", "हर प्रश्न का एक सही उत्तर", "अंत में अपना स्कोर देखें"],
       },
     ],
@@ -311,8 +297,7 @@ const modules: Module[] = [
     lessons: [
       {
         title: "आज का अभ्यास",
-        content:
-          "प्रतिदिन कुछ नए शब्द, एक मुहावरा और व्याकरण का एक नियम दोहराएँ। नियमित अभ्यास से समझ मजबूत होती है।",
+        content: "प्रतिदिन कुछ नए शब्द, एक मुहावरा और व्याकरण का एक नियम दोहराएँ। नियमित अभ्यास से समझ मजबूत होती है।",
         examples: ["5 पर्यायवाची याद करें", "5 विलोम शब्द दोहराएँ", "3 MCQ हल करें"],
       },
     ],
@@ -350,7 +335,7 @@ function readProgress(): Record<string, number> {
   }
 }
 
-export default function HindiLearning() {
+export default function HindiSikho() {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const dark = theme === "dark";
@@ -361,23 +346,38 @@ export default function HindiLearning() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [quizFinished, setQuizFinished] = useState(false);
+  const [quizStarted, setQuizStarted] = useState(false);
   const [progress, setProgress] = useState<Record<string, number>>(readProgress);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
   }, [progress]);
 
-  const totalCompleted = useMemo(
+  const totalAttempts = useMemo(
     () => Object.values(progress).reduce((sum, value) => sum + value, 0),
     [progress],
   );
+
+  const completedModules = modules.filter((m) => progress[m.id] > 0).length;
 
   const totalQuestions = modules.reduce(
     (sum, module) => sum + module.questions.length,
     0,
   );
 
-  const currentQuestion = selectedModule?.questions[questionIndex];
+  const currentQuestion = quizStarted
+    ? selectedModule?.questions[questionIndex]
+    : undefined;
+
+  const pageBg = dark
+    ? "bg-[#060A16] text-white"
+    : "bg-[#F5F7FC] text-slate-900";
+
+  const panel = dark
+    ? "border-white/[0.07] bg-[#10182B]"
+    : "border-slate-200 bg-white";
+
+  const muted = dark ? "text-slate-400" : "text-slate-500";
 
   const openModule = (module: Module) => {
     setSelectedModule(module);
@@ -386,12 +386,14 @@ export default function HindiLearning() {
     setSelectedAnswer(null);
     setScore(0);
     setQuizFinished(false);
+    setQuizStarted(false);
   };
 
   const closeModule = () => {
     setSelectedModule(null);
-    setSelectedAnswer(null);
+    setQuizStarted(false);
     setQuizFinished(false);
+    setSelectedAnswer(null);
   };
 
   const startQuiz = () => {
@@ -399,6 +401,7 @@ export default function HindiLearning() {
     setSelectedAnswer(null);
     setScore(0);
     setQuizFinished(false);
+    setQuizStarted(true);
   };
 
   const chooseAnswer = (index: number) => {
@@ -426,405 +429,755 @@ export default function HindiLearning() {
     }
   };
 
-  const pageBg = dark ? "bg-[#050A18] text-white" : "bg-[#F4F7FF] text-slate-900";
-  const panel = dark
-    ? "border-white/[0.08] bg-[#0C1630]"
-    : "border-slate-200 bg-white";
+  // ================= MODULE VIEW =================
 
   if (selectedModule) {
     const lesson = selectedModule.lessons[selectedLesson];
 
     return (
       <div className={`min-h-screen ${pageBg}`}>
-        <header className={`sticky top-0 z-30 border-b px-4 py-4 backdrop-blur-xl ${
-          dark ? "border-white/10 bg-[#050A18]/90" : "border-slate-200 bg-white/90"
+        <header className={`sticky top-0 z-40 border-b backdrop-blur-xl ${
+          dark
+            ? "border-white/[0.07] bg-[#060A16]/90"
+            : "border-slate-200 bg-white/90"
         }`}>
-          <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
             <button
               onClick={closeModule}
-              className="rounded-xl border border-slate-500/20 px-4 py-2 text-xs font-bold"
+              className={`rounded-xl border px-4 py-2.5 text-xs font-bold transition hover:-translate-y-0.5 ${
+                dark
+                  ? "border-white/10 hover:bg-white/5"
+                  : "border-slate-200 hover:bg-slate-100"
+              }`}
             >
-              ← वापस जाएँ
+              ← वापस
             </button>
-            <span className="text-xs font-black">Ranker Bhaiya</span>
+
+            <div className="text-center">
+              <p className="text-sm font-black">Ranker Bhaiya</p>
+              <p className={`text-[10px] ${muted}`}>Hindi Learning</p>
+            </div>
+
             <button
               onClick={() => navigate("/student/dashboard")}
-              className="rounded-xl bg-indigo-500/10 px-3 py-2 text-xs font-bold text-indigo-500"
+              className="rounded-xl bg-indigo-500/10 px-4 py-2.5 text-xs font-bold text-indigo-500 transition hover:bg-indigo-500/20"
             >
               Dashboard
             </button>
           </div>
         </header>
 
-        <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-          <div className={`overflow-hidden rounded-[30px] bg-gradient-to-br ${selectedModule.color} p-6 text-white shadow-xl sm:p-8`}>
-            <div className="text-4xl">{selectedModule.icon}</div>
-            <p className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/70">
-              {selectedModule.subtitle}
-            </p>
-            <h1 className="mt-2 text-3xl font-black">{selectedModule.title}</h1>
-            <p className="mt-2 text-sm text-white/80">{selectedModule.description}</p>
-          </div>
+        <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <section className={`relative overflow-hidden rounded-[30px] bg-gradient-to-br ${selectedModule.color} p-6 text-white shadow-xl sm:p-9`}>
+            <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
 
-          <div className="mt-6 grid gap-5 lg:grid-cols-[260px_1fr]">
-            <aside className={`h-fit rounded-[24px] border p-4 ${panel}`}>
-              <h2 className="mb-3 text-sm font-black">पाठ चुनें</h2>
-              <div className="space-y-2">
+            <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-3xl backdrop-blur-xl">
+                  {selectedModule.icon}
+                </div>
+
+                <p className="mt-5 text-[10px] font-black uppercase tracking-[0.22em] text-white/70">
+                  {selectedModule.subtitle}
+                </p>
+
+                <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                  {selectedModule.title}
+                </h1>
+
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-white/80">
+                  {selectedModule.description}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur-xl">
+                  <p className="text-[10px] font-bold text-white/70">Lessons</p>
+                  <p className="mt-1 text-2xl font-black">{selectedModule.lessons.length}</p>
+                </div>
+                <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur-xl">
+                  <p className="text-[10px] font-bold text-white/70">Questions</p>
+                  <p className="mt-1 text-2xl font-black">{selectedModule.questions.length}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+            <aside className={`h-fit rounded-[26px] border p-5 ${panel}`}>
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-black">Learning Chapters</h2>
+                <span className="rounded-full bg-indigo-500/10 px-3 py-1 text-[10px] font-black text-indigo-500">
+                  {selectedModule.lessons.length}
+                </span>
+              </div>
+
+              <p className={`mt-2 text-xs ${muted}`}>
+                अपना lesson चुनें
+              </p>
+
+              <div className="mt-5 space-y-2">
                 {selectedModule.lessons.map((item, index) => (
                   <button
                     key={item.title}
-                    onClick={() => setSelectedLesson(index)}
-                    className={`w-full rounded-xl px-3 py-3 text-left text-xs font-bold transition ${
-                      selectedLesson === index
-                        ? "bg-indigo-600 text-white"
+                    onClick={() => {
+                      setSelectedLesson(index);
+                      setQuizStarted(false);
+                      setQuizFinished(false);
+                    }}
+                    className={`w-full rounded-2xl p-4 text-left transition ${
+                      selectedLesson === index && !quizStarted
+                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
                         : dark
-                          ? "bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]"
-                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          ? "bg-white/[0.03] hover:bg-white/[0.07]"
+                          : "bg-slate-50 hover:bg-slate-100"
                     }`}
                   >
-                    {index + 1}. {item.title}
+                    <div className="flex items-center gap-3">
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
+                        selectedLesson === index && !quizStarted
+                          ? "bg-white/15"
+                          : "bg-indigo-500/10 text-indigo-500"
+                      }`}>
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span className="text-sm font-bold">{item.title}</span>
+                    </div>
                   </button>
                 ))}
-                <button
-                  onClick={startQuiz}
-                  className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-3 py-3 text-left text-xs font-black text-white"
-                >
-                  🎯 अभ्यास Quiz शुरू करें
-                </button>
+              </div>
+
+              <button
+                onClick={startQuiz}
+                className="mt-4 w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 p-4 text-left text-white shadow-lg shadow-orange-500/10 transition hover:-translate-y-0.5"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-xl">
+                    🎯
+                  </span>
+                  <div>
+                    <p className="text-sm font-black">Practice Quiz</p>
+                    <p className="mt-1 text-[10px] text-white/80">अपना ज्ञान जाँचें</p>
+                  </div>
+                </div>
+              </button>
+
+              <div className={`mt-5 rounded-2xl p-4 ${
+                dark ? "bg-white/[0.03]" : "bg-indigo-50"
+              }`}>
+                <p className="text-[10px] font-black uppercase tracking-wider text-indigo-500">
+                  Your Attempts
+                </p>
+                <p className="mt-2 text-2xl font-black">
+                  {progress[selectedModule.id] || 0}
+                </p>
+                <p className={`mt-1 text-xs ${muted}`}>
+                  इस module में quiz attempts
+                </p>
               </div>
             </aside>
 
-            <section className={`rounded-[24px] border p-5 sm:p-7 ${panel}`}>
-              {!quizFinished && !currentQuestion && (
-                <p className="text-sm text-slate-500">इस मॉड्यूल में अभी प्रश्न उपलब्ध नहीं हैं।</p>
-              )}
-
-              <div className="mb-5 flex items-center justify-between">
-                <span className="rounded-full bg-indigo-500/10 px-3 py-1.5 text-[10px] font-black text-indigo-500">
-                  LESSON {selectedLesson + 1}
-                </span>
-                <span className="text-[10px] font-bold text-slate-500">
-                  {selectedLesson + 1}/{selectedModule.lessons.length}
-                </span>
-              </div>
-
-              <h2 className="text-2xl font-black">{lesson.title}</h2>
-              <p className="mt-4 text-sm leading-8 text-slate-500">{lesson.content}</p>
-
-              <div className={`mt-6 rounded-2xl p-5 ${
-                dark ? "bg-white/[0.04]" : "bg-indigo-50"
-              }`}>
-                <h3 className="text-sm font-black text-indigo-500">उदाहरण</h3>
-                <ul className="mt-3 space-y-3">
-                  {lesson.examples.map((example) => (
-                    <li key={example} className="flex gap-3 text-sm">
-                      <span className="font-black text-emerald-500">✓</span>
-                      <span>{example}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="mt-6 flex flex-wrap justify-between gap-3">
-                <button
-                  disabled={selectedLesson === 0}
-                  onClick={() => setSelectedLesson((value) => value - 1)}
-                  className="rounded-xl border border-slate-500/20 px-5 py-3 text-xs font-bold disabled:opacity-30"
-                >
-                  ← पिछला पाठ
-                </button>
-                <button
-                  disabled={selectedLesson === selectedModule.lessons.length - 1}
-                  onClick={() => setSelectedLesson((value) => value + 1)}
-                  className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black text-white disabled:opacity-30"
-                >
-                  अगला पाठ →
-                </button>
-              </div>
-
-              <div className={`mt-8 border-t pt-6 ${
-                dark ? "border-white/10" : "border-slate-200"
-              }`}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-black">अपनी तैयारी जाँचें</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      इस मॉड्यूल के प्रश्न हल करके अभ्यास करें।
-                    </p>
-                  </div>
-                  <button
-                    onClick={startQuiz}
-                    className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-3 text-xs font-black text-white"
-                  >
-                    Start Quiz →
-                  </button>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          {currentQuestion && (
-            <section className={`mt-6 rounded-[26px] border p-5 sm:p-7 ${panel}`}>
-              {!quizFinished ? (
-                <>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-500">
-                      Practice Quiz
+            <section className="min-w-0 space-y-6">
+              {!quizStarted && (
+                <article className={`rounded-[26px] border p-6 sm:p-8 ${panel}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="rounded-full bg-indigo-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-500">
+                      Lesson {selectedLesson + 1}
                     </span>
-                    <span className="text-xs font-bold text-slate-500">
-                      प्रश्न {questionIndex + 1}/{selectedModule.questions.length}
+                    <span className={`text-xs font-bold ${muted}`}>
+                      {selectedLesson + 1} / {selectedModule.lessons.length}
                     </span>
                   </div>
 
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-500/10">
+                  <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-slate-500/10">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all"
+                      className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all"
                       style={{
-                        width: `${((questionIndex + 1) / selectedModule.questions.length) * 100}%`,
+                        width: `${((selectedLesson + 1) / selectedModule.lessons.length) * 100}%`,
                       }}
                     />
                   </div>
 
-                  <h2 className="mt-6 text-lg font-black leading-8">
-                    {currentQuestion.question}
+                  <h2 className="mt-7 text-2xl font-black sm:text-3xl">
+                    {lesson.title}
                   </h2>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    {currentQuestion.options.map((option, index) => {
-                      const isCorrect = index === currentQuestion.answer;
-                      const isSelected = selectedAnswer === index;
+                  <p className={`mt-5 text-sm leading-8 sm:text-base ${muted}`}>
+                    {lesson.content}
+                  </p>
 
-                      let style = dark
-                        ? "border-white/10 bg-white/[0.03] hover:border-indigo-400/50"
-                        : "border-slate-200 bg-slate-50 hover:border-indigo-300";
+                  <div className={`mt-7 rounded-[24px] border p-5 sm:p-6 ${
+                    dark
+                      ? "border-indigo-500/15 bg-indigo-500/[0.05]"
+                      : "border-indigo-100 bg-indigo-50/70"
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-xl">
+                        💡
+                      </span>
+                      <h3 className="text-base font-black text-indigo-500">
+                        उदाहरण और अभ्यास
+                      </h3>
+                    </div>
 
-                      if (selectedAnswer !== null && isCorrect) {
-                        style = "border-emerald-500 bg-emerald-500/10 text-emerald-500";
-                      } else if (isSelected && !isCorrect) {
-                        style = "border-rose-500 bg-rose-500/10 text-rose-500";
-                      }
-
-                      return (
-                        <button
-                          key={option}
-                          disabled={selectedAnswer !== null}
-                          onClick={() => chooseAnswer(index)}
-                          className={`rounded-2xl border p-4 text-left text-sm font-bold transition ${style}`}
-                        >
-                          <span className="mr-3 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-500/10 text-xs">
-                            {String.fromCharCode(65 + index)}
+                    <ul className="mt-5 space-y-4">
+                      {lesson.examples.map((example, index) => (
+                        <li key={example} className="flex items-start gap-3">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-xs font-black text-emerald-500">
+                            {index + 1}
                           </span>
-                          {option}
-                        </button>
-                      );
-                    })}
+                          <span className="pt-1 text-sm font-medium leading-6">
+                            {example}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
 
-                  {selectedAnswer !== null && (
-                    <div className={`mt-5 rounded-2xl p-4 ${
-                      selectedAnswer === currentQuestion.answer
-                        ? "bg-emerald-500/10 text-emerald-500"
-                        : "bg-rose-500/10 text-rose-500"
-                    }`}>
-                      <p className="text-sm font-black">
-                        {selectedAnswer === currentQuestion.answer
-                          ? "✓ बिल्कुल सही!"
-                          : "✕ सही उत्तर: " + currentQuestion.options[currentQuestion.answer]}
+                  <div className="mt-7 flex flex-wrap justify-between gap-3">
+                    <button
+                      disabled={selectedLesson === 0}
+                      onClick={() => setSelectedLesson((value) => value - 1)}
+                      className={`rounded-xl border px-5 py-3 text-xs font-bold transition disabled:opacity-30 ${
+                        dark
+                          ? "border-white/10 hover:bg-white/5"
+                          : "border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      ← पिछला पाठ
+                    </button>
+
+                    <button
+                      disabled={selectedLesson === selectedModule.lessons.length - 1}
+                      onClick={() => setSelectedLesson((value) => value + 1)}
+                      className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black text-white shadow-lg shadow-indigo-600/15 transition hover:-translate-y-0.5 disabled:opacity-30"
+                    >
+                      अगला पाठ →
+                    </button>
+                  </div>
+                </article>
+              )}
+
+              {!quizStarted && (
+                <section className={`rounded-[26px] border p-6 sm:p-7 ${panel}`}>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">
+                        Practice Zone
                       </p>
-                      <p className="mt-2 text-xs leading-6">{currentQuestion.explanation}</p>
-                      <button
-                        onClick={nextQuestion}
-                        className="mt-4 rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black text-white"
-                      >
-                        {questionIndex === selectedModule.questions.length - 1
-                          ? "परिणाम देखें"
-                          : "अगला प्रश्न →"}
-                      </button>
+                      <h3 className="mt-2 text-xl font-black">
+                        अपनी तैयारी जाँचें
+                      </h3>
+                      <p className={`mt-2 text-xs leading-6 ${muted}`}>
+                        इस module के प्रश्न हल करें और अपना स्कोर देखें।
+                      </p>
                     </div>
-                  )}
-                </>
-              ) : (
-                <div className="py-5 text-center">
-                  <div className="text-5xl">🏆</div>
-                  <h2 className="mt-4 text-2xl font-black">Quiz पूरा हुआ!</h2>
-                  <p className="mt-2 text-sm text-slate-500">
-                    आपने {selectedModule.questions.length} प्रश्नों का अभ्यास पूरा किया।
-                  </p>
-                  <p className="mt-5 text-4xl font-black text-indigo-500">
-                    {score}/{selectedModule.questions.length * 10}
-                  </p>
-                  <p className="mt-2 text-xs font-bold text-slate-500">आपका स्कोर</p>
-                  <div className="mt-6 flex flex-wrap justify-center gap-3">
+
                     <button
                       onClick={startQuiz}
-                      className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black text-white"
+                      className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-xs font-black text-white shadow-lg shadow-indigo-500/15 transition hover:-translate-y-0.5"
                     >
-                      फिर से प्रयास करें
-                    </button>
-                    <button
-                      onClick={closeModule}
-                      className="rounded-xl border border-slate-500/20 px-5 py-3 text-xs font-bold"
-                    >
-                      सभी Modules देखें
+                      Quiz शुरू करें →
                     </button>
                   </div>
-                </div>
+                </section>
+              )}
+
+              {quizStarted && currentQuestion && (
+                <section className={`rounded-[26px] border p-6 sm:p-8 ${panel}`}>
+                  {!quizFinished ? (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="rounded-full bg-violet-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-violet-500">
+                          Practice Quiz
+                        </span>
+                        <span className={`text-xs font-bold ${muted}`}>
+                          प्रश्न {questionIndex + 1} / {selectedModule.questions.length}
+                        </span>
+                      </div>
+
+                      <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-500/10">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-500"
+                          style={{
+                            width: `${((questionIndex + 1) / selectedModule.questions.length) * 100}%`,
+                          }}
+                        />
+                      </div>
+
+                      <h2 className="mt-7 text-xl font-black leading-8 sm:text-2xl">
+                        {currentQuestion.question}
+                      </h2>
+
+                      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                        {currentQuestion.options.map((option, index) => {
+                          const isCorrect = index === currentQuestion.answer;
+                          const isSelected = selectedAnswer === index;
+
+                          let style = dark
+                            ? "border-white/10 bg-white/[0.03] hover:border-indigo-400/50"
+                            : "border-slate-200 bg-slate-50 hover:border-indigo-300";
+
+                          if (selectedAnswer !== null && isCorrect) {
+                            style = "border-emerald-500 bg-emerald-500/10 text-emerald-500";
+                          } else if (isSelected && !isCorrect) {
+                            style = "border-rose-500 bg-rose-500/10 text-rose-500";
+                          }
+
+                          return (
+                            <button
+                              key={option}
+                              disabled={selectedAnswer !== null}
+                              onClick={() => chooseAnswer(index)}
+                              className={`rounded-2xl border p-4 text-left text-sm font-bold transition ${style}`}
+                            >
+                              <span className="mr-3 inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-500/10 text-xs">
+                                {String.fromCharCode(65 + index)}
+                              </span>
+                              {option}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {selectedAnswer !== null && (
+                        <div className={`mt-6 rounded-2xl border p-5 ${
+                          selectedAnswer === currentQuestion.answer
+                            ? "border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-500"
+                            : "border-rose-500/20 bg-rose-500/[0.08] text-rose-500"
+                        }`}>
+                          <p className="font-black">
+                            {selectedAnswer === currentQuestion.answer
+                              ? "✓ बिल्कुल सही!"
+                              : "✕ सही उत्तर: " + currentQuestion.options[currentQuestion.answer]}
+                          </p>
+
+                          <p className="mt-3 text-sm leading-7">
+                            {currentQuestion.explanation}
+                          </p>
+
+                          <button
+                            onClick={nextQuestion}
+                            className="mt-5 rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black text-white"
+                          >
+                            {questionIndex === selectedModule.questions.length - 1
+                              ? "परिणाम देखें"
+                              : "अगला प्रश्न →"}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="py-8 text-center">
+                      <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[30px] bg-gradient-to-br from-amber-400 to-orange-500 text-5xl shadow-xl shadow-orange-500/20">
+                        🏆
+                      </div>
+
+                      <p className="mt-6 text-xs font-black uppercase tracking-[0.2em] text-indigo-500">
+                        Quiz Completed
+                      </p>
+
+                      <h2 className="mt-3 text-3xl font-black">
+                        शानदार प्रयास!
+                      </h2>
+
+                      <p className={`mt-3 text-sm ${muted}`}>
+                        आपने इस quiz के सभी प्रश्नों का अभ्यास पूरा किया।
+                      </p>
+
+                      <div className={`mx-auto mt-7 max-w-sm rounded-[26px] border p-6 ${panel}`}>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-indigo-500">
+                          आपका स्कोर
+                        </p>
+                        <p className="mt-3 text-5xl font-black text-indigo-500">
+                          {score}
+                          <span className={`text-2xl ${muted}`}>
+                            /{selectedModule.questions.length * 10}
+                          </span>
+                        </p>
+                        <p className={`mt-3 text-xs ${muted}`}>
+                          {Math.round((score / (selectedModule.questions.length * 10)) * 100)}% सही स्कोर
+                        </p>
+                      </div>
+
+                      <div className="mt-7 flex flex-wrap justify-center gap-3">
+                        <button
+                          onClick={startQuiz}
+                          className="rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black text-white"
+                        >
+                          फिर से प्रयास करें
+                        </button>
+
+                        <button
+                          onClick={closeModule}
+                          className={`rounded-xl border px-5 py-3 text-xs font-bold ${
+                            dark
+                              ? "border-white/10"
+                              : "border-slate-200"
+                          }`}
+                        >
+                          सभी Modules देखें
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
               )}
             </section>
-          )}
+          </div>
         </main>
 
-        <footer className="px-4 py-8 text-center text-[10px] font-semibold text-slate-500">
+        <footer className={`border-t px-4 py-8 text-center text-xs ${muted} ${
+          dark ? "border-white/[0.07]" : "border-slate-200"
+        }`}>
           Ranker Bhaiya · Aapki Mehnat, Hamari Strategy.
         </footer>
       </div>
     );
   }
 
+  // ================= MAIN DASHBOARD =================
+
   return (
     <div className={`min-h-screen ${pageBg}`}>
-      <header className={`sticky top-0 z-30 border-b px-4 py-4 backdrop-blur-xl ${
-        dark ? "border-white/10 bg-[#050A18]/90" : "border-slate-200 bg-white/90"
+      <header className={`sticky top-0 z-40 border-b backdrop-blur-xl ${
+        dark
+          ? "border-white/[0.07] bg-[#060A16]/90"
+          : "border-slate-200 bg-white/90"
       }`}>
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <button
             onClick={() => navigate("/student/dashboard")}
-            className="rounded-xl border border-slate-500/20 px-4 py-2 text-xs font-bold"
+            className={`rounded-xl border px-4 py-2.5 text-xs font-bold transition hover:-translate-y-0.5 ${
+              dark
+                ? "border-white/10 hover:bg-white/5"
+                : "border-slate-200 hover:bg-slate-100"
+            }`}
           >
             ← Dashboard
           </button>
-          <span className="text-xs font-black">Ranker Bhaiya</span>
-          <span className="text-xl">📚</span>
+
+          <div className="text-center">
+            <p className="text-sm font-black">Ranker Bhaiya</p>
+            <p className={`text-[10px] ${muted}`}>Hindi Learning Zone</p>
+          </div>
+
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-xl text-white shadow-lg">
+            📚
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-10">
-        <section className="relative isolate overflow-hidden rounded-[32px] bg-gradient-to-br from-violet-700 via-indigo-700 to-blue-700 p-6 text-white shadow-[0_24px_70px_rgba(79,70,229,0.25)] sm:p-10">
-          <div className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" />
+      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-9 lg:px-8">
+        {/* HERO */}
 
-          <div className="relative grid gap-7 lg:grid-cols-[1fr_260px] lg:items-center">
+        <section className="relative isolate overflow-hidden rounded-[32px] bg-gradient-to-br from-violet-700 via-indigo-700 to-blue-700 p-6 text-white shadow-[0_25px_80px_rgba(79,70,229,0.22)] sm:p-10 lg:p-12">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 left-1/3 h-72 w-72 rounded-full bg-cyan-300/10 blur-3xl" />
+          <div className="pointer-events-none absolute right-[20%] top-10 text-[150px] font-black text-white/[0.04] lg:text-[220px]">
+            अ
+          </div>
+
+          <div className="relative grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
             <div>
-              <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em]">
-                ✨ Hindi Learning Zone
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] backdrop-blur-xl">
+                <span className="h-2 w-2 rounded-full bg-emerald-300" />
+                Hindi Learning Zone
               </span>
-              <h1 className="mt-5 text-4xl font-black tracking-tight sm:text-5xl">
+
+              <h1 className="mt-6 text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
                 हिंदी सीखें
+                <span className="mt-2 block text-indigo-200">
+                  स्मार्ट तरीके से।
+                </span>
               </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-indigo-100 sm:text-base">
+
+              <p className="mt-5 max-w-3xl text-sm leading-8 text-indigo-100 sm:text-base">
                 व्याकरण से लेकर प्रतियोगी परीक्षा तक, हिंदी की पूरी तैयारी एक जगह।
+                सीखें, अभ्यास करें और अपनी तैयारी को मजबूत बनाएं।
               </p>
-              <button
-                onClick={() => openModule(modules[0])}
-                className="mt-6 rounded-xl bg-white px-5 py-3 text-xs font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5"
-              >
-                सीखना शुरू करें →
-              </button>
+
+              <div className="mt-7 flex flex-wrap gap-3">
+                <button
+                  onClick={() => openModule(modules[0])}
+                  className="rounded-2xl bg-white px-6 py-4 text-sm font-black text-indigo-700 shadow-xl transition hover:-translate-y-1"
+                >
+                  सीखना शुरू करें →
+                </button>
+
+                <button
+                  onClick={() => openModule(modules[6])}
+                  className="rounded-2xl border border-white/20 bg-white/10 px-6 py-4 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/20"
+                >
+                  🔥 Daily Challenge
+                </button>
+              </div>
+
+              <div className="mt-8 flex flex-wrap gap-5 text-xs font-bold text-white/70">
+                <span>✓ Interactive Lessons</span>
+                <span>✓ MCQ Practice</span>
+                <span>✓ Daily Learning</span>
+              </div>
             </div>
 
-            <div className="hidden items-center justify-center lg:flex">
-              <div className="flex h-52 w-52 rotate-3 items-center justify-center rounded-[42px] border border-white/20 bg-white/10 text-8xl shadow-2xl backdrop-blur">
-                अ
+            <div className="hidden lg:block">
+              <div className="relative mx-auto flex h-[300px] w-[300px] rotate-3 items-center justify-center rounded-[48px] border border-white/20 bg-white/[0.08] shadow-2xl backdrop-blur-xl">
+                <div className="absolute inset-5 rounded-[36px] border border-white/10" />
+                <div className="text-[150px] font-black text-white drop-shadow-xl">
+                  अ
+                </div>
+
+                <div className="absolute -left-8 top-10 rounded-2xl border border-white/15 bg-white/10 p-4 shadow-xl backdrop-blur-xl">
+                  <span className="text-2xl">📖</span>
+                </div>
+
+                <div className="absolute -right-8 bottom-10 rounded-2xl border border-white/15 bg-white/10 p-4 shadow-xl backdrop-blur-xl">
+                  <span className="text-2xl">🎯</span>
+                </div>
+
+                <div className="absolute bottom-4 left-8 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 shadow-xl backdrop-blur-xl">
+                  <p className="text-xs font-black">Learn · Practice · Grow</p>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className={`rounded-2xl border p-4 ${panel}`}>
-            <p className="text-[10px] font-bold text-slate-500">कुल Modules</p>
-            <p className="mt-2 text-2xl font-black">{modules.length}</p>
-          </div>
-          <div className={`rounded-2xl border p-4 ${panel}`}>
-            <p className="text-[10px] font-bold text-slate-500">Quiz Attempts</p>
-            <p className="mt-2 text-2xl font-black">{totalCompleted}</p>
-          </div>
-          <div className={`col-span-2 rounded-2xl border p-4 sm:col-span-1 ${panel}`}>
-            <p className="text-[10px] font-bold text-slate-500">उपलब्ध प्रश्न</p>
-            <p className="mt-2 text-2xl font-black">{totalQuestions}</p>
-          </div>
-        </section>
+        {/* STATS */}
 
-        <section className="mt-9">
-          <div className="mb-5">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500">
-              Your Learning Path
-            </p>
-            <h2 className="mt-2 text-2xl font-black">अपनी तैयारी चुनें</h2>
-            <p className="mt-2 text-xs text-slate-500">
-              किसी भी module को खोलें और सीखना शुरू करें।
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {modules.map((module, index) => (
-              <button
-                key={module.id}
-                onClick={() => openModule(module)}
-                className={`group relative overflow-hidden rounded-[25px] border p-5 text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                  dark
-                    ? "border-white/[0.08] bg-[#0C1630] hover:border-indigo-400/40"
-                    : "border-slate-200 bg-white hover:border-indigo-300"
-                }`}
-              >
-                <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${module.color}`} />
-                <div className="flex items-start justify-between">
-                  <span className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${module.color} text-2xl text-white shadow-lg`}>
-                    {module.icon}
-                  </span>
-                  <span className="rounded-full bg-indigo-500/10 px-3 py-1 text-[9px] font-black text-indigo-500">
-                    MODULE {String(index + 1).padStart(2, "0")}
-                  </span>
-                </div>
-
-                <h3 className="mt-5 text-lg font-black">{module.title}</h3>
-                <p className="mt-1 text-[10px] font-bold text-indigo-500">
-                  {module.subtitle}
-                </p>
-                <p className="mt-3 min-h-10 text-xs leading-6 text-slate-500">
-                  {module.description}
-                </p>
-
-                <div className="mt-5 flex items-center justify-between border-t border-slate-500/10 pt-4">
-                  <span className="text-[10px] font-black text-indigo-500">
-                    {module.lessons.length} Lessons · {module.questions.length} Questions
-                  </span>
-                  <span className="text-sm transition-transform group-hover:translate-x-1">→</span>
-                </div>
-
-                {progress[module.id] > 0 && (
-                  <p className="mt-3 text-[10px] font-bold text-emerald-500">
-                    ✓ Quiz completed {progress[module.id]} time(s)
+        <section className="mt-7 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[
+            {
+              label: "Learning Modules",
+              value: modules.length,
+              icon: "📚",
+              color: "from-violet-500 to-indigo-500",
+            },
+            {
+              label: "Quiz Attempts",
+              value: totalAttempts,
+              icon: "🎯",
+              color: "from-blue-500 to-cyan-500",
+            },
+            {
+              label: "Completed Modules",
+              value: completedModules,
+              icon: "🏆",
+              color: "from-emerald-500 to-teal-500",
+            },
+            {
+              label: "Available Questions",
+              value: totalQuestions,
+              icon: "✍️",
+              color: "from-orange-500 to-amber-500",
+            },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className={`group rounded-[24px] border p-5 transition hover:-translate-y-1 hover:shadow-xl sm:p-6 ${panel}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className={`text-xs font-bold ${muted}`}>
+                    {stat.label}
                   </p>
-                )}
-              </button>
-            ))}
-          </div>
+                  <p className="mt-3 text-3xl font-black tracking-tight">
+                    {stat.value}
+                  </p>
+                </div>
+
+                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${stat.color} text-2xl text-white shadow-lg`}>
+                  {stat.icon}
+                </div>
+              </div>
+            </div>
+          ))}
         </section>
 
-        <section className="mt-9 rounded-[26px] border border-indigo-500/15 bg-gradient-to-r from-indigo-600/10 to-violet-600/10 p-5 sm:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* MODULES */}
+
+        <section className="mt-10">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">
-                Daily Practice
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-500">
+                Your Learning Path
               </p>
-              <h2 className="mt-2 text-lg font-black">रोज़ थोड़ा सीखें, आगे बढ़ते रहें।</h2>
-              <p className="mt-2 text-xs leading-6 text-slate-500">
-                नियमित अभ्यास से शब्द ज्ञान और व्याकरण की समझ मजबूत करें।
+              <h2 className="mt-2 text-2xl font-black sm:text-3xl">
+                अपनी तैयारी चुनें
+              </h2>
+              <p className={`mt-2 text-sm ${muted}`}>
+                अपनी पसंद का module चुनें और अभ्यास शुरू करें।
               </p>
             </div>
-            <button
-              onClick={() => openModule(modules[6])}
-              className="shrink-0 rounded-xl bg-indigo-600 px-5 py-3 text-xs font-black text-white"
-            >
-              आज का Challenge →
-            </button>
+
+            <div className={`rounded-xl border px-4 py-3 text-xs font-bold ${panel}`}>
+              <span className="text-indigo-500">{completedModules}</span>
+              <span className={muted}> / {modules.length} Modules Completed</span>
+            </div>
           </div>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {modules.map((module, index) => {
+              const attempts = progress[module.id] || 0;
+
+              return (
+                <button
+                  key={module.id}
+                  onClick={() => openModule(module)}
+                  className={`group relative overflow-hidden rounded-[28px] border p-5 text-left transition duration-300 hover:-translate-y-1.5 hover:shadow-2xl sm:p-6 ${
+                    dark
+                      ? "border-white/[0.07] bg-[#10182B] hover:border-indigo-400/30"
+                      : "border-slate-200 bg-white hover:border-indigo-300"
+                  }`}
+                >
+                  <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${module.color}`} />
+
+                  <div className="flex items-start justify-between gap-3">
+                    <div className={`flex h-[68px] w-[68px] items-center justify-center rounded-[22px] bg-gradient-to-br ${module.color} text-3xl text-white shadow-xl transition duration-300 group-hover:scale-105`}>
+                      {module.icon}
+                    </div>
+
+                    <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${
+                      dark
+                        ? "bg-white/[0.05] text-slate-400"
+                        : "bg-slate-100 text-slate-500"
+                    }`}>
+                      MODULE {String(index + 1).padStart(2, "0")}
+                    </span>
+                  </div>
+
+                  <h3 className="mt-6 text-xl font-black">
+                    {module.title}
+                  </h3>
+
+                  <p className="mt-2 text-xs font-bold text-indigo-500">
+                    {module.subtitle}
+                  </p>
+
+                  <p className={`mt-4 min-h-[60px] text-sm leading-7 ${muted}`}>
+                    {module.description}
+                  </p>
+
+                  <div className={`mt-5 grid grid-cols-2 gap-3 ${
+                    dark ? "border-white/[0.07]" : "border-slate-100"
+                  } border-t pt-5`}>
+                    <div>
+                      <p className={`text-[10px] font-bold ${muted}`}>
+                        Lessons
+                      </p>
+                      <p className="mt-1 text-sm font-black">
+                        {module.lessons.length}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className={`text-[10px] font-bold ${muted}`}>
+                        Questions
+                      </p>
+                      <p className="mt-1 text-sm font-black">
+                        {module.questions.length}
+                      </p>
+                    </div>
+                  </div>
+
+                  {attempts > 0 && (
+                    <div className="mt-4 rounded-xl bg-emerald-500/10 px-3 py-2.5">
+                      <p className="text-xs font-bold text-emerald-500">
+                        ✓ Quiz attempted {attempts} time(s)
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex items-center justify-between">
+                    <span className="text-xs font-black text-indigo-500">
+                      सीखना शुरू करें
+                    </span>
+
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500 transition group-hover:translate-x-1 group-hover:bg-indigo-600 group-hover:text-white">
+                      →
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* DAILY CHALLENGE */}
+
+        <section className="mt-10">
+          <button
+            onClick={() => openModule(modules[6])}
+            className="group relative w-full overflow-hidden rounded-[30px] bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 p-6 text-left text-white shadow-[0_25px_60px_rgba(249,115,22,0.18)] transition hover:-translate-y-1 sm:p-8 lg:p-10"
+          >
+            <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+            <div className="pointer-events-none absolute right-10 top-10 text-8xl text-white/[0.08]">
+              🔥
+            </div>
+
+            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em]">
+                  Daily Practice
+                </span>
+
+                <h2 className="mt-5 text-2xl font-black sm:text-3xl">
+                  रोज़ थोड़ा सीखें,
+                  <span className="block">आगे बढ़ते रहें।</span>
+                </h2>
+
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-white/80">
+                  रोज़ाना छोटे अभ्यास, नए शब्द और MCQ के साथ अपनी हिंदी की तैयारी मजबूत करें।
+                </p>
+
+                <div className="mt-6 flex flex-wrap gap-3 text-xs font-bold text-white/80">
+                  <span className="rounded-xl bg-white/10 px-4 py-3">
+                    3 Questions
+                  </span>
+                  <span className="rounded-xl bg-white/10 px-4 py-3">
+                    Quick Practice
+                  </span>
+                  <span className="rounded-xl bg-white/10 px-4 py-3">
+                    Daily Learning
+                  </span>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                <div className="flex h-16 items-center justify-center rounded-2xl bg-white px-7 text-sm font-black text-orange-600 shadow-xl transition group-hover:scale-105">
+                  आज का Challenge →
+                </div>
+              </div>
+            </div>
+          </button>
+        </section>
+
+        {/* FOOTER */}
+
+        <section className={`mt-10 rounded-[24px] border p-6 text-center ${panel}`}>
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-xl text-white">
+            अ
+          </div>
+
+          <h3 className="mt-4 text-lg font-black">
+            सीखना जारी रखें
+          </h3>
+
+          <p className={`mx-auto mt-2 max-w-xl text-sm leading-7 ${muted}`}>
+            नियमित अभ्यास और निरंतर सीखने से अपनी तैयारी को बेहतर बनाएं।
+          </p>
+
+          <p className="mt-5 text-xs font-bold text-indigo-500">
+            Ranker Bhaiya · Aapki Mehnat, Hamari Strategy.
+          </p>
         </section>
       </main>
 
-      <footer className="px-4 py-8 text-center text-[10px] font-semibold text-slate-500">
-        Ranker Bhaiya · Aapki Mehnat, Hamari Strategy.
+      <footer className={`border-t px-4 py-8 text-center text-xs ${muted} ${
+        dark ? "border-white/[0.07]" : "border-slate-200"
+      }`}>
+        © Ranker Bhaiya · Hindi Learning Zone
       </footer>
     </div>
   );
