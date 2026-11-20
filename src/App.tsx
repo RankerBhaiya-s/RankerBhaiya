@@ -1,3 +1,4 @@
+
 import { HashRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -36,6 +37,7 @@ import ShortVideos from "./pages/student/ShortVideos";
 import NCERTBooks from "./pages/student/NCERTBooks";
 import PreviousYearPapers from "./pages/student/PreviousYearPapers";
 import MathGames from "./pages/student/MathGames";
+import HindiSikho from "./pages/student/HindiSikho";
 
 // Admin Pages
 import { AdminLogin } from "./pages/admin/Login";
@@ -167,9 +169,16 @@ export default function App() {
                     element={<DailyChallenge />}
                   />
 
+                  {/* Math Games */}
                   <Route
                     path="student/math-games"
                     element={<MathGames />}
+                  />
+
+                  {/* Hindi Learning */}
+                  <Route
+                    path="student/hindi-learning"
+                    element={<HindiSikho />}
                   />
 
                   <Route
