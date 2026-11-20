@@ -1,3 +1,4 @@
+
 import {
   useCallback,
   useEffect,
@@ -16,15 +17,10 @@ import { registerPushNotifications } from "../../lib/pushNotifications";
 
 type ActivityRow = {
   activity_date: string;
-  activity_type: string;
 };
 
 type PracticeAttempt = {
-  id: string;
-  user_id: string;
-  question_id: string;
   is_correct: boolean;
-  created_at: string;
   practice_questions?: {
     category: string | null;
   } | null;
@@ -33,7 +29,6 @@ type PracticeAttempt = {
 type Profile = {
   full_name?: string | null;
   class_name?: string | null;
-  board?: string | null;
   exam?: string | null;
 };
 
@@ -291,26 +286,19 @@ export function StudentDashboard() {
           await Promise.all([
             supabase
               .from("profiles")
-              .select("full_name,class_name,board,exam")
+              .select("full_name,class_name,exam")
               .eq("id", user.id)
               .maybeSingle(),
 
             supabase
               .from("student_daily_activity")
-              .select("activity_date,activity_type")
+              .select("activity_date")
               .eq("user_id", user.id)
               .order("activity_date", { ascending: false }),
 
             supabase
               .from("practice_attempts")
-              .select(`
-                id,
-                user_id,
-                question_id,
-                is_correct,
-                created_at,
-                practice_questions(category)
-              `)
+              .select("is_correct,practice_questions(category)")
               .eq("user_id", user.id)
               .order("created_at", { ascending: false }),
           ]);
@@ -339,14 +327,12 @@ export function StudentDashboard() {
 
           const normalized: PracticeAttempt[] = rows.map((row) => {
             const relation = row.practice_questions;
-            const question = Array.isArray(relation) ? relation[0] : relation;
+            const question = Array.isArray(relation)
+              ? relation[0]
+              : relation;
 
             return {
-              id: String(row.id),
-              user_id: String(row.user_id),
-              question_id: String(row.question_id),
               is_correct: Boolean(row.is_correct),
-              created_at: String(row.created_at),
               practice_questions: question
                 ? { category: question.category ?? null }
                 : null,
@@ -600,7 +586,8 @@ export function StudentDashboard() {
       setEnablingReminders(false);
     }
   };
-    const overviewItems: NavItem[] = [
+
+  const overviewItems: NavItem[] = [
     { icon: "⌂", title: "Dashboard", path: "/student/dashboard" },
     { icon: "📊", title: "My Progress", path: "/student/progress" },
   ];
@@ -614,6 +601,7 @@ export function StudentDashboard() {
     },
     { icon: "⚡", title: "Daily Challenge", path: "/student/daily-challenge" },
     { icon: "🧮", title: "Math Games", path: "/student/math-games" },
+    { icon: "अ", title: "Hindi Sikho", path: "/student/hindi-learning" },
   ];
 
   const learningItems: NavItem[] = [
@@ -653,6 +641,7 @@ export function StudentDashboard() {
       title: "Handwritten Notes",
       path: "/student/handwritten-notes",
     },
+    { icon: "अ", title: "Hindi Sikho", path: "/student/hindi-learning" },
     { icon: "📖", title: "NCERT Books", path: "/student/ncert-books" },
     {
       icon: "📝",
@@ -692,6 +681,12 @@ export function StudentDashboard() {
       title: "Math Games",
       text: "Explore maths interactively",
       path: "/student/math-games",
+    },
+    {
+      icon: "अ",
+      title: "Hindi Sikho",
+      text: "व्याकरण और हिंदी का इंटरैक्टिव अभ्यास",
+      path: "/student/hindi-learning",
     },
   ];
 
@@ -1057,7 +1052,8 @@ export function StudentDashboard() {
             {reminderMessage}
           </div>
         )}
-                <main className="mx-auto max-w-[1500px] px-4 py-5 pb-28 sm:px-6 sm:py-7 sm:pb-28 lg:px-8 lg:pb-10">
+
+        <main className="mx-auto max-w-[1500px] px-4 py-5 pb-28 sm:px-6 sm:py-7 sm:pb-28 lg:px-8 lg:pb-10">
           {/* HERO */}
           <section className="relative isolate overflow-hidden rounded-[30px] border border-indigo-300/10 bg-[radial-gradient(ellipse_at_top_right,rgba(129,140,248,0.32),transparent_35%),radial-gradient(ellipse_at_bottom_left,rgba(56,189,248,0.20),transparent_40%),linear-gradient(135deg,#07142F_0%,#172554_48%,#312E81_100%)] p-6 text-white shadow-[0_24px_80px_rgba(30,64,175,0.22)] sm:rounded-[34px] sm:p-8 lg:p-10">
             <div className="pointer-events-none absolute -right-16 -top-20 h-72 w-72 rounded-full bg-violet-400/20 blur-[80px]" />
@@ -1298,7 +1294,7 @@ export function StudentDashboard() {
               subtitle="Everything you need for focused preparation."
             />
 
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
               {preparationTools.map((item) => (
                 <button
                   type="button"
@@ -1486,7 +1482,8 @@ export function StudentDashboard() {
               ))}
             </div>
           </section>
-                            {/* PERFORMANCE ANALYTICS */}
+
+          {/* PERFORMANCE ANALYTICS */}
           <section className="mt-8 sm:mt-10">
             <SectionTitle
               dark={dark}
